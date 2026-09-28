@@ -1,0 +1,4 @@
+#!/bin/sh
+# Doucko factory: deterministic inner loop. Never bypass with --no-verify;
+# if a hook blocks a legitimate commit, fix the hook (and commit that fix).
+exec node scripts/hooks-pre-commit.mjs

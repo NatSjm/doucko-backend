@@ -1,0 +1,31 @@
+schema: spec-driven
+
+# Product-level truth lives in the docs STORE (id: doucko) — read-only here.
+# `openspec instructions` lists its specs with the exact fetch command:
+#   openspec show <spec-id> --type spec --store doucko
+# When the docs repo has a remote, switch to:
+#   - { id: doucko, remote: "<docs-clone-url>" }
+references:
+  - doucko
+
+context: |
+  Repo: Doučko BACKEND — implementation-level changes only (implement-<capability>-api).
+  Stack: Kotlin, Spring Boot 3.x, JVM 21, Maven (mvnw), Postgres 16, Flyway,
+  Spring Security (single admin, bcrypt from env), Spring Modulith, JUnit 5/Kotest,
+  Testcontainers, JaCoCo, Spotless (ktlint), openapi-generator-maven-plugin
+  (kotlin-spring, interfaceOnly) from contract/api/openapi.yaml.
+  Architecture: modular monolith, hexagonal per module, package cz.doucko.<module>
+  (content, checking [pure, no Spring], practice, progress, tutor [TutorPort],
+  storage [FileStoragePort], shared). No AI calls in MVP (TC-6).
+  Contract: the docs store, pinned as the contract/ git submodule.
+
+rules:
+  proposal:
+    - Cite the store spec (`openspec show <cap> --type spec --store doucko`) and the FR/NFR ids this backend change owns per the capability plan.
+    - If the API must change, stop — that is a docs-store contract change first, then a contract/ pin bump.
+  specs:
+    - ADDED requirements describe backend-observable behavior only (HTTP responses, persisted state, checker verdicts) and cite FR ids.
+  design:
+    - Name the module and hexagon layer for every new type; state the Flyway migration and JSONB payload types.
+  tasks:
+    - Follow factory template change.backend.md — failing tests (red) before implementation, `npm run qa:verify` + review-gate before archive.

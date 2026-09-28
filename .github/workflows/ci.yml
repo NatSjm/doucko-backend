@@ -1,0 +1,65 @@
+# Doučko backend CI — the loop nobody can skip. Adapted from upstream
+# project-factory templates/ci/github-actions.yml for Kotlin + Spring Boot +
+# Maven. If it isn't green here, it isn't done, whatever an agent claims.
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # contract/ = the docs store (requirements, plan, product specs,
+          # api/openapi.yaml) pinned as a git submodule. CI never reads an
+          # unpinned sibling checkout.
+          submodules: recursive
+          fetch-depth: 0 # trajectory + integrity checks read git history
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Contract is pinned
+        run: test -f contract/docs/requirements.md || { echo "contract/ submodule missing or empty"; exit 1; }
+
+      # --- generated reports must be committed fresh ---
+      - name: Traceability (freshness)
+        run: node scripts/check-traceability.mjs --check-fresh
+      - name: Trajectory (freshness)
+        run: node scripts/check-trajectory.mjs --check-fresh
+
+      # --- the full battery: Maven verify (compile, ktlint, unit, IT with
+      # Testcontainers, Spring Modulith boundaries, JaCoCo), coverage ratchet,
+      # acceptance join, integrity lock, OpenSpec strict validation ---
+      - name: qa-verify battery
+        run: node scripts/qa-verify.mjs
+
+      - name: Release hygiene (main only)
+        if: github.ref_name == 'main' || github.ref_name == 'master'
+        run: |
+          node scripts/check-traceability.mjs --release --strict-tests
+          node scripts/check-trajectory.mjs --release
+
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-evidence
+          path: |
+            docs/qa/
+            trace/
+            target/site/jacoco/
+            target/surefire-reports/
+            target/failsafe-reports/
+          if-no-files-found: ignore

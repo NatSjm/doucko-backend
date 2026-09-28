@@ -1,0 +1,3 @@
+#!/bin/sh
+# Doucko factory: trace trailers (Slice:/Refs:) on feature commits.
+exec node scripts/hooks-commit-msg.mjs "$1"

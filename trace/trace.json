@@ -1,0 +1,22 @@
+{
+  "generatedBy": "scripts/check-traceability.mjs",
+  "repo": "backend",
+  "contractSource": "sibling-unpinned",
+  "requirements": {},
+  "links": [],
+  "failures": [],
+  "warnings": [
+    {
+      "check": "contract",
+      "msg": "contract read from the sibling checkout ../docs (UNPINNED) — contract/ submodule is absent or empty. Fine for local work before remotes exist; CI requires the pinned submodule (git submodule add <docs-remote-url> contract). Marker: docs/requirements.md"
+    },
+    {
+      "check": "requirements",
+      "msg": "../docs/docs/requirements.md not found - FR chain checks skipped (expected before Phase 1; mandatory at --release)"
+    },
+    {
+      "check": "plan-ownership",
+      "msg": "../docs/docs/mvp-capability-plan.md not found - ownership check skipped (expected before Phase 3; mandatory at --release)"
+    }
+  ]
+}

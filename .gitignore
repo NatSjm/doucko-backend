@@ -1,0 +1,20 @@
+# build
+target/
+!.mvn/wrapper/maven-wrapper.jar
+node_modules/
+*.log
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+# secrets
+.env
+.env.*
+!.env.example
+# NFR-3 / NFR-4: runtime data and workbook content never enter a repository
+uploads/
+storage/
+pgdata/
+backups/
+*.dump

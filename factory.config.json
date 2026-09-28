@@ -1,0 +1,82 @@
+{
+  "_comment": [
+    "Doučko factory config for the BACKEND repo (Kotlin + Spring Boot + Maven).",
+    "Read by every scripts/check-*.mjs, qa-verify, gate-status and the git/Claude hooks via scripts/lib/factory-config.mjs.",
+    "GATE-BEARING: this file is hashed into factory-lock.json. Weakening the battery or a hook rule without an approved `Refs: PD-x` commit is a hard red.",
+    "{contract} resolves to the pinned contract/ submodule (the docs store), or to ../docs with a visible UNPINNED warning."
+  ],
+  "project": "doucko",
+  "repo": "backend",
+  "store": "doucko",
+  "contract": { "submodule": "contract", "sibling": "../docs" },
+  "paths": {
+    "requirements": "{contract}/docs/requirements.md",
+    "plan": "{contract}/docs/mvp-capability-plan.md",
+    "storeSpecs": "{contract}/openspec/specs",
+    "specsDir": "openspec/specs",
+    "changesDir": "openspec/changes",
+    "openapi": "{contract}/api/openapi.yaml"
+  },
+  "productCode": { "dirs": ["src/main"], "ext": "\\.(kts?|java)$", "exclude": [] },
+  "tests": { "dirs": ["src/test", "src/integrationTest"], "pattern": "(Test|Tests|IT|Spec)\\.kt$" },
+  "featureCodePattern": "^src/main/",
+  "moduleScope": { "pattern": "^src/main/kotlin/cz/doucko/([^/]+)/", "shared": ["shared", "config", "api"] },
+  "acceptanceMethods": ["local-verifiable"],
+  "gateKeysExcluded": ["recordings", "evals", "visual", "workspace", "workspaceRelease"],
+  "coverage": { "format": "jacoco-xml", "summary": "target/site/jacoco/jacoco.xml" },
+  "battery": [
+    { "name": "traceability", "command": "node", "args": ["scripts/check-traceability.mjs"] },
+    { "name": "trajectory", "command": "node", "args": ["scripts/check-trajectory.mjs"] },
+    { "name": "acceptance-artifacts", "command": "node", "args": ["scripts/check-acceptance-methods.mjs", "--mode=artifact"] },
+    { "name": "process-ratchet", "command": "node", "args": ["scripts/check-process-ratchet.mjs"] },
+    { "name": "factory-integrity", "command": "node", "args": ["scripts/check-factory-integrity.mjs"] },
+    { "name": "maven-verify", "command": "node", "args": ["scripts/mvnw.mjs", "-B", "verify"] },
+    { "name": "coverage-ratchet", "command": "node", "args": ["scripts/check-coverage-ratchet.mjs"] },
+    { "name": "openspec-all", "command": "npx", "args": ["openspec", "validate", "--all", "--strict"] },
+    { "name": "openspec-active-list", "command": "npx", "args": ["openspec", "list"] }
+  ],
+  "precommit": [
+    {
+      "name": "ktlint (spotless)",
+      "when": "\\.kts?$",
+      "requires": "pom.xml",
+      "run": "node scripts/mvnw.mjs -q spotless:check",
+      "hint": "scaffold the Spring Boot app (pom.xml + mvnw) with the spotless-maven-plugin (ktlint) first"
+    },
+    {
+      "name": "compile",
+      "when": "^src/.*\\.kts?$",
+      "requires": "pom.xml",
+      "run": "node scripts/mvnw.mjs -q test-compile",
+      "hint": "scaffold the Spring Boot app (pom.xml + mvnw) first"
+    },
+    {
+      "name": "openspec",
+      "when": "^openspec/",
+      "requires": "node_modules/.bin/openspec",
+      "run": "npx openspec validate --all --strict",
+      "hint": "npm install (pins @fission-ai/openspec)"
+    }
+  ],
+  "postEdit": [
+    {
+      "name": "ktlint (spotless)",
+      "match": "\\.kts?$",
+      "requires": "mvnw",
+      "run": "node scripts/mvnw.mjs -q spotless:check -DspotlessFiles={fileRegex}",
+      "timeoutSec": 90,
+      "hint": "Maven wrapper not generated yet"
+    }
+  ],
+  "forbidden": [
+    {
+      "pattern": "\\.pdf$",
+      "allow": "(^|/)fixtures/self-authored/",
+      "reason": "NFR-4: workbook PDFs are copyrighted and are never committed. Self-authored test PDFs go under .../fixtures/self-authored/."
+    },
+    {
+      "pattern": "(^|/)(uploads|storage|pgdata|backups?)/|\\.(dump|sql\\.gz)$",
+      "reason": "NFR-3/NFR-4: runtime data (uploaded files, DB volumes, pg_dump backups) holds the child's data and workbook content — never commit it."
+    }
+  ]
+}

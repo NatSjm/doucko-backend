@@ -1,0 +1,29 @@
+{
+  "name": "doucko-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "qa:verify": "node scripts/qa-verify.mjs",
+    "gate:status": "node scripts/gate-status.mjs",
+    "check:trace": "node scripts/check-traceability.mjs",
+    "check:trajectory": "node scripts/check-trajectory.mjs",
+    "check:acceptance": "node scripts/check-acceptance-methods.mjs --mode=existence",
+    "check:acceptance:artifact": "node scripts/check-acceptance-methods.mjs --mode=artifact",
+    "check:process": "node scripts/check-process-ratchet.mjs",
+    "check:integrity": "node scripts/check-factory-integrity.mjs",
+    "correct": "node scripts/correct.mjs",
+    "retro:digest": "node scripts/ledger-report.mjs",
+    "check": "npm run qa:verify",
+    "verify": "node scripts/mvnw.mjs -B verify",
+    "test:run": "node scripts/mvnw.mjs -q test",
+    "check:coverage": "node scripts/check-coverage-ratchet.mjs",
+    "factory:check": "node ../docs/factory/install.mjs --repo=backend --check",
+    "factory:install": "node ../docs/factory/install.mjs --repo=backend"
+  },
+  "devDependencies": {
+    "@fission-ai/openspec": "1.13.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
