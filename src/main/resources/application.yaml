@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: doucko-backend
+  datasource:
+    # Values come from the environment (.env, never committed — see .env.example).
+    url: ${DOUCKO_DB_URL:jdbc:postgresql://localhost:5432/doucko}
+    username: ${DOUCKO_DB_USER:doucko}
+    password: ${DOUCKO_DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway owns the schema (append-only migrations); Hibernate only validates it.
+      ddl-auto: validate
+  flyway:
+    locations: classpath:db/migration
+  mvc:
+    problemdetails:
+      # RFC 7807 problem responses instead of raw error pages.
+      enabled: true
+
+server:
+  error:
+    include-stacktrace: never
+    include-exception: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,modulith

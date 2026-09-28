@@ -1,6 +1,6 @@
 # Doučko — backend — Agent Rules
 
-Kotlin + Spring Boot 3 + JVM 21 + **Maven** + Postgres 16 + Flyway. One of
+Kotlin + Spring Boot 4 (ADR-0003) + JVM 21 + **Maven** + Postgres 16 + Flyway. One of
 three repos: product truth lives in the **docs store** (`../docs`, OpenSpec
 store `doucko`, pinned here as the `contract/` submodule); the UI lives in
 `../frontend`.

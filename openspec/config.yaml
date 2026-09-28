@@ -10,7 +10,7 @@ references:
 
 context: |
   Repo: Doučko BACKEND — implementation-level changes only (implement-<capability>-api).
-  Stack: Kotlin, Spring Boot 3.x, JVM 21, Maven (mvnw), Postgres 16, Flyway,
+  Stack: Kotlin, Spring Boot 4.x (ADR-0003, Jackson 3), JVM 21, Maven (mvnw), Postgres 16, Flyway,
   Spring Security (single admin, bcrypt from env), Spring Modulith, JUnit 5/Kotest,
   Testcontainers, JaCoCo, Spotless (ktlint), openapi-generator-maven-plugin
   (kotlin-spring, interfaceOnly) from contract/api/openapi.yaml.
