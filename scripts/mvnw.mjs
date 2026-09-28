@@ -7,7 +7,9 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 
 const win = process.platform === "win32";
-const wrapper = win ? "mvnw.cmd" : "./mvnw";
+// Explicit relative path: cmd.exe does not search the current directory when
+// NoDefaultCurrentDirectoryInExePath is set (agent shells set it).
+const wrapper = win ? ".\\mvnw.cmd" : "./mvnw";
 if (!existsSync(win ? "mvnw.cmd" : "mvnw")) {
   console.error(
     "mvnw: Maven wrapper not found — the backend is not scaffolded yet. Generate it (Spring Initializr: Kotlin, Maven, Java 21) " +

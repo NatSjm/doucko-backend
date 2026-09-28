@@ -41,7 +41,8 @@ npx openspec doctor
 - The machine's `java` on PATH is 1.8 and `JAVA_HOME` is JDK 26. The build works on 26, and
   `-Xjdk-release=21` keeps the API surface at 21. CI uses Temurin 21; a local JDK 21 is at
   `C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot`.
-- Agent shells set `NoDefaultCurrentDirectoryInExePath=1`, so `node scripts/mvnw.mjs` fails there
-  ("mvnw.cmd is not recognized"). Harness defect, open. Workaround: `env -u NoDefaultCurrentDirectoryInExePath …`.
+- Agent shells set `NoDefaultCurrentDirectoryInExePath=1`. Before PD-1 this made `node scripts/mvnw.mjs`
+  fail ("mvnw.cmd is not recognized"). The launcher now spawns `.\mvnw.cmd`, and `npm run verify` passed
+  with the variable set on 2026-09-28. No workaround needed (docs `f3ece43`, proposal `openspec/changes/improve-PD-1/`).
 - Until `api/openapi.yaml` exists, Maven logs "Code generation is skipped" (profile `no-sibling-contract`).
 - Boot 4 = Jackson 3 (`tools.jackson.*`; annotations stay `com.fasterxml.jackson.annotation`).
