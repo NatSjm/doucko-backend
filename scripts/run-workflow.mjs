@@ -10,6 +10,10 @@
 //       agentType -> `claude --agent <type>` (definition in .claude/agents/,
 //       which brings its own tools); untyped steps get --untyped-tools
 //       (default read-only: Read,Grep,Glob). schema -> `--json-schema`.
+//       PD-13: `--agent` makes the CLI ignore `--json-schema` (no
+//       structured_output, the agent answers in its own markdown), so a typed
+//       step WITH a schema inlines the definition instead: its body via
+//       --append-system-prompt and its frontmatter `tools:` via --tools.
 //   parallel([() => promise, ...])      -> Promise.all over the thunks
 //   pipeline(items, stage1, stage2, ..) -> each item flows through the stages
 //       concurrently; stage n>1 receives (previousResult, item, index)
@@ -162,6 +166,19 @@ function runClaude(cmdArgs, prompt) {
   });
 }
 
+// PD-13: an agent definition split into frontmatter `tools:` and its prompt body.
+function agentDefinition(type) {
+  const text = readFileSync(join(root, ".claude", "agents", `${type}.md`), "utf8").replace(/\r\n/g, "\n");
+  const m = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  const front = m?.[1] ?? "";
+  const tools = front.match(/^tools:\s*(.+)$/m)?.[1].split(",").map((t) => t.trim()).filter(Boolean).join(",") || UNTYPED_TOOLS;
+  const body = (m?.[2] ?? text).trim();
+  return {
+    tools,
+    prompt: `${body}\n\nThis run requests a JSON schema: deliver your output contract through the structured output, not as prose.`,
+  };
+}
+
 function parseStructured(j) {
   if (j.structured_output !== undefined && j.structured_output !== null) return j.structured_output;
   const text = String(j.result ?? "").trim();
@@ -193,7 +210,10 @@ async function agent(prompt, opts = {}) {
       return null;
     }
     const cmd = ["-p", "--output-format", "json", "--no-session-persistence", "--permission-mode", PERMISSION_MODE, "--max-budget-usd", String(BUDGET_PER_AGENT)];
-    if (opts.agentType) cmd.push("--agent", opts.agentType);
+    if (opts.agentType && opts.schema) {
+      const def = agentDefinition(opts.agentType);
+      cmd.push("--tools", def.tools, "--append-system-prompt", def.prompt);
+    } else if (opts.agentType) cmd.push("--agent", opts.agentType);
     else cmd.push("--tools", UNTYPED_TOOLS);
     if (opts.schema) cmd.push("--json-schema", JSON.stringify(opts.schema));
     if (MODEL) cmd.push("--model", MODEL);

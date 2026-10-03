@@ -1,6 +1,6 @@
 {
-  "createdAt": "2026-10-03T23:13:39.054Z",
-  "gitHead": "3f3a1f70db8f61705085a50775aa34ac46d69ca7",
+  "createdAt": "2026-10-03T23:30:40.738Z",
+  "gitHead": "69ea34355d323c9d40100011b8f047e3b9bf31a1",
   "files": {
     ".claude/workflows/review-gate.js": "7295d8e94ba347213120b9d190b9ebbb88dee373173cfc7daba2114b726ca76b",
     ".claude/workflows/trajectory-eval.js": "ea229b3a57f6e0723c27e9f3148fdd5df17181225349d8b0770dc346efe47715",
@@ -8,7 +8,8 @@
     ".githooks/pre-commit": "dffa1154686e27f1fa24323e95371be4ada9cbbe096580049be113dc8e08ce06",
     ".github/workflows/ci.yml": "6ab8b2594bdac751b40a2e90e064f5ee567fc041a8b1fd91c04e164f046d3416",
     "factory.config.json": "c83fa947d94cc98766b665d63e7ff78e5084dc109238f93edbb652bc978c96f5",
-    "quality/process-baseline.json": "c4138cf68d31420931034e59d580cc4db6fdd08550de95347c7396bd9b2923d5",
+    "quality/coverage-baseline.json": "bd1677260180e29450421fc142ef186ddfc5aeb812effd28ec6cd2d0d21464d5",
+    "quality/process-baseline.json": "d14c53a770ed09fd9689de6eef85f22e6c61ae02216f955f0e82e473b0a96f1e",
     "quality/telemetry.config.json": "98276dbbd18f9d694f3378aed7ecc042439d99c8e292bb3caeed7a833005835b",
     "scripts/check-acceptance-methods.mjs": "1f7ce3e924b64a93a4b0b63ffa36bf6bdc16fa5ffb19caf6621fac7aea54fc39",
     "scripts/check-coverage-ratchet.mjs": "99acb7e873845655fa21c202a199e57716757e269f5209d25d8315458ede9e33",
