@@ -18,7 +18,8 @@
     "test:run": "node scripts/mvnw.mjs -q test",
     "check:coverage": "node scripts/check-coverage-ratchet.mjs",
     "factory:check": "node ../docs/factory/install.mjs --repo=backend --check",
-    "factory:install": "node ../docs/factory/install.mjs --repo=backend"
+    "factory:install": "node ../docs/factory/install.mjs --repo=backend",
+    "workflow": "node scripts/run-workflow.mjs"
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.13.2"

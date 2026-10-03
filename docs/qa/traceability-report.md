@@ -5,58 +5,58 @@ requirements/spec/test/recording change; CI runs `--check-fresh`.
 
 Repo: backend (contract: sibling-unpinned).
 Scope: 48 MVP functional requirements, 0 owned by backend.
-Result: SKIP-pending (no product spec yet - the FR -> spec chain is unchecked), 51 warning(s)
+Result: PASS, 3 warning(s)
 
 | FR | Spec | Plan | Owner repo(s) | Test trace here | Recording here |
 |---|---|---|---|---|---|
-| FR-1 | **MISSING** | n/a | - | n/a | n/a |
-| FR-2 | **MISSING** | n/a | - | n/a | n/a |
-| FR-3 | **MISSING** | n/a | - | n/a | n/a |
-| FR-4 | **MISSING** | n/a | - | n/a | n/a |
-| FR-5 | **MISSING** | n/a | - | n/a | n/a |
-| FR-6 | **MISSING** | n/a | - | n/a | n/a |
-| FR-7 | **MISSING** | n/a | - | n/a | n/a |
-| FR-8 | **MISSING** | n/a | - | n/a | n/a |
-| FR-9 | **MISSING** | n/a | - | n/a | n/a |
-| FR-10 | **MISSING** | n/a | - | n/a | n/a |
-| FR-11 | **MISSING** | n/a | - | n/a | n/a |
-| FR-12 | **MISSING** | n/a | - | n/a | n/a |
-| FR-13 | **MISSING** | n/a | - | n/a | n/a |
-| FR-55 | **MISSING** | n/a | - | n/a | n/a |
-| FR-56 | **MISSING** | n/a | - | n/a | n/a |
-| FR-57 | **MISSING** | n/a | - | n/a | n/a |
-| FR-14 | **MISSING** | n/a | - | n/a | n/a |
-| FR-15 | **MISSING** | n/a | - | n/a | n/a |
-| FR-16 | **MISSING** | n/a | - | n/a | n/a |
-| FR-17 | **MISSING** | n/a | - | n/a | n/a |
-| FR-18 | **MISSING** | n/a | - | n/a | n/a |
-| FR-19 | **MISSING** | n/a | - | n/a | n/a |
-| FR-20 | **MISSING** | n/a | - | n/a | n/a |
-| FR-21 | **MISSING** | n/a | - | n/a | n/a |
-| FR-22 | **MISSING** | n/a | - | n/a | n/a |
-| FR-23 | **MISSING** | n/a | - | n/a | n/a |
-| FR-24 | **MISSING** | n/a | - | n/a | n/a |
-| FR-25 | **MISSING** | n/a | - | n/a | n/a |
-| FR-26 | **MISSING** | n/a | - | n/a | n/a |
-| FR-27 | **MISSING** | n/a | - | n/a | n/a |
-| FR-28 | **MISSING** | n/a | - | n/a | n/a |
-| FR-29 | **MISSING** | n/a | - | n/a | n/a |
-| FR-30 | **MISSING** | n/a | - | n/a | n/a |
-| FR-31 | **MISSING** | n/a | - | n/a | n/a |
-| FR-32 | **MISSING** | n/a | - | n/a | n/a |
-| FR-33 | **MISSING** | n/a | - | n/a | n/a |
-| FR-34 | **MISSING** | n/a | - | n/a | n/a |
-| FR-35 | **MISSING** | n/a | - | n/a | n/a |
-| FR-36 | **MISSING** | n/a | - | n/a | n/a |
-| FR-37 | **MISSING** | n/a | - | n/a | n/a |
-| FR-38 | **MISSING** | n/a | - | n/a | n/a |
-| FR-39 | **MISSING** | n/a | - | n/a | n/a |
-| FR-58 | **MISSING** | n/a | - | n/a | n/a |
-| FR-40 | **MISSING** | n/a | - | n/a | n/a |
-| FR-41 | **MISSING** | n/a | - | n/a | n/a |
-| FR-42 | **MISSING** | n/a | - | n/a | n/a |
-| FR-43 | **MISSING** | n/a | - | n/a | n/a |
-| FR-44 | **MISSING** | n/a | - | n/a | n/a |
+| FR-1 | yes | n/a | - | n/a | n/a |
+| FR-2 | yes | n/a | - | n/a | n/a |
+| FR-3 | yes | n/a | - | n/a | n/a |
+| FR-4 | yes | n/a | - | n/a | n/a |
+| FR-5 | yes | n/a | - | n/a | n/a |
+| FR-6 | yes | n/a | - | n/a | n/a |
+| FR-7 | yes | n/a | - | n/a | n/a |
+| FR-8 | yes | n/a | - | n/a | n/a |
+| FR-9 | yes | n/a | - | n/a | n/a |
+| FR-10 | yes | n/a | - | n/a | n/a |
+| FR-11 | yes | n/a | - | n/a | n/a |
+| FR-12 | yes | n/a | - | n/a | n/a |
+| FR-13 | yes | n/a | - | n/a | n/a |
+| FR-55 | yes | n/a | - | n/a | n/a |
+| FR-56 | yes | n/a | - | n/a | n/a |
+| FR-57 | yes | n/a | - | n/a | n/a |
+| FR-14 | yes | n/a | - | n/a | n/a |
+| FR-15 | yes | n/a | - | n/a | n/a |
+| FR-16 | yes | n/a | - | n/a | n/a |
+| FR-17 | yes | n/a | - | n/a | n/a |
+| FR-18 | yes | n/a | - | n/a | n/a |
+| FR-19 | yes | n/a | - | n/a | n/a |
+| FR-20 | yes | n/a | - | n/a | n/a |
+| FR-21 | yes | n/a | - | n/a | n/a |
+| FR-22 | yes | n/a | - | n/a | n/a |
+| FR-23 | yes | n/a | - | n/a | n/a |
+| FR-24 | yes | n/a | - | n/a | n/a |
+| FR-25 | yes | n/a | - | n/a | n/a |
+| FR-26 | yes | n/a | - | n/a | n/a |
+| FR-27 | yes | n/a | - | n/a | n/a |
+| FR-28 | yes | n/a | - | n/a | n/a |
+| FR-29 | yes | n/a | - | n/a | n/a |
+| FR-30 | yes | n/a | - | n/a | n/a |
+| FR-31 | yes | n/a | - | n/a | n/a |
+| FR-32 | yes | n/a | - | n/a | n/a |
+| FR-33 | yes | n/a | - | n/a | n/a |
+| FR-34 | yes | n/a | - | n/a | n/a |
+| FR-35 | yes | n/a | - | n/a | n/a |
+| FR-36 | yes | n/a | - | n/a | n/a |
+| FR-37 | yes | n/a | - | n/a | n/a |
+| FR-38 | yes | n/a | - | n/a | n/a |
+| FR-39 | yes | n/a | - | n/a | n/a |
+| FR-58 | yes | n/a | - | n/a | n/a |
+| FR-40 | yes | n/a | - | n/a | n/a |
+| FR-41 | yes | n/a | - | n/a | n/a |
+| FR-42 | yes | n/a | - | n/a | n/a |
+| FR-43 | yes | n/a | - | n/a | n/a |
+| FR-44 | yes | n/a | - | n/a | n/a |
 
 ## Failures
 
@@ -65,53 +65,5 @@ None.
 ## Warnings
 
 - **contract**: contract read from the sibling checkout ../docs (UNPINNED) — contract/ submodule is absent or empty. Fine for local work before remotes exist; CI requires the pinned submodule (git submodule add <docs-remote-url> contract). Marker: docs/requirements.md
-- **spec-mention**: FR-1 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-2 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-3 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-4 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-5 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-6 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-7 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-8 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-9 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-10 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-11 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-12 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-13 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-55 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-56 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-57 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-14 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-15 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-16 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-17 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-18 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-19 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-20 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-21 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-22 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-23 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-24 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-25 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-26 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-27 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-28 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-29 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-30 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-31 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-32 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-33 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-34 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-35 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-36 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-37 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-38 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-39 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-58 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-40 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-41 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-42 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-43 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
-- **spec-mention**: FR-44 is not cited by any spec under ../docs/openspec/specs or openspec/specs/ (no specs authored yet - expected before Phase 2)
 - **plan-ownership**: ../docs/docs/mvp-capability-plan.md not found - ownership check skipped (expected before Phase 3; mandatory at --release)
 - **ownership**: ../docs/docs/mvp-capability-plan.md not found - this repo owns no FRs yet, so test-trace checks are pending (expected before G3)
