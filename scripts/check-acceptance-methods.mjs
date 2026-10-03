@@ -43,7 +43,10 @@
 //     specs, breakpoints/masks placeholders) and exits 1: the build may not
 //     legally enter Phase 4 with a phantom acceptance method.
 //   --mode=artifact    (G4/G6/G7 + every qa-verify run): every declared
-//     method must resolve to a FRESH, threshold-passing artifact. Defaults:
+//     method must resolve to a FRESH, threshold-passing artifact. PD-10: only for
+//     requirements whose plan slice (| Req | Slice | Repo(s) |) has an active or
+//     archived implement-<slice>-* change in this repo; later slices are visible
+//     SKIP-pending. --release audits every requirement. Defaults:
 //       pixel-diff     -> docs/qa/visual-diff/*/report.json  score >= threshold
 //       vision-verify  -> docs/qa/vision-report.json (check-vision) met: true
 //       recording      -> docs/qa/demo-recordings/**manifest.json  >= 1 clip
@@ -84,12 +87,13 @@
 //
 // STDOUT CONVENTIONS (parsed by qa-verify/gate-status):
 //   "Scope: <n> tagged requirement(s)" ... per-finding WARN/FAIL/WAIVED/
-//   SKIP-pending lines ... "Result: PASS|FAIL|SKIP-pending|NOT-EARNED[, N warning(s)]"
+//   SKIP-pending / PLANNED lines ... "Result: PASS|FAIL|SKIP-pending|SKIP-planned|NOT-EARNED[, N warning(s)]"
 //
 // Usage:
 //   node scripts/check-acceptance-methods.mjs --mode=existence
 //   node scripts/check-acceptance-methods.mjs --mode=artifact
 //   node scripts/check-acceptance-methods.mjs --mode=artifact --max-age-hours 24
+//   node scripts/check-acceptance-methods.mjs --mode=artifact --release   # G7: no slice scoping
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { hasProductCode, isTestFile as cfgIsTestFile, loadConfig, ownership, ownsMethod, testFiles } from "./lib/factory-config.mjs";
@@ -108,9 +112,12 @@ function flagVal(name) {
 }
 const mode = flagVal("--mode");
 if (mode !== "existence" && mode !== "artifact") {
-  console.error("Usage: node scripts/check-acceptance-methods.mjs --mode=existence|artifact [--max-age-hours N]");
+  console.error("Usage: node scripts/check-acceptance-methods.mjs --mode=existence|artifact [--max-age-hours N] [--release]");
   process.exit(2);
 }
+// PD-10: during Phase 4, artifact mode audits only requirements whose plan slice has started in this
+// repo; the rest are visible SKIP-pending ("planned"), never PASS. --release (G7) audits everything.
+const release = argv.includes("--release");
 
 // ---------- config (built-in defaults, extensible via telemetry.config) ----------
 const DEFAULT_TOKENS = {
@@ -177,6 +184,7 @@ const CONFIG_PATH = "quality/telemetry.config.json";
 const failures = [];
 const warnings = [];
 const skips = []; // SKIP-pending lines (pre-phase emptiness, visible, never PASS)
+const planned = []; // PD-10: PLANNED lines (slice not started in this repo; visible, never PASS)
 const waivedLines = [];
 const fail = (id, msg) => failures.push({ id, msg });
 const warn = (id, msg) => warnings.push({ id, msg });
@@ -573,6 +581,10 @@ for (const e of entries) {
     e.status = "waived";
     waivedLines.push(`WAIVED [${e.id}] ${e.method}: ${e.problem} — suppressed by ${waivedIds.get(e.id)} (visible, never silent)`);
     warn(e.id, `${e.method} failure waived by ${waivedIds.get(e.id)}`);
+  } else if (mode === "artifact" && !release && !OWN.sliceStarted(e.id)) {
+    // PD-10: planned for a slice with no implement-<slice>-* change in this repo yet.
+    e.status = "planned";
+    planned.push(`PLANNED [${e.id}] ${e.method}: slice "${OWN.sliceOf(e.id)}" has no implement-${OWN.sliceOf(e.id)}-* change in this repo yet (not due, NOT a pass)`);
   } else if (mode === "artifact" && !productCode) {
     // Pre-phase emptiness: the method is declared but the build hasn't started.
     // Visible SKIP-pending, never PASS (qa-verify/gate-status render it SKIP).
@@ -671,6 +683,7 @@ writeFileSync(
 );
 
 // ---------- report ----------
+for (const p of planned) console.log(p);
 for (const s of skips) console.log(s);
 for (const wline of waivedLines) console.log(wline);
 for (const cw of closedWaiverNotes)
@@ -678,8 +691,11 @@ for (const cw of closedWaiverNotes)
 for (const w of warnings) console.warn(`WARN  [${w.id}] ${w.msg}`);
 for (const f of failures) console.error(`FAIL  [${f.id}] ${f.msg}`);
 for (const d of drafted) console.log(`drafted ${d} — implement or waive before Phase 4`);
-console.log(`acceptance (${mode}): ${entries.length} contract(s) across ${contracts.size} requirement(s) — ${failures.length} failure(s), ${warnings.length} warning(s), ${skips.length} pending`);
+console.log(`acceptance (${mode}): ${entries.length} contract(s) across ${contracts.size} requirement(s) — ${failures.length} failure(s), ${warnings.length} warning(s), ${skips.length} pending, ${planned.length} planned`);
 
-const result = failures.length ? "FAIL" : skips.length ? "SKIP-pending" : "PASS";
+// PD-10: PASS needs at least one audited (due) contract; when every contract belongs to a slice
+// that has not started here, nothing is due yet: SKIP-planned (visible, never PASS, not NOT-EARNED).
+const audited = entries.filter((e) => e.status !== "planned").length;
+const result = failures.length ? "FAIL" : skips.length ? "SKIP-pending" : audited === 0 && planned.length ? "SKIP-planned" : "PASS";
 console.log(`Result: ${result}${warnings.length ? `, ${warnings.length} warning(s)` : ""}`);
 process.exit(failures.length ? 1 : 0);

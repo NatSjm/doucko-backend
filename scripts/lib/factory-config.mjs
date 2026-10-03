@@ -238,9 +238,70 @@ export function ownership(root = process.cwd()) {
   const cfg = loadConfig(root);
   const planPath = join(root, cfg.paths.plan);
   const planPresent = existsSync(planPath);
-  const owners = planPresent ? parseOwnership(readFileSync(planPath, "utf8")) : new Map();
+  const planText = planPresent ? readFileSync(planPath, "utf8") : "";
+  const owners = planPresent ? parseOwnership(planText) : new Map();
   const owns = (id) => (cfg.repo === "docs" || !cfg.contract ? true : owners.get(id)?.has(cfg.repo) ?? false);
-  return { planPresent, owners, owns, repo: cfg.repo };
+  const slices = parsePlanSlices(planText);
+  const started = startedSlices(root, cfg);
+  // PD-10: a requirement is "started" in this repo once its plan slice has an active or archived
+  // implement-<slice>-(api|ui) change here. Ids with no slice in the plan count as started (audited).
+  const sliceOf = (id) => slices.get(id) ?? null;
+  const sliceStarted = (id) => !slices.has(id) || started.has(slices.get(id));
+  return { planPresent, owners, owns, repo: cfg.repo, sliceOf, sliceStarted, startedSlices: started };
+}
+
+// PD-10: the plan's coverage table also names each requirement's owner SLICE (`| Req | Slice | Repo(s) |`).
+export function parsePlanSlices(planText) {
+  const slices = new Map(); // id -> slice name
+  let sliceCol = -1;
+  for (const line of (planText ?? "").split("\n")) {
+    if (!line.trim().startsWith("|")) {
+      sliceCol = -1;
+      continue;
+    }
+    const cells = line.split("|").slice(1, -1).map((c) => c.trim().replace(/\*/g, "").replace(/`/g, ""));
+    const hdr = cells.findIndex((c) => /^slice$/i.test(c));
+    if (hdr >= 0 && cells.some((c) => /^repo(\(s\)|s)?$/i.test(c))) {
+      sliceCol = hdr;
+      continue;
+    }
+    if (sliceCol < 0) continue;
+    const m = line.match(ID_RE);
+    if (m && cells[sliceCol]) slices.set(m[1], cells[sliceCol]);
+  }
+  return slices;
+}
+
+/**
+ * PD-10: the MVP requirements this repo owns that declare `method` in their Verification column,
+ * split into `due` (plan slice started here) and `planned` (not started yet).
+ */
+export function declaredMethodIds(root, method) {
+  const cfg = loadConfig(root);
+  const own = ownership(root);
+  const file = join(root, cfg.paths.requirements);
+  const text = existsSync(file) ? readFileSync(file, "utf8") : "";
+  const due = [];
+  const planned = [];
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(ID_RE);
+    if (!m || /\|\s*Future\s*\|/i.test(line) || !own.owns(m[1])) continue;
+    const tags = (line.split("|").slice(1, -1).at(-1) ?? "").toLowerCase().split(/[\s,;/+`]+/);
+    if (tags.includes(method)) (own.sliceStarted(m[1]) ? due : planned).push(m[1]);
+  }
+  return { due, planned };
+}
+
+/** Slices with an active or archived `implement-<slice>-api|ui` change in this repo (PD-10). */
+export function startedSlices(root = process.cwd(), cfg = loadConfig(root)) {
+  const dir = join(root, cfg.paths.changesDir ?? "openspec/changes");
+  const names = [...readdirSafe(dir), ...readdirSafe(join(dir, "archive"))];
+  const started = new Set();
+  for (const n of names) {
+    const m = n.match(/^(?:\d{4}-\d{2}-\d{2}-)?implement-(.+)-(?:api|ui)$/);
+    if (m) started.add(m[1]);
+  }
+  return started;
 }
 
 /** Is `method` one this repo is responsible for proving? */

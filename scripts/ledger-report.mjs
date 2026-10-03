@@ -181,9 +181,17 @@ const parseTs = (ts) => {
 };
 
 function computeMetrics(events, contracts, corrections) {
-  // Vacuous passes: exit 0 on scope 0 while product code exists (the disease).
+  // Vacuous passes: exit 0 on scope 0 while product code exists (the disease) — counted only when the
+  // run was RENDERED as a pass. PD-10: a run qa-verify classified NOT-EARNED, SKIP-pending or PLANNED
+  // was never counted as success, so it is not a vacuous pass. Events without a recorded status
+  // (older ledgers) still count.
+  const NOT_A_PASS = new Set(["NOT-EARNED", "SKIP-pending", "PLANNED", "FAIL"]);
   const vacuous = events.filter(
-    (e) => e.exitCode === 0 && e.scope_n === 0 && (e.meta?.productCode === true || e.meta?.notEarned === true),
+    (e) =>
+      e.exitCode === 0 &&
+      e.scope_n === 0 &&
+      (e.meta?.productCode === true || e.meta?.notEarned === true) &&
+      !NOT_A_PASS.has(e.meta?.status),
   );
   const notEarned = events.filter((e) => e.event === "not-earned" || e.result === "NOT-EARNED" || e.meta?.notEarned === true);
 

@@ -267,14 +267,17 @@ function stubBody(entry) {
 }
 
 // Classify one member from its stdout contract ("Scope: <n> <unit>" +
-// final "Result: PASS|FAIL|SKIP-pending|NOT-EARNED") and exit code. Members
+// final "Result: PASS|FAIL|SKIP-pending|SKIP-planned|NOT-EARNED") and exit code. PD-10: SKIP-planned
+// = nothing due yet (every relevant requirement belongs to a plan slice not started in this repo):
+// shown as PLANNED, never PASS evidence, and not flipped to NOT-EARNED by product code. Members
 // without the contract (unit tests, lint, build) classify on exit code alone.
 function classify(output, exitCode) {
   const scopeMatch = output.match(/^Scope:\s*(\d+)\b/m);
   const scopeN = scopeMatch ? Number(scopeMatch[1]) : null;
-  const declared = [...output.matchAll(/^Result:\s*(PASS|FAIL|SKIP-pending|NOT-EARNED)\b/gm)].pop()?.[1] ?? null;
+  const declared = [...output.matchAll(/^Result:\s*(PASS|FAIL|SKIP-pending|SKIP-planned|NOT-EARNED)\b/gm)].pop()?.[1] ?? null;
   const empty = (reason) => ({ status: postPhase ? "NOT-EARNED" : "SKIP-pending", scopeN, reason });
   if (declared === "NOT-EARNED") return { status: "NOT-EARNED", scopeN, reason: "self" };
+  if (declared === "SKIP-planned" && exitCode === 0) return { status: "PLANNED", scopeN, reason: "planned" };
   if (declared === "SKIP-pending") return empty("skip");
   if (exitCode !== 0) return { status: "FAIL", scopeN, reason: "exit" };
   if (scopeN === 0) return empty("scope-0");
@@ -316,7 +319,9 @@ for (const entry of commands) {
   const { status, scopeN, reason } = classify(result.output, result.exitCode);
   if (status === "NOT-EARNED" && reason !== "self") {
     console.log(`NOT-EARNED ${entry.name}: emptiness (${reason}) while product code exists / header claims Phase ${phase ?? "?"} — absence of evidence is never success.`);
-  } else if (status === "SKIP-pending") {
+  } else if (status === "PLANNED") {
+    console.log(`PLANNED ${entry.name}: nothing due yet — its requirements belong to plan slices not started in this repo (PD-10). Visible, never counted as PASS.`);
+} else if (status === "SKIP-pending") {
     console.log(`SKIP-pending ${entry.name}: pre-phase emptiness — visible, never counted as PASS.`);
   }
   results.push({
@@ -346,6 +351,7 @@ const failMember = results.find((r) => r.status === "FAIL");
 const unearned = results.filter((r) => r.status === "NOT-EARNED");
 const skipped = results.filter((r) => r.status === "SKIP-pending");
 const missing = results.filter((r) => r.status === "MISSING");
+const plannedMembers = results.filter((r) => r.status === "PLANNED");
 
 // FORBIDDEN: "Overall result: Pass" while any member is NOT-EARNED — and a
 // battery where EVERY member is MISSING verified nothing at all, so it may
@@ -355,6 +361,8 @@ if (failMember) overall = "Fail";
 else if (unearned.length) overall = `NOT-EARNED (${unearned.length} member(s) unearned)`;
 else if (results.length > 0 && missing.length === results.length)
   overall = `NOT-EARNED (all ${results.length} battery member(s) missing — nothing was verified)`;
+else if (plannedMembers.length)
+  overall = `Pass (${plannedMembers.length} member(s) PLANNED, not yet due: ${plannedMembers.map((r) => r.name).join(", ")})`;
 else overall = "Pass";
 const exitCode = failMember ? failMember.exitCode || 1 : overall.startsWith("NOT-EARNED") ? 1 : 0;
 
@@ -366,6 +374,7 @@ console.log(`\nWrote ${outputPath}`);
 
 console.log(`\nScope: ${results.length} battery member(s)`);
 if (missing.length) console.log(`MISSING member(s): ${missing.map((m) => m.name).join(", ")} — explicit warnings, never silent successes.`);
+if (plannedMembers.length) console.log(`PLANNED member(s): ${plannedMembers.map((m) => m.name).join(", ")} — not yet due per the capability plan, not counted as PASS.`);
 if (skipped.length) console.log(`SKIP-pending member(s): ${skipped.map((m) => m.name).join(", ")} — pre-phase, not counted as PASS.`);
 console.log(`Overall result: ${overall}`);
 

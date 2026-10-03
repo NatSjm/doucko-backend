@@ -937,6 +937,10 @@
     {
       "check": "test-trace",
       "msg": "FR-44 (owned by backend) has no test annotated \"@trace FR-44\""
+    },
+    {
+      "check": "active-changes",
+      "msg": "active change \"implement-platform-foundation-api\" is not archived"
     }
   ]
 }

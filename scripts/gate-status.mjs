@@ -168,10 +168,12 @@ function runCheck(key) {
   const exit = r.status ?? 1;
   const scopeM = out.match(/^Scope:\s*(\d+)\b/m);
   const scopeN = scopeM ? Number(scopeM[1]) : null;
-  const declared = [...out.matchAll(/^Result:\s*(PASS|FAIL|SKIP-pending|NOT-EARNED)\b/gm)].pop()?.[1] ?? null;
+  const declared = [...out.matchAll(/^Result:\s*(PASS|FAIL|SKIP-pending|SKIP-planned|NOT-EARNED)\b/gm)].pop()?.[1] ?? null;
   let status;
   if (declared === "NOT-EARNED") status = "NOT-EARNED";
   else if (declared === "SKIP-pending") status = "SKIP-pending";
+  // PD-10: nothing due yet per the capability plan — visible, never PASS, and not a vacuity flip.
+  else if (declared === "SKIP-planned" && exit === 0) status = "SKIP-planned";
   else if (exit !== 0) status = releaseTier && !productCode ? "SKIP-pending" : "FAIL";
   else if (scopeN === 0 || (declared === null && (/^SKIP\b/m.test(out) || /\bNothing to ratchet\b/.test(out)))) status = "SKIP-pending";
   else status = "PASS";
@@ -191,7 +193,8 @@ if (EXCLUDED.size) console.log(`Excluded for repo ${CFG.repo}: ${[...EXCLUDED].j
 // "n/a" (check not installed) counts as SKIP-pending: absence of a check is
 // pending evidence, not proof.
 // ---------------------------------------------------------------------------
-const SEVERITY = ["PASS", "SKIP-pending", "needs sign-off", "NOT-EARNED", "FAIL"];
+// PD-10: SKIP-planned sits just above PASS — a gate with a planned member is never PASS.
+const SEVERITY = ["PASS", "SKIP-planned", "SKIP-pending", "needs sign-off", "NOT-EARNED", "FAIL"];
 function worst(...statuses) {
   let w = "PASS";
   for (const raw of statuses) {

@@ -1,6 +1,6 @@
 {
-  "createdAt": "2026-10-03T17:09:11.793Z",
-  "gitHead": "993bdcf5498aac5acc4b02ee53f70b2fccd8fcce",
+  "createdAt": "2026-10-03T18:11:30.975Z",
+  "gitHead": "bba709afd5f1587c66411d0a88063a5f5548092c",
   "files": {
     ".claude/workflows/review-gate.js": "7295d8e94ba347213120b9d190b9ebbb88dee373173cfc7daba2114b726ca76b",
     ".claude/workflows/trajectory-eval.js": "ea229b3a57f6e0723c27e9f3148fdd5df17181225349d8b0770dc346efe47715",
@@ -10,20 +10,20 @@
     "factory.config.json": "c83fa947d94cc98766b665d63e7ff78e5084dc109238f93edbb652bc978c96f5",
     "quality/process-baseline.json": "c4138cf68d31420931034e59d580cc4db6fdd08550de95347c7396bd9b2923d5",
     "quality/telemetry.config.json": "98276dbbd18f9d694f3378aed7ecc042439d99c8e292bb3caeed7a833005835b",
-    "scripts/check-acceptance-methods.mjs": "5384a80c28c3ec57207382ac623a3f287e7dfe22b4c238d3c953d7d4f641c758",
+    "scripts/check-acceptance-methods.mjs": "1f7ce3e924b64a93a4b0b63ffa36bf6bdc16fa5ffb19caf6621fac7aea54fc39",
     "scripts/check-coverage-ratchet.mjs": "99acb7e873845655fa21c202a199e57716757e269f5209d25d8315458ede9e33",
     "scripts/check-factory-integrity.mjs": "40aae2f7f12ae0a1f30897977e08ce9ad2617e9a4f7d007361fe75b460fd9883",
     "scripts/check-process-ratchet.mjs": "417743a1465e7d4735d5da1f50dd50ec4bfa114153e0e76f37c9c0f3061ceb6c",
     "scripts/check-traceability.mjs": "a78a1d83660b38f7f03bf830016498d4beb5c47c27abef5ad1d82e67536739e0",
-    "scripts/check-trajectory.mjs": "4cee32bc3f87aef5a26f6b240913a930b438aba0579397d4357253e36839004f",
-    "scripts/gate-status.mjs": "e0cd5057ded6fb8d05f9bd1f6e8fde04844e5d91b49e2d8d8db4112b1de84b11",
+    "scripts/check-trajectory.mjs": "79fcfe10d671998f48ac14e44ab65ebafa10445a6b8de97aac881fe2d971e916",
+    "scripts/gate-status.mjs": "d9c79391086129ca8a9fb512fcc13be5083db1bc73d79b26525c51ae84777754",
     "scripts/hooks-commit-msg.mjs": "2cd9ebbd0054e1dfc9a9b2b39bca25de6d3dc188fd5d7793808ee48f209aaf20",
     "scripts/hooks-post-edit.mjs": "9b51573b157c1841f5fc275ea9f7b4a2b0167f664860a65d00f8c6a1503a89e0",
     "scripts/hooks-pre-commit.mjs": "8ab9935d45c8ee3e5219c7703e5af953eb8c671752e6981482518adcae886209",
-    "scripts/lib/factory-config.mjs": "2b758140256f20601c56c695626460de7a1a81768e97ea0f2c590c9c3e376f49",
-    "scripts/qa-verify.mjs": "e301272c73d4c2507b4a3a92207b01bb35a5570902dd18fe8e9fe96442254986"
+    "scripts/lib/factory-config.mjs": "b01f6c55d32603cbc5be5bfd29a4a45a42bd6229f077be1c0f9caf32865c5c2c",
+    "scripts/qa-verify.mjs": "77e5c4a00ff226baeabb5a9adedd4546d11db758ce4c5692301138a07616906e"
   },
   "adaptations": [
-    "PD-9: check-vision gate; vision-verify artifact is the JSON report"
+    "PD-10: gates scoped to started plan slices (SKIP-planned), vacuous-pass predicate; PD-11: check-a11y report"
   ]
 }

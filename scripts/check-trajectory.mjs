@@ -29,7 +29,7 @@
 import { readdirSync, readFileSync, statSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { loadConfig } from "./lib/factory-config.mjs";
+import { loadConfig, startedSlices } from "./lib/factory-config.mjs";
 
 const root = process.cwd();
 const flags = new Set(process.argv.slice(2));
@@ -190,5 +190,14 @@ for (const w of warnings) console.warn(`WARN  [${w.check}] ${w.msg}`);
 for (const f of failures) console.error(`FAIL  [${f.check}] ${f.msg}`);
 console.log(`\nScope: ${slices.length} archived slice(s)`);
 if (!flags.has("--check-fresh")) console.log(`wrote ${PATHS.reportOut} and ${PATHS.jsonOut}`);
+// PD-10: before the first archive, an implement-<slice>-* change in progress means the first slice
+// is being built — no archived trajectory is due yet. SKIP-planned (visible, never PASS); --release
+// keeps the strict verdict.
+const inProgress = startedSlices(root, CFG);
+if (!failures.length && slices.length === 0 && inProgress.size > 0 && !flags.has("--release")) {
+  console.log(`PLANNED: first slice in progress (${[...inProgress].join(", ")}); no archived slice to audit yet (PD-10)`);
+  console.log(`Result: SKIP-planned${warnings.length ? `, ${warnings.length} warning(s)` : ""}`);
+  process.exit(0);
+}
 console.log(`Result: ${failures.length ? "FAIL" : "PASS"}${warnings.length ? `, ${warnings.length} warning(s)` : ""}`);
 process.exit(failures.length ? 1 : 0);
