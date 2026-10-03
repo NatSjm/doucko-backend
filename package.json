@@ -19,7 +19,11 @@
     "check:coverage": "node scripts/check-coverage-ratchet.mjs",
     "factory:check": "node ../docs/factory/install.mjs --repo=backend --check",
     "factory:install": "node ../docs/factory/install.mjs --repo=backend",
-    "workflow": "node scripts/run-workflow.mjs"
+    "workflow": "node scripts/run-workflow.mjs",
+    "stack:up": "node tools/stack.mjs up",
+    "stack:down": "node tools/stack.mjs down",
+    "backup": "node tools/backup.mjs",
+    "restore": "node tools/restore.mjs"
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.13.2"

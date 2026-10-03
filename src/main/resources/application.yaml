@@ -17,11 +17,24 @@ spring:
     problemdetails:
       # RFC 7807 problem responses instead of raw error pages.
       enabled: true
+    # NFR-3: never log request parameters or header values (DispatcherServlet masks them while false).
+    log-request-details: false
+  messages:
+    # NFR-9: backend copy (problem titles, details) comes from messages*.properties.
+    basename: messages
+    fallback-to-system-locale: false
 
 server:
   error:
     include-stacktrace: never
     include-exception: false
+
+logging:
+  level:
+    # NFR-3: at DEBUG, Spring Security logs "Securing <METHOD> <path>?<query>" and Spring MVC logs a
+    # bound request body ("Read ... to ..."). Keep both at INFO; RequestContentNotLoggedTest guards it.
+    org.springframework.web: INFO
+    org.springframework.security: INFO
 
 management:
   endpoints:

@@ -1,0 +1,56 @@
+# Doučko stack on the home laptop (TC-5). Start it with `npm run stack:up`, which refuses a bind
+# address that is not loopback or a private LAN address (NFR-2) before calling `docker compose up`.
+#
+# - Every published port binds DOUCKO_BIND_ADDRESS (default 127.0.0.1). Set it in .env to the
+#   laptop's RFC 1918 address (e.g. 192.168.1.20) to reach the app from the home LAN.
+# - The database is never published to the host (admin-access "Database not published").
+# - Data lives on the named volume doucko-pgdata (NFR-10); `npm run backup` dumps it to
+#   ~/doucko-backups, outside every repository.
+# - The frontend service builds from the sibling checkout ../frontend (decision D-P1).
+name: doucko
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: doucko
+      POSTGRES_USER: doucko
+      POSTGRES_PASSWORD: ${DOUCKO_DB_PASSWORD:?set DOUCKO_DB_PASSWORD in .env (see .env.example)}
+    volumes:
+      - doucko-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U doucko -d doucko"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  backend:
+    build: .
+    environment:
+      DOUCKO_DB_URL: jdbc:postgresql://db:5432/doucko
+      DOUCKO_DB_USER: doucko
+      DOUCKO_DB_PASSWORD: ${DOUCKO_DB_PASSWORD:?set DOUCKO_DB_PASSWORD in .env (see .env.example)}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  frontend:
+    build: ../frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80"
+    restart: unless-stopped
+
+volumes:
+  doucko-pgdata:

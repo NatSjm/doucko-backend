@@ -1,0 +1,6 @@
+{
+  "source": "ledger-report-deterministic-fallback",
+  "generatedAt": "2026-10-03T23:06:23.212Z",
+  "note": "Deterministic skeleton derived from ledger data alone. The LLM process-auditor replaces this file at phase boundaries; until then G7 keys on this fallback so API-less CI never blocks.",
+  "defects": []
+}

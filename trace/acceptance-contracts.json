@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/check-acceptance-methods.mjs",
-  "mode": "existence",
+  "mode": "artifact",
   "productCode": true,
   "contracts": {
     "FR-1": [
@@ -8,7 +8,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-5": [
@@ -16,7 +16,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-6": [
@@ -24,7 +24,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-7": [
@@ -32,7 +32,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-8": [
@@ -40,7 +40,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-12": [
@@ -48,7 +48,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-56": [
@@ -56,7 +56,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-57": [
@@ -64,7 +64,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-14": [
@@ -72,7 +72,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-15": [
@@ -80,7 +80,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-16": [
@@ -88,7 +88,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-17": [
@@ -96,7 +96,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-18": [
@@ -104,7 +104,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-19": [
@@ -112,7 +112,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-20": [
@@ -120,7 +120,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-21": [
@@ -128,7 +128,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-22": [
@@ -136,7 +136,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-23": [
@@ -144,7 +144,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-27": [
@@ -152,7 +152,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-33": [
@@ -160,7 +160,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-34": [
@@ -168,7 +168,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-35": [
@@ -176,7 +176,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-36": [
@@ -184,7 +184,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-38": [
@@ -192,7 +192,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-39": [
@@ -200,7 +200,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-42": [
@@ -208,7 +208,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-43": [
@@ -216,7 +216,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "FR-44": [
@@ -224,7 +224,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "NFR-1": [
@@ -232,31 +232,31 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "NFR-2": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "mechanism-ok"
+        "artifact": "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "NFR-3": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "mechanism-ok"
+        "artifact": "src/test/kotlin/cz/doucko/shared/RequestContentNotLoggedTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "NFR-4": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "mechanism-ok"
+        "artifact": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "NFR-5": [
@@ -264,39 +264,39 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "NFR-9": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "mechanism-ok"
+        "artifact": "src/test/kotlin/cz/doucko/shared/UndeclaredPathTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "NFR-10": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "mechanism-ok"
+        "artifact": "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "NFR-11": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "mechanism-ok"
+        "artifact": "src/test/kotlin/cz/doucko/ModularityTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "NFR-12": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "mechanism-ok"
+        "artifact": "src/test/kotlin/cz/doucko/platform/ContractGenerationTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "NFR-15": [
@@ -304,7 +304,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "NFR-16": [
@@ -312,7 +312,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ],
     "NFR-17": [
@@ -320,7 +320,7 @@
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
         "artifact": null,
-        "status": "mechanism-ok"
+        "status": "planned"
       }
     ]
   }

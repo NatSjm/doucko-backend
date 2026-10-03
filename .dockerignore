@@ -1,0 +1,10 @@
+target/
+node_modules/
+.git/
+.idea/
+docs/
+trace/
+retro/
+openspec/
+.env
+.env.*

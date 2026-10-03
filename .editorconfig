@@ -10,6 +10,8 @@ indent_size = 4
 [*.{kt,kts}]
 ktlint_code_style = ktlint_official
 max_line_length = 140
+# Hexagonal layout puts inbound adapters in `adapter.`in`.web`; `in` is a keyword, so the package needs backticks.
+ktlint_standard_package-name = disabled
 
 [*.{json,yml,yaml,md,mjs}]
 indent_size = 2

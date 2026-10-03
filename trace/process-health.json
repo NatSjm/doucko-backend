@@ -1,0 +1,190 @@
+{
+  "generatedAt": "2026-10-03T23:06:23.212Z",
+  "ledger": {
+    "path": "trace/ledger.jsonl",
+    "present": true,
+    "eventCount": 44,
+    "malformedLines": 0
+  },
+  "productCodePresent": true,
+  "result": "PASS",
+  "vacuousPasses": 0,
+  "warningsByClass": {},
+  "acceptanceCoverage": {
+    "covered": 7,
+    "declared": 40
+  },
+  "metrics": {
+    "vacuousPasses": {
+      "count": 0,
+      "events": []
+    },
+    "warningsByClass": {},
+    "notEarned": {
+      "count": 1
+    },
+    "warningTrendByClass": {},
+    "retriesPerCheck": {
+      "traceability": {
+        "runs": 3,
+        "failures": 0,
+        "retries": 0
+      },
+      "trajectory": {
+        "runs": 3,
+        "failures": 0,
+        "retries": 0
+      },
+      "acceptance-artifacts": {
+        "runs": 3,
+        "failures": 0,
+        "retries": 0
+      },
+      "process-ratchet": {
+        "runs": 3,
+        "failures": 2,
+        "retries": 1
+      },
+      "factory-integrity": {
+        "runs": 1,
+        "failures": 0,
+        "retries": 0
+      },
+      "maven-verify": {
+        "runs": 1,
+        "failures": 1,
+        "retries": 0
+      },
+      "coverage-ratchet": {
+        "runs": 1,
+        "failures": 0,
+        "retries": 0
+      },
+      "openspec-all": {
+        "runs": 1,
+        "failures": 0,
+        "retries": 0
+      },
+      "openspec-active-list": {
+        "runs": 1,
+        "failures": 0,
+        "retries": 0
+      },
+      "qa-verify": {
+        "runs": 3,
+        "failures": 3,
+        "retries": 2
+      },
+      "pre-commit": {
+        "runs": 10,
+        "failures": 0,
+        "retries": 0
+      },
+      "commit-msg": {
+        "runs": 10,
+        "failures": 0,
+        "retries": 0
+      },
+      "gate-status": {
+        "runs": 4,
+        "failures": 4,
+        "retries": 3
+      }
+    },
+    "redToGreenLatency": {
+      "perCheck": {
+        "traceability": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": false
+        },
+        "trajectory": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": false
+        },
+        "acceptance-artifacts": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": false
+        },
+        "process-ratchet": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": true
+        },
+        "factory-integrity": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": false
+        },
+        "maven-verify": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": true
+        },
+        "coverage-ratchet": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": false
+        },
+        "openspec-all": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": false
+        },
+        "openspec-active-list": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": false
+        },
+        "qa-verify": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": true
+        },
+        "pre-commit": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": false
+        },
+        "commit-msg": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": false
+        },
+        "gate-status": {
+          "episodes": [],
+          "avgMs": null,
+          "stillRed": true
+        }
+      },
+      "overallAvgMs": null
+    },
+    "waivers": {
+      "ledgerEvents": 0,
+      "contractWaivers": 0,
+      "total": 0
+    },
+    "claimDivergence": {
+      "ledgerEvents": 0,
+      "unmetContracts": 0,
+      "unmet": [],
+      "total": 0
+    },
+    "uncommittedWork": {
+      "dirtyStreakEvents": 44,
+      "since": "2026-09-28T11:48:41.778Z",
+      "ageMs": 472630491
+    },
+    "corrections": {
+      "total": 0,
+      "open": 0,
+      "openIds": []
+    }
+  },
+  "inputs": {
+    "acceptanceContracts": 40,
+    "corrections": 0
+  }
+}
