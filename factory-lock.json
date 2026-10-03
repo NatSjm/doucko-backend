@@ -1,6 +1,6 @@
 {
-  "createdAt": "2026-09-28T11:48:41.282Z",
-  "gitHead": null,
+  "createdAt": "2026-10-03T03:39:31.623Z",
+  "gitHead": "301f988fa0db501539359f8089653433e6d412e0",
   "files": {
     ".claude/workflows/review-gate.js": "7295d8e94ba347213120b9d190b9ebbb88dee373173cfc7daba2114b726ca76b",
     ".claude/workflows/trajectory-eval.js": "ea229b3a57f6e0723c27e9f3148fdd5df17181225349d8b0770dc346efe47715",
@@ -14,7 +14,7 @@
     "scripts/check-coverage-ratchet.mjs": "99acb7e873845655fa21c202a199e57716757e269f5209d25d8315458ede9e33",
     "scripts/check-factory-integrity.mjs": "40aae2f7f12ae0a1f30897977e08ce9ad2617e9a4f7d007361fe75b460fd9883",
     "scripts/check-process-ratchet.mjs": "417743a1465e7d4735d5da1f50dd50ec4bfa114153e0e76f37c9c0f3061ceb6c",
-    "scripts/check-traceability.mjs": "1874ddff66371378ecc7ff5b32a42ec7040f0313d0490043d58784878cf65276",
+    "scripts/check-traceability.mjs": "a78a1d83660b38f7f03bf830016498d4beb5c47c27abef5ad1d82e67536739e0",
     "scripts/check-trajectory.mjs": "4cee32bc3f87aef5a26f6b240913a930b438aba0579397d4357253e36839004f",
     "scripts/gate-status.mjs": "e0cd5057ded6fb8d05f9bd1f6e8fde04844e5d91b49e2d8d8db4112b1de84b11",
     "scripts/hooks-commit-msg.mjs": "2cd9ebbd0054e1dfc9a9b2b39bca25de6d3dc188fd5d7793808ee48f209aaf20",
@@ -24,6 +24,6 @@
     "scripts/qa-verify.mjs": "e301272c73d4c2507b4a3a92207b01bb35a5570902dd18fe8e9fe96442254986"
   },
   "adaptations": [
-    "Doucko multi-repo harness adapted from project-factory@0d7286a1 (ADR-0002); role=backend"
+    "doucko multi-repo harness (backend); PD-8 check-traceability SKIP-pending before first spec"
   ]
 }

@@ -132,6 +132,10 @@ for (const file of walk(PATHS.changesDir, (f) => f === "spec.md")) {
   recordSpec(file);
 }
 const specsStarted = specFileCount > 0;
+// Before the first spec the FR -> spec chain is unchecked, not proven: the
+// verdict is SKIP-pending, never PASS (COR-2 — gate-status read the old
+// exit-0 + "Scope: <MVP FR count>" as a G2 PASS over zero specs).
+const specChainPending = !specsStarted && !flags.has("--release");
 for (const id of mvpFRs) {
   if (!specMentions.has(id)) {
     const msg = `${id} is not cited by any spec under ${specRoots.join(" or ")}/`;
@@ -250,7 +254,7 @@ requirements/spec/test/recording change; CI runs \`--check-fresh\`.
 
 Repo: ${CFG.repo} (contract: ${CFG.contractSource}).
 Scope: ${mvpFRs.length} MVP functional requirements${CFG.repo === "docs" ? " (product chain; per-repo tests are joined in workspace-traceability-report.md)" : `, ${ownedFRs.length} owned by ${CFG.repo}`}.
-Result: ${failures.length === 0 ? "PASS" : `FAIL (${failures.length} failure${failures.length === 1 ? "" : "s"})`}${warnings.length ? `, ${warnings.length} warning(s)` : ""}
+Result: ${failures.length ? `FAIL (${failures.length} failure${failures.length === 1 ? "" : "s"})` : specChainPending ? "SKIP-pending (no product spec yet - the FR -> spec chain is unchecked)" : "PASS"}${warnings.length ? `, ${warnings.length} warning(s)` : ""}
 
 | FR | Spec | Plan | Owner repo(s) | Test trace here | Recording here |
 |---|---|---|---|---|---|
@@ -302,5 +306,9 @@ function finish() {
     `\ntraceability: ${mvpFRs?.length ?? 0} MVP FRs checked — ${failures.length} failure(s), ${warnings.length} warning(s)`,
   );
   if (!flags.has("--check-fresh")) console.log(`wrote ${PATHS.reportOut} and ${PATHS.jsonOut}`);
+  // Declared verdict for gate-status / qa-verify (three-valued, RC2).
+  if (failures.length) console.log("Result: FAIL");
+  else if (specChainPending) console.log(`Result: SKIP-pending (0 spec files under ${specRoots.join(" or ")} - FR -> spec chain unchecked; expected before Phase 2)`);
+  else console.log("Result: PASS");
   process.exit(failures.length ? 1 : 0);
 }
