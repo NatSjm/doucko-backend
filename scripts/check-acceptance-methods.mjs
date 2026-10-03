@@ -45,7 +45,7 @@
 //   --mode=artifact    (G4/G6/G7 + every qa-verify run): every declared
 //     method must resolve to a FRESH, threshold-passing artifact. Defaults:
 //       pixel-diff     -> docs/qa/visual-diff/*/report.json  score >= threshold
-//       vision-verify  -> docs/qa/vision-report.(md|json)    met: true
+//       vision-verify  -> docs/qa/vision-report.json (check-vision) met: true
 //       recording      -> docs/qa/demo-recordings/**manifest.json  >= 1 clip
 //       e2e            -> test-results/.last-run.json status (a fresh FAILING
 //                         status vetoes sibling mere-existence reports) or an
@@ -130,7 +130,9 @@ const DEFAULT_TOKENS = {
   "vision-verify": {
     npmScripts: ["check:vision"],
     scriptGlobs: ["scripts/check-vision.*"],
-    artifactGlobs: ["docs/qa/vision-report.md", "docs/qa/vision-report.json"],
+    // PD-9: only the gate's JSON. The vision-verify workflow's human table
+    // (vision-report.md) has no `met:` line and would veto a good run.
+    artifactGlobs: ["docs/qa/vision-report.json"],
     artifactCheck: "vision-met",
   },
   recording: {
