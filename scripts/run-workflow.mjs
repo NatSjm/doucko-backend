@@ -24,7 +24,12 @@
 //   node scripts/run-workflow.mjs <name|path.js> [--args '<json>' | --args-file <file>]
 //        [--concurrency 4] [--model <model>] [--budget-usd 2] [--max-total-usd 20]
 //        [--timeout-min 20] [--untyped-tools Read,Grep,Glob]
-//        [--permission-mode acceptEdits] [--dry-run]
+//        [--permission-mode acceptEdits] [--allowed-tools "Bash(npx openspec validate:*)"]
+//        [--dry-run]
+//   --allowed-tools  pre-approves tool calls for every step (passed to
+//              claude --allowedTools); headless steps cannot answer a
+//              permission prompt, so e.g. Bash commands an agent definition
+//              tells it to run must be listed here.
 //   --dry-run  no API calls: prints each step's command and returns a minimal
 //              schema-valid stub, so a workflow's wiring can be checked for free.
 //
@@ -48,12 +53,12 @@ function opt(name, fallback) {
 function usage(msg) {
   if (msg) console.error(`run-workflow: ${msg}`);
   console.error(
-    "usage: node scripts/run-workflow.mjs <name|path.js> [--args '<json>' | --args-file <file>] [--concurrency N] [--model M] [--budget-usd X] [--max-total-usd Y] [--timeout-min T] [--untyped-tools Read,Grep,Glob] [--permission-mode acceptEdits] [--dry-run]",
+    "usage: node scripts/run-workflow.mjs <name|path.js> [--args '<json>' | --args-file <file>] [--concurrency N] [--model M] [--budget-usd X] [--max-total-usd Y] [--timeout-min T] [--untyped-tools Read,Grep,Glob] [--permission-mode acceptEdits] [--allowed-tools <rules>] [--dry-run]",
   );
   process.exit(2);
 }
 
-const VALUE_FLAGS = new Set(["args", "args-file", "concurrency", "model", "budget-usd", "max-total-usd", "timeout-min", "untyped-tools", "permission-mode"]);
+const VALUE_FLAGS = new Set(["args", "args-file", "concurrency", "model", "budget-usd", "max-total-usd", "timeout-min", "untyped-tools", "permission-mode", "allowed-tools"]);
 const positional = argv.filter((a, i) => !a.startsWith("--") && !(i > 0 && VALUE_FLAGS.has(argv[i - 1].replace(/^--/, ""))));
 const target = positional[0];
 if (!target) usage("missing workflow name");
@@ -66,6 +71,7 @@ const MAX_TOTAL = Number(opt("max-total-usd", "20"));
 const TIMEOUT_MS = Math.max(1, Number(opt("timeout-min", "20"))) * 60_000;
 const UNTYPED_TOOLS = opt("untyped-tools", "Read,Grep,Glob");
 const PERMISSION_MODE = opt("permission-mode", "acceptEdits");
+const ALLOWED_TOOLS = opt("allowed-tools", null);
 const CLAUDE_BIN = process.env.CLAUDE_BIN || "claude";
 
 // ---------- resolve workflow + args ----------
@@ -191,6 +197,7 @@ async function agent(prompt, opts = {}) {
     else cmd.push("--tools", UNTYPED_TOOLS);
     if (opts.schema) cmd.push("--json-schema", JSON.stringify(opts.schema));
     if (MODEL) cmd.push("--model", MODEL);
+    if (ALLOWED_TOOLS) cmd.push("--allowedTools", ALLOWED_TOOLS);
     step.command = `${CLAUDE_BIN} ${cmd.map((c) => (/[\s"{]/.test(c) ? "<…>" : c)).join(" ")}`;
     step.promptChars = String(prompt).length;
     const t0 = Date.now();
@@ -218,7 +225,8 @@ async function agent(prompt, opts = {}) {
       step.numTurns = j.num_turns ?? null;
       totalCost += step.costUsd;
       if (j.is_error) {
-        step.error = String(j.result ?? j.subtype ?? "error").slice(0, 500);
+        // On budget/turn limits the CLI leaves `result` empty and explains in `errors`.
+        step.error = [j.subtype, ...(Array.isArray(j.errors) ? j.errors : []), j.result].filter((x) => x !== undefined && x !== null && x !== "").join(" — ").slice(0, 500) || "error";
         if (/authenticate|oauth|log ?in|api key/i.test(step.error)) fatal = `claude CLI not authenticated (${step.error})`;
       } else if (opts.schema) {
         const parsed = parseStructured(j);
@@ -288,7 +296,7 @@ const record = {
   startedAt: startedAt.toISOString(),
   finishedAt: new Date().toISOString(),
   args,
-  settings: { concurrency: CONCURRENCY, model: MODEL, budgetPerAgentUsd: Number(BUDGET_PER_AGENT), maxTotalUsd: MAX_TOTAL, untypedTools: UNTYPED_TOOLS, permissionMode: PERMISSION_MODE },
+  settings: { allowedTools: ALLOWED_TOOLS, concurrency: CONCURRENCY, model: MODEL, budgetPerAgentUsd: Number(BUDGET_PER_AGENT), maxTotalUsd: MAX_TOTAL, untypedTools: UNTYPED_TOOLS, permissionMode: PERMISSION_MODE },
   outcome: ok ? "ok" : "failed",
   stoppedBecause: fatal,
   error: thrown ? String(thrown?.message ?? thrown) : returnedError,
