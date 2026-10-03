@@ -1,7 +1,7 @@
 {
   "generatedBy": "scripts/check-traceability.mjs",
   "repo": "backend",
-  "contractSource": "sibling-unpinned",
+  "contractSource": "submodule",
   "requirements": {
     "FR-1": "MVP",
     "FR-2": "MVP",
@@ -100,7 +100,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -114,7 +114,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -128,7 +128,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -142,7 +142,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -155,7 +155,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -169,7 +169,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -183,7 +183,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -197,7 +197,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -211,7 +211,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -225,7 +225,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -239,7 +239,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -252,7 +252,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -266,7 +266,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -280,7 +280,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -293,7 +293,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -306,7 +306,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -319,7 +319,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/answer-checking/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -332,7 +332,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/answer-checking/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -345,7 +345,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/answer-checking/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -358,8 +358,8 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/answer-checking/spec.md",
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md",
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -372,7 +372,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/answer-checking/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -385,7 +385,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/answer-checking/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -398,8 +398,8 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/answer-checking/spec.md",
-        "../docs/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md",
+        "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -412,7 +412,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/answer-checking/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -426,7 +426,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/answer-checking/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -439,7 +439,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/answer-checking/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -453,7 +453,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -467,7 +467,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -481,7 +481,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -495,7 +495,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -509,7 +509,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -523,7 +523,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -537,7 +537,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -551,7 +551,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -565,7 +565,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -579,7 +579,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -592,7 +592,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -605,7 +605,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -619,7 +619,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -633,7 +633,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -647,7 +647,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -661,7 +661,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -674,7 +674,7 @@
       ],
       "ownedHere": false,
       "specs": [
-        "../docs/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -688,7 +688,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/progress-stats/spec.md"
+        "contract/openspec/specs/progress-stats/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -702,7 +702,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/progress-stats/spec.md"
+        "contract/openspec/specs/progress-stats/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -715,7 +715,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/progress-stats/spec.md"
+        "contract/openspec/specs/progress-stats/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -728,7 +728,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/child-profile/spec.md"
+        "contract/openspec/specs/child-profile/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -741,7 +741,7 @@
       ],
       "ownedHere": true,
       "specs": [
-        "../docs/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [],
@@ -750,10 +750,6 @@
   ],
   "failures": [],
   "warnings": [
-    {
-      "check": "contract",
-      "msg": "contract read from the sibling checkout ../docs (UNPINNED) — contract/ submodule is absent or empty. Fine for local work before remotes exist; CI requires the pinned submodule (git submodule add <docs-remote-url> contract). Marker: docs/requirements.md"
-    },
     {
       "check": "test-trace",
       "msg": "FR-1 (owned by backend) has no test annotated \"@trace FR-1\""
