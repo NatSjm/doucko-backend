@@ -170,7 +170,8 @@ const testTraces = new Map(); // id -> [test files]
 {
   for (const file of testFiles(root)) {
     const text = read(file) ?? "";
-    for (const m of text.matchAll(/@trace\s+([A-Z]+-\d+(?:\s*,\s*[A-Z]+-\d+)*)/g)) {
+    // PD-12: categorized ids (NFR-A11Y-02) too — the same grammar check-process-ratchet counts.
+    for (const m of text.matchAll(/@trace\s+([A-Z]+-(?:[A-Z0-9]+-)?\d+(?:\s*,\s*[A-Z]+-(?:[A-Z0-9]+-)?\d+)*)/g)) {
       for (const id of m[1].split(/\s*,\s*/)) {
         if (!testTraces.has(id)) testTraces.set(id, []);
         testTraces.get(id).push(file.replaceAll("\\", "/"));
@@ -243,6 +244,17 @@ const rows = mvpFRs.map((id) => ({
   tests: testTraces.get(id) ?? [],
   recordings: recordingMentions.get(id) ?? [],
 }));
+// PD-12: MVP NFR/TC/BC rows join the chain too, so an @trace on a non-functional requirement is
+// evidence (check-process-ratchet's dead-@trace guard reads these links). They carry no spec/plan
+// citation checks — those stay FR-only.
+const otherRows = [...requirements]
+  .filter(([id, v]) => !id.startsWith("FR-") && v.phase === "MVP")
+  .map(([id]) => ({
+    id,
+    owners: [...(OWN.owners.get(id) ?? [])].sort(),
+    ownedHere: CFG.repo === "docs" ? null : OWN.owns(id),
+    tests: testTraces.get(id) ?? [],
+  }));
 
 // Generated artifacts are ASCII-only on purpose: they get parsed, diffed,
 // and displayed by many tools across OSes; encoding drift is a real failure
@@ -265,6 +277,14 @@ ${rows
   )
   .join("\n")}
 
+## Other MVP requirements (NFR / TC / BC)
+
+| Req | Owner repo(s) | Test trace here |
+|---|---|---|
+${otherRows
+  .map((r) => `| ${r.id} | ${r.owners.join(", ") || "-"} | ${r.ownedHere === false ? "n/a" : r.tests.length ? r.tests.length : "-"} |`)
+  .join("\n")}
+
 ## Failures
 
 ${failures.length ? failures.map((f) => `- **${f.check}**: ${f.msg}`).join("\n") : "None."}
@@ -279,7 +299,7 @@ const trace = {
   repo: CFG.repo,
   contractSource: CFG.contractSource,
   requirements: Object.fromEntries([...requirements].map(([id, v]) => [id, v.phase])),
-  links: rows,
+  links: [...rows, ...otherRows],
   failures,
   warnings,
 };

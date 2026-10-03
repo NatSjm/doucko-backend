@@ -1,6 +1,6 @@
 {
-  "createdAt": "2026-10-03T18:11:30.975Z",
-  "gitHead": "bba709afd5f1587c66411d0a88063a5f5548092c",
+  "createdAt": "2026-10-03T23:13:39.054Z",
+  "gitHead": "3f3a1f70db8f61705085a50775aa34ac46d69ca7",
   "files": {
     ".claude/workflows/review-gate.js": "7295d8e94ba347213120b9d190b9ebbb88dee373173cfc7daba2114b726ca76b",
     ".claude/workflows/trajectory-eval.js": "ea229b3a57f6e0723c27e9f3148fdd5df17181225349d8b0770dc346efe47715",
@@ -14,7 +14,7 @@
     "scripts/check-coverage-ratchet.mjs": "99acb7e873845655fa21c202a199e57716757e269f5209d25d8315458ede9e33",
     "scripts/check-factory-integrity.mjs": "40aae2f7f12ae0a1f30897977e08ce9ad2617e9a4f7d007361fe75b460fd9883",
     "scripts/check-process-ratchet.mjs": "417743a1465e7d4735d5da1f50dd50ec4bfa114153e0e76f37c9c0f3061ceb6c",
-    "scripts/check-traceability.mjs": "a78a1d83660b38f7f03bf830016498d4beb5c47c27abef5ad1d82e67536739e0",
+    "scripts/check-traceability.mjs": "489a1532aad09eef4f2b8a9dbef9fbf7e20b42d60919bcc51108b842d254090e",
     "scripts/check-trajectory.mjs": "79fcfe10d671998f48ac14e44ab65ebafa10445a6b8de97aac881fe2d971e916",
     "scripts/gate-status.mjs": "d9c79391086129ca8a9fb512fcc13be5083db1bc73d79b26525c51ae84777754",
     "scripts/hooks-commit-msg.mjs": "2cd9ebbd0054e1dfc9a9b2b39bca25de6d3dc188fd5d7793808ee48f209aaf20",
@@ -24,6 +24,6 @@
     "scripts/qa-verify.mjs": "77e5c4a00ff226baeabb5a9adedd4546d11db758ce4c5692301138a07616906e"
   },
   "adaptations": [
-    "PD-10: gates scoped to started plan slices (SKIP-planned), vacuous-pass predicate; PD-11: check-a11y report"
+    "doucko multi-repo harness (backend)"
   ]
 }

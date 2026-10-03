@@ -746,6 +746,235 @@
       "planned": true,
       "tests": [],
       "recordings": []
+    },
+    {
+      "id": "NFR-1",
+      "owners": [
+        "backend"
+      ],
+      "ownedHere": true,
+      "tests": []
+    },
+    {
+      "id": "NFR-2",
+      "owners": [
+        "backend"
+      ],
+      "ownedHere": true,
+      "tests": [
+        "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
+        "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
+        "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt",
+        "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt"
+      ]
+    },
+    {
+      "id": "NFR-3",
+      "owners": [
+        "backend",
+        "frontend"
+      ],
+      "ownedHere": true,
+      "tests": [
+        "src/test/kotlin/cz/doucko/shared/RequestContentNotLoggedTest.kt",
+        "src/test/kotlin/cz/doucko/shared/RequestContentNotLoggedTest.kt"
+      ]
+    },
+    {
+      "id": "NFR-4",
+      "owners": [
+        "backend",
+        "frontend"
+      ],
+      "ownedHere": true,
+      "tests": [
+        "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+        "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt"
+      ]
+    },
+    {
+      "id": "NFR-5",
+      "owners": [
+        "backend",
+        "frontend"
+      ],
+      "ownedHere": true,
+      "tests": []
+    },
+    {
+      "id": "NFR-6",
+      "owners": [
+        "frontend"
+      ],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "NFR-7",
+      "owners": [
+        "frontend"
+      ],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "NFR-8",
+      "owners": [
+        "frontend"
+      ],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "NFR-9",
+      "owners": [
+        "backend",
+        "frontend"
+      ],
+      "ownedHere": true,
+      "tests": [
+        "src/test/kotlin/cz/doucko/shared/UndeclaredPathTest.kt",
+        "src/test/kotlin/cz/doucko/shared/UndeclaredPathTest.kt"
+      ]
+    },
+    {
+      "id": "NFR-10",
+      "owners": [
+        "backend"
+      ],
+      "ownedHere": true,
+      "tests": [
+        "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+        "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt"
+      ]
+    },
+    {
+      "id": "NFR-11",
+      "owners": [
+        "backend"
+      ],
+      "ownedHere": true,
+      "tests": [
+        "src/test/kotlin/cz/doucko/ModularityTest.kt"
+      ]
+    },
+    {
+      "id": "NFR-12",
+      "owners": [
+        "backend",
+        "frontend"
+      ],
+      "ownedHere": true,
+      "tests": [
+        "src/test/kotlin/cz/doucko/platform/ContractGenerationTest.kt",
+        "src/test/kotlin/cz/doucko/platform/ContractGenerationTest.kt",
+        "src/test/kotlin/cz/doucko/platform/ContractGenerationTest.kt"
+      ]
+    },
+    {
+      "id": "NFR-13",
+      "owners": [
+        "frontend"
+      ],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "NFR-15",
+      "owners": [
+        "backend"
+      ],
+      "ownedHere": true,
+      "tests": []
+    },
+    {
+      "id": "NFR-16",
+      "owners": [
+        "backend"
+      ],
+      "ownedHere": true,
+      "tests": []
+    },
+    {
+      "id": "NFR-17",
+      "owners": [
+        "backend",
+        "frontend"
+      ],
+      "ownedHere": true,
+      "tests": []
+    },
+    {
+      "id": "TC-1",
+      "owners": [],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "TC-2",
+      "owners": [],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "TC-3",
+      "owners": [],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "TC-4",
+      "owners": [],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "TC-5",
+      "owners": [],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "TC-6",
+      "owners": [],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "TC-7",
+      "owners": [],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "TC-8",
+      "owners": [],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "BC-1",
+      "owners": [],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "BC-2",
+      "owners": [],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "BC-3",
+      "owners": [],
+      "ownedHere": false,
+      "tests": []
+    },
+    {
+      "id": "BC-4",
+      "owners": [],
+      "ownedHere": false,
+      "tests": []
     }
   ],
   "failures": [],
