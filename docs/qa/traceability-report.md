@@ -5,7 +5,7 @@ requirements/spec/test/recording change; CI runs `--check-fresh`.
 
 Repo: backend (contract: submodule).
 Scope: 48 MVP functional requirements, 47 owned by backend.
-Result: PASS, 47 warning(s)
+Result: PASS, 48 warning(s)
 
 | FR | Spec | Plan | Owner repo(s) | Test trace here | Recording here |
 |---|---|---|---|---|---|
@@ -62,9 +62,9 @@ Result: PASS, 47 warning(s)
 
 | Req | Owner repo(s) | Test trace here |
 |---|---|---|
-| NFR-1 | backend | - |
+| NFR-1 | backend | 15 |
 | NFR-2 | backend | 11 |
-| NFR-3 | backend, frontend | 6 |
+| NFR-3 | backend, frontend | 7 |
 | NFR-4 | backend, frontend | 6 |
 | NFR-5 | backend, frontend | - |
 | NFR-6 | frontend | n/a |
@@ -75,8 +75,8 @@ Result: PASS, 47 warning(s)
 | NFR-11 | backend | 2 |
 | NFR-12 | backend, frontend | 3 |
 | NFR-13 | frontend | n/a |
-| NFR-15 | backend | - |
-| NFR-16 | backend | - |
+| NFR-15 | backend | 15 |
+| NFR-16 | backend | 9 |
 | NFR-17 | backend, frontend | - |
 | TC-1 | - | n/a |
 | TC-2 | - | n/a |
@@ -144,3 +144,4 @@ None.
 - **test-trace**: FR-42 (owned by backend) has no test annotated "@trace FR-42"
 - **test-trace**: FR-43 (owned by backend) has no test annotated "@trace FR-43"
 - **test-trace**: FR-44 (owned by backend) has no test annotated "@trace FR-44"
+- **active-changes**: active change "implement-admin-access-api" is not archived

@@ -753,7 +753,23 @@
         "backend"
       ],
       "ownedHere": true,
-      "tests": []
+      "tests": [
+        "src/test/kotlin/cz/doucko/admin/AdminCredentialsTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminCredentialsTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminCredentialsTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionIT.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionIT.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt"
+      ]
     },
     {
       "id": "NFR-2",
@@ -783,6 +799,7 @@
       ],
       "ownedHere": true,
       "tests": [
+        "src/test/kotlin/cz/doucko/admin/AdminSessionIT.kt",
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/platform/DockerContextTest.kt",
@@ -910,7 +927,23 @@
         "backend"
       ],
       "ownedHere": true,
-      "tests": []
+      "tests": [
+        "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionIT.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt"
+      ]
     },
     {
       "id": "NFR-16",
@@ -918,7 +951,17 @@
         "backend"
       ],
       "ownedHere": true,
-      "tests": []
+      "tests": [
+        "src/test/kotlin/cz/doucko/admin/AdminPasswordPolicyTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminPasswordPolicyTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminPasswordPolicyTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminPasswordPolicyTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminPasswordPolicyTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminPasswordPolicyTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminStartupTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminStartupTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminStartupTest.kt"
+      ]
     },
     {
       "id": "NFR-17",
@@ -1191,6 +1234,10 @@
     {
       "check": "test-trace",
       "msg": "FR-44 (owned by backend) has no test annotated \"@trace FR-44\""
+    },
+    {
+      "check": "active-changes",
+      "msg": "active change \"implement-admin-access-api\" is not archived"
     }
   ]
 }

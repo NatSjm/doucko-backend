@@ -1,5 +1,6 @@
 package cz.doucko.shared
 
+import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -25,10 +26,10 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Contract `info` → Conventions: an undeclared path is 404 problem+json (NFR-9: title from the catalog).
- * Until admin-access, every `/api/admin/` request is refused as problem+json and no handler runs.
+ * Without an admin session, every `/api/admin/` request is refused as problem+json and no handler runs.
  */
 @WebMvcTest
-@Import(SecurityConfiguration::class, UndeclaredPathTest.AdminProbe::class)
+@Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, UndeclaredPathTest.AdminProbe::class)
 class UndeclaredPathTest {
     @Autowired
     lateinit var mvc: MockMvc
@@ -90,10 +91,10 @@ class UndeclaredPathTest {
     // @trace NFR-9
     @ParameterizedTest
     @ValueSource(strings = ["GET", "POST", "PUT", "DELETE"])
-    fun `the admin area is closed until admin-access, as problem+json, and no handler runs`(method: String) {
+    fun `the admin area refuses a client without a session, as problem+json, and no handler runs`(method: String) {
         AdminProbe.calls.set(0)
         for (path in listOf("/api/admin/probe", "/api/admin/sources", "/api/admin/does-not-exist")) {
-            send(method, path).isProblem(403, messages.getMessage("problem.title.403", null, Locale.ENGLISH))
+            send(method, path).isProblem(401, messages.getMessage("problem.title.401", null, Locale.ENGLISH))
         }
         AdminProbe.calls.get() shouldBe 0
     }

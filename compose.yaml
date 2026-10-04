@@ -33,6 +33,8 @@ services:
       DOUCKO_DB_URL: jdbc:postgresql://db:5432/doucko
       DOUCKO_DB_USER: doucko
       DOUCKO_DB_PASSWORD: ${DOUCKO_DB_PASSWORD:?set DOUCKO_DB_PASSWORD in .env (see .env.example)}
+      # admin-access: the backend refuses to start unless it is 12 characters to 72 bytes (NFR-16).
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env (see .env.example)}
     depends_on:
       db:
         condition: service_healthy

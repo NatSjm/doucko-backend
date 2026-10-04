@@ -13,7 +13,8 @@ import java.util.Locale
 /**
  * Problem responses written outside Spring MVC's exception handling: security refusals, firewall
  * rejections and container-level errors. Titles and details come from the message catalog
- * (`problem.title.<status>` / `problem.detail.<status>`, else `problem.title` / `problem.detail`), NFR-9.
+ * (`problem.title.<key>` / `problem.detail.<key>`, else `problem.title` / `problem.detail`), NFR-9. The key is
+ * the status code unless a caller names a more specific one (e.g. `invalid-credentials`).
  */
 class ProblemResponses(
     private val messages: MessageSource,
@@ -23,9 +24,10 @@ class ProblemResponses(
         status: HttpStatus,
         instance: String,
         locale: Locale,
+        key: String = status.value().toString(),
     ): ProblemDetail {
         fun text(kind: String) =
-            messages.getMessage("problem.$kind.${status.value()}", null, null, locale) ?: messages.getMessage("problem.$kind", null, locale)
+            messages.getMessage("problem.$kind.$key", null, null, locale) ?: messages.getMessage("problem.$kind", null, locale)
         return ProblemDetail.forStatusAndDetail(status, text("detail")).apply {
             title = text("title")
             this.instance = URI.create(instance.replace(" ", "%20"))
@@ -36,9 +38,10 @@ class ProblemResponses(
         request: HttpServletRequest,
         response: HttpServletResponse,
         status: HttpStatus,
+        key: String = status.value().toString(),
     ) {
         response.status = status.value()
         response.contentType = MediaType.APPLICATION_PROBLEM_JSON_VALUE
-        json.writeValue(response.outputStream, problem(status, request.requestURI, request.locale))
+        json.writeValue(response.outputStream, problem(status, request.requestURI, request.locale, key))
     }
 }

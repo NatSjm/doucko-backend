@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 class BackupRestoreIT {
     private val project = "doucko-it-" + UUID.randomUUID().toString().take(8)
     private val backupDir: File = Files.createTempDirectory("doucko-backup-it").toFile()
-    private val env = mapOf("DOUCKO_DB_PASSWORD" to "it-only-password")
+    private val env = mapOf("DOUCKO_DB_PASSWORD" to "it-only-password", "ADMIN_PASSWORD" to "it-only-admin-password")
 
     private fun exec(
         vararg command: String,

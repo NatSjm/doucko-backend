@@ -41,7 +41,7 @@ const docker = (...args) => spawnSync("docker", [...composeArgs(), ...args], { s
 const command = positional[0];
 
 if (command === "up") {
-  // Also fails when DOUCKO_DB_PASSWORD is unset: compose.yaml requires it (${...:?}).
+  // Also fails when DOUCKO_DB_PASSWORD or ADMIN_PASSWORD is unset: compose.yaml requires them (${...:?}).
   if (refuseConfig()) process.exit(1);
   const frontendDockerfile = join(ROOT, "..", "frontend", "Dockerfile");
   if (!existsSync(frontendDockerfile)) {

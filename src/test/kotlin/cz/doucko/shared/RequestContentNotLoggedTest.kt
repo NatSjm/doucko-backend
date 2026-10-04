@@ -1,5 +1,6 @@
 package cz.doucko.shared
 
+import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -55,6 +56,13 @@ class RequestContentNotLoggedTest {
             header("X-Probe", SENTINEL)
         }
 
+    /** admin-access: a submitted password is request content like any other (NFR-3). */
+    private fun MockMvc.signInWithSentinel() =
+        post("/api/admin/session") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"password":"$SENTINEL"}"""
+        }.andExpect { status { isUnauthorized() } }
+
     @Nested
     @WebMvcTest(
         properties = [
@@ -64,7 +72,7 @@ class RequestContentNotLoggedTest {
             "logging.level.cz.doucko=TRACE",
         ],
     )
-    @Import(SecurityConfiguration::class, Echo::class)
+    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, Echo::class)
     @ExtendWith(OutputCaptureExtension::class)
     inner class AtTrace {
         @Autowired
@@ -75,13 +83,14 @@ class RequestContentNotLoggedTest {
         fun `a bound body, query and header values stay out of the logs even at TRACE`(output: CapturedOutput) {
             mvc.postWithSentinel(ECHO).andExpect { status { isNoContent() } }
             mvc.postWithSentinel("/api/child/does-not-exist")
+            mvc.signInWithSentinel()
             output.all shouldNotContain SENTINEL
         }
     }
 
     @Nested
     @WebMvcTest(properties = ["logging.level.root=INFO"])
-    @Import(SecurityConfiguration::class, Echo::class)
+    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, Echo::class)
     @ExtendWith(OutputCaptureExtension::class)
     inner class AtConfiguredLevels {
         @Autowired
@@ -92,6 +101,7 @@ class RequestContentNotLoggedTest {
         fun `a bound body, query and header values stay out of the logs at the configured levels`(output: CapturedOutput) {
             mvc.postWithSentinel(ECHO).andExpect { status { isNoContent() } }
             mvc.postWithSentinel("/api/child/does-not-exist")
+            mvc.signInWithSentinel()
             output.all shouldNotContain SENTINEL
         }
     }
@@ -109,7 +119,7 @@ class RequestContentNotLoggedTest {
             "logging.level.org.springframework.security=DEBUG",
         ],
     )
-    @Import(SecurityConfiguration::class, Echo::class)
+    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, Echo::class)
     @ExtendWith(OutputCaptureExtension::class)
     inner class CaptureControl {
         // @trace NFR-3

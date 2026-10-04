@@ -231,8 +231,8 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/admin/AdminCredentialsTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "NFR-2": [
@@ -247,7 +247,7 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
+        "artifact": "src/test/kotlin/cz/doucko/admin/AdminSessionIT.kt",
         "status": "artifact-ok"
       }
     ],
@@ -303,16 +303,16 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "NFR-16": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/admin/AdminPasswordPolicyTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "NFR-17": [

@@ -25,6 +25,18 @@ spring:
     fallback-to-system-locale: false
 
 server:
+  servlet:
+    session:
+      # admin-access (NFR-15): the admin session. AdminIdleTimeoutFilter enforces the 8 h idle expiry on
+      # the backend clock; Tomcat's own timeout is the same 8 h, as a backstop. Only cookies, never URLs.
+      timeout: 8h
+      tracking-modes: cookie
+      cookie:
+        name: SESSION
+        http-only: true
+        same-site: strict
+        # Only the admin API receives it: child endpoints never see the admin session (NFR-1).
+        path: /api/admin
   error:
     include-stacktrace: never
     include-exception: false

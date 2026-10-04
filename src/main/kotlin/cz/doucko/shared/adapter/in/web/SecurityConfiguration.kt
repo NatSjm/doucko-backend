@@ -6,26 +6,24 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpStatus
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.invoke
+import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.provisioning.InMemoryUserDetailsManager
 import org.springframework.security.web.AuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.access.AccessDeniedHandler
-import org.springframework.security.web.csrf.CsrfFilter
 import org.springframework.security.web.firewall.HttpFirewall
 import org.springframework.security.web.firewall.RequestRejectedHandler
 import org.springframework.security.web.firewall.StrictHttpFirewall
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
-import org.springframework.security.web.util.matcher.AndRequestMatcher
 import tools.jackson.databind.json.JsonMapper
 
 /**
- * Baseline filter chain (platform-foundation). Nothing outside the admin area has a login or a
- * session, so only `/api/admin/` needs CSRF protection (contract `info`); everything else reaches
- * MVC, where an undeclared path is 404 problem+json. The admin area stays closed until the
- * admin-access slice replaces that rule with the session + CSRF chain (NFR-1, NFR-15). Every
- * refusal is problem+json titled from the message catalog (NFR-9), never Boot's error page: 403 from
- * the chain, 400 for a URL the firewall rejects.
+ * Baseline filter chain (platform-foundation) for everything outside `/api/admin/`, which the admin
+ * module's own chain owns (admin-access, NFR-1, NFR-15). Nothing here has a login or a session, so
+ * this chain is stateless and needs no CSRF protection (contract `info`): every request reaches MVC,
+ * where an undeclared path is 404 problem+json, and the child API can never see the admin session.
+ * Every refusal is problem+json titled from the message catalog (NFR-9), never Boot's error page:
+ * 400 for a URL the firewall rejects.
  */
 @Configuration(proxyBeanMethods = false)
 class SecurityConfiguration {
@@ -35,7 +33,7 @@ class SecurityConfiguration {
         json: JsonMapper,
     ) = ProblemResponses(messages, json)
 
-    /** No users until admin-access: Boot would otherwise mint one and log its password at startup (NFR-3). */
+    /** The admin is not a user store entry (admin-access): without this Boot would mint a user and log its password (NFR-3). */
     @Bean
     fun userDetailsService(): UserDetailsService = InMemoryUserDetailsManager()
 
@@ -63,13 +61,10 @@ class SecurityConfiguration {
     ): SecurityFilterChain {
         http {
             authorizeHttpRequests {
-                authorize("/api/admin/**", denyAll)
                 authorize(anyRequest, permitAll)
             }
-            csrf {
-                requireCsrfProtectionMatcher =
-                    AndRequestMatcher(CsrfFilter.DEFAULT_CSRF_MATCHER, PathPatternRequestMatcher.withDefaults().matcher("/api/admin/**"))
-            }
+            csrf { disable() }
+            sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
             exceptionHandling {
                 authenticationEntryPoint =
                     AuthenticationEntryPoint { request, response, _ -> problems.write(request, response, HttpStatus.FORBIDDEN) }

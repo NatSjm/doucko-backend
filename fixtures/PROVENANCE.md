@@ -11,3 +11,4 @@ does not have the shape below.
 
 | Path | Origin | Author | What it is |
 |---|---|---|---|
+| `src/test/resources/application.properties` | self-authored | Doučko maintainers | Test-only `ADMIN_PASSWORD`, the example value from the admin-access spec scenarios. Not a real password. |
