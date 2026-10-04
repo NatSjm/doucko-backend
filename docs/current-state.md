@@ -8,9 +8,7 @@
 - **Date and time:** 2026-10-04 (Europe/Prague)
 - **Current phase:** Phase 4
 - **Last completed gate:** G3
-- **Active change:** `implement-admin-access-api` (slice 2, branch `slice2-admin-access`, committed, not pushed or
-  merged). Review gate run 2026-10-04; findings fixed in `513a886` or waived with reasons in
-  `openspec/changes/implement-admin-access-api/review-findings.json`. Next: archive.
+- **Active change:** none. Slice 2 `implement-admin-access-api` archived 2026-10-04 (branch `slice2-admin-access`, not pushed or merged).
 - **Contract pin:** `contract/` submodule (`url = ../docs`) at docs `4c87d67`, API 0.5.1
 - **Progress:** Spring Boot 4.1.1 / Kotlin 2.3 / JVM 21 scaffold (ADR-0003) plus slice 1 platform
   foundation: Compose stack (db, backend, frontend; only the frontend's 8081 published, on
@@ -20,7 +18,7 @@
   (`StrictHttpFirewall`), fixture provenance test. Slice 2: module `cz.doucko.admin` with
   its own chain for `/api/admin/**` (sign-in, session check, sign-out, CSRF, 401 before 403, 8 h idle
   expiry on an injectable `Clock`, startup password policy).
-- **Next task:** archive slice 2, then slice 3 (answer-checker) or 4 (child-profile) per the capability plan.
+- **Next task:** slice 3 (answer-checker) or 4 (child-profile) per the capability plan.
 - **Claims:**
   - Slice 2 QA battery passes (108 unit, 25 integration tests incl. `AdminSessionIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
   - Slice 2 RED run — evidence: `docs/qa/evidence/slice2-red-run.md`; real-stack smoke — evidence: `docs/qa/evidence/slice2-compose-smoke.md`
@@ -30,7 +28,7 @@
     `openspec/changes/archive/*implement-platform-foundation-api/review-findings.json`
   - G0, G2, G4, G5, G6, G8 PASS (G4 audits the archived slice); G1 and G3 need the owner's sign-off; G7 (release) fails until every
     MVP slice is archived. Evidence: `npm run gate:status`
-- **Scope NOT delivered:** slice 2 review gate and archive (pending); the "Child write is limited to its own practice" scenario (needs slice 7 attempts); every product capability after slice 1 (authoring, practice, gamification,
+- **Scope NOT delivered:** the "Child write is limited to its own practice" scenario (needs slice 7 attempts); every product capability after slice 1 (authoring, practice, gamification,
   admin-access, stats); Modulith JPA event registry (deferred, ADR-0003); the round-3 review fixes
   were not re-confirmed by a further review round (owner's choice).
 

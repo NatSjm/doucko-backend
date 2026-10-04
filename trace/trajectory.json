@@ -2,6 +2,16 @@
   "generatedBy": "scripts/check-trajectory.mjs",
   "slices": [
     {
+      "slice": "2026-10-04-implement-admin-access-api",
+      "reviewEvidence": "clean",
+      "trailerCommits": 3,
+      "libDomains": [
+        "admin",
+        "shared"
+      ],
+      "processComplete": true
+    },
+    {
       "slice": "2026-10-04-implement-platform-foundation-api",
       "reviewEvidence": "clean",
       "trailerCommits": 8,

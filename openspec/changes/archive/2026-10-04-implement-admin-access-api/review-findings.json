@@ -35,7 +35,8 @@
       "title": "Concurrent invalidation makes the idle filter throw IllegalStateException, giving a raw 500",
       "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt",
       "line": 29,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "513a886"
     },
     {
       "id": "F02",
@@ -45,7 +46,8 @@
       "title": "Admin sign-in has no throttling, so a LAN client can guess passwords online without limit and use BCrypt to load the CPU",
       "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
       "line": 73,
-      "status": "open"
+      "status": "waived",
+      "reason": "The store spec excludes lockout and rate limiting (\"No sign-in lockout\", decision OQ-23, NFR-2 LAN only). AdminSessionTest proves 20 failures do not lock."
     },
     {
       "id": "F03",
@@ -55,7 +57,8 @@
       "title": "The admin password and the SESSION cookie travel in cleartext on the home LAN (no Secure flag, no TLS)",
       "file": "src/main/resources/application.yaml",
       "line": 36,
-      "status": "open"
+      "status": "waived",
+      "reason": "The store spec excludes TLS (\"no public hosting, TLS termination\", LAN only, NFR-2). The SESSION cookie cannot be Secure without TLS."
     },
     {
       "id": "F04",
@@ -65,7 +68,8 @@
       "title": "The build has no Maven dependency advisory scan, so checklist item 7 cannot be verified",
       "file": "pom.xml",
       "line": 182,
-      "status": "open"
+      "status": "waived",
+      "reason": "A dependency advisory scan is a harness-wide build concern with no admin-access requirement. It belongs in ../docs/factory as a PD change, not in this slice."
     },
     {
       "id": "F05",
@@ -75,7 +79,8 @@
       "title": "tasks.md 5.5 is unticked and current-state.md is stale relative to the commit",
       "file": "docs/current-state.md",
       "line": 11,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "a4117cf"
     },
     {
       "id": "F06",
@@ -85,7 +90,8 @@
       "title": "A failed sign-in that carries a valid session resets the idle clock, though the spec says a 401 must not reset anything",
       "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt",
       "line": 33,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "513a886"
     },
     {
       "id": "F07",
@@ -95,7 +101,8 @@
       "title": "The sign-in advice takes over HttpMessageNotReadable and HttpMediaTypeNotSupported handling for the whole app at HIGHEST_PRECEDENCE",
       "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/SignInFailureAdvice.kt",
       "line": 41,
-      "status": "open"
+      "status": "waived",
+      "reason": "Every other path delegates to Spring ResponseEntityExceptionHandler.handleException with the same MessageSource, so the responses equal Boot defaults. The global scope is needed because 415 is raised before a handler is chosen."
     },
     {
       "id": "F08",
@@ -105,7 +112,8 @@
       "title": "Sign-out and expiry don't clear the SESSION cookie in the browser",
       "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
       "line": 52,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "513a886"
     },
     {
       "id": "F09",
@@ -115,7 +123,9 @@
       "title": "'Child write is limited to its own practice' is deferred to slice 7 but nothing tracks it there",
       "file": "contract/openspec/specs/admin-access/spec.md",
       "line": null,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "513a886",
+      "note": "Tracked in ../docs/docs/mvp-capability-plan.md section 4.7 Definition of done (docs working tree, to commit in docs)."
     },
     {
       "id": "F10",
@@ -125,9 +135,10 @@
       "title": "'No content-changing child operation exists' has no executable check in the backend",
       "file": "contract/openspec/specs/admin-access/spec.md",
       "line": null,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "513a886"
     }
   ],
-  "clean": false,
+  "clean": true,
   "generatedAt": "2026-10-04T15:00:16Z"
 }
