@@ -8,8 +8,7 @@
 - **Date and time:** 2026-10-04 (Europe/Prague)
 - **Current phase:** Phase 4
 - **Last completed gate:** G3
-- **Active change:** none. Slices 3 `implement-answer-checking-api` and 4 `implement-child-profile-api`
-  archived 2026-10-04 and merged into `slice2-admin-access` (not pushed, not merged to `main`).
+- **Active change:** none. Slice 5 backend `implement-authoring-tasks-api` archived 2026-10-04 on branch `slice5-authoring-tasks` (not pushed, not merged).
 - **Contract pin:** `contract/` submodule (`url = ../docs`) at docs `4c87d67`, API 0.5.1
 - **Progress:** Spring Boot 4.1.1 / Kotlin 2.3 / JVM 21 scaffold (ADR-0003) plus slice 1 platform
   foundation: Compose stack (db, backend, frontend; only the frontend's 8081 published, on
@@ -25,8 +24,11 @@
   migration `V1__child_profile.sql` (single-row `child_profile`), profile created on first start from
   `DOUCKO_CHILD_DISPLAY_NAME` (validated, startup refusal never echoes it), `getProfileSettings` /
   `updateProfileSettings` login-free with presence-aware PATCH, configured task locales (`uk`).
-- **Next task:** slice 5 (authoring-tasks) per the capability plan, after the owner merges slices 2–4.
+- **Next task:** owner merges slice 5 (backend and frontend), runs the slice-5 smoke (`docs/qa/evidence/slice5-compose-smoke.md`), then slice 6 (authoring-missions).
 - **Claims:**
+  - Slice 5 QA battery passes (548 unit, 44 integration tests incl. `ContentAuthoringIT`, `UploadLimitsIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
+  - Slice 5 review gate clean (14 findings: 11 fixed in `3738bfe`, 3 waived) — evidence: `openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/review-findings.json`
+  - Slice 5 RED run — evidence: `docs/qa/evidence/slice5-red-run.md`; real-stack smoke NOT RUN (owner stack on 8081) — evidence: `docs/qa/evidence/slice5-compose-smoke.md`
   - Slice 3 QA battery passes (347 unit, 25 integration tests; 217 golden cases, checker p95 37–73 µs; review gate 14 findings dispositioned) — evidence: `docs/qa/automated-verification-latest.md`, `docs/qa/evidence/slice3-checker-run.md` (2026-10-04)
   - Slice 3 review gate clean (14 findings: 8 fixed in `f26150d` and `6343ca7`, 6 waived with reasons) — evidence: `openspec/changes/archive/2026-10-04-implement-answer-checking-api/review-findings.json`
   - Slice 3 RED run — evidence: `docs/qa/evidence/slice3-red-run.md`
@@ -41,7 +43,7 @@
     `openspec/changes/archive/*implement-platform-foundation-api/review-findings.json`
   - G0, G2, G4, G5, G6, G8 PASS (G4 audits the archived slice); G1 and G3 need the owner's sign-off; G7 (release) fails until every
     MVP slice is archived. Evidence: `npm run gate:status`
-- **Scope NOT delivered:** the answer-checking endpoint rules (FR-22 whole-submission refusal, answer tester, re-evaluation: slices 5, 7, 9); slice 4 parts that need later slices or other repos (HQ `displayName`, XP/resolved tasks surviving a restart, e2e profile count, translation toggle, privacy scan, recordings; see `openspec/changes/archive/2026-10-04-implement-child-profile-api/design.md` Non-goals); the "Child write is limited to its own practice" scenario (needs slice 7 attempts); every product capability after slice 1 (authoring, practice, gamification,
+- **Scope NOT delivered:** slice 5: missions, publish rules and delete guards (slice 6), child serving (slice 7), backup of the `doucko-storage` volume (NFR-10 covers only Postgres), the real-stack smoke; the answer-checking endpoint rules (FR-22 whole-submission refusal, answer tester, re-evaluation: slices 5, 7, 9); slice 4 parts that need later slices or other repos (HQ `displayName`, XP/resolved tasks surviving a restart, e2e profile count, translation toggle, privacy scan, recordings; see `openspec/changes/archive/2026-10-04-implement-child-profile-api/design.md` Non-goals); the "Child write is limited to its own practice" scenario (needs slice 7 attempts); every product capability after slice 1 (authoring, practice, gamification,
   admin-access, stats); Modulith JPA event registry (deferred, ADR-0003); the round-3 review fixes
   were not re-confirmed by a further review round (owner's choice).
 

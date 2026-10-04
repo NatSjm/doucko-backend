@@ -35,7 +35,9 @@
       "title": "FileStoragePort's only implementation (FilesystemFileStorage) is gitignored and missing from the commit",
       "file": ".gitignore",
       "line": 17,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "3738bfe",
+      "resolution": "Anchored .gitignore runtime-data rules to the repo root; adapter moved to adapter/out/files and committed."
     },
     {
       "id": "F02",
@@ -45,7 +47,9 @@
       "title": "Concurrent image uploads collide on the deferred (task_id, position) unique constraint and return a raw 500",
       "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
       "line": 154,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "3738bfe",
+      "resolution": "Image add/reorder/delete lock the task row (SELECT ... FOR UPDATE)."
     },
     {
       "id": "F03",
@@ -55,7 +59,9 @@
       "title": "Check-then-act source delete / task save can hit FK violations that surface as 500",
       "file": "src/main/kotlin/cz/doucko/content/application/SourceService.kt",
       "line": 89,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "3738bfe",
+      "resolution": "DataIntegrityViolationException mapped to 409 problem+json; test with fault injection."
     },
     {
       "id": "F04",
@@ -65,7 +71,9 @@
       "title": "The file storage adapter, which holds the path-traversal guard, is gitignored and missing from the commit, so a clean checkout cannot start",
       "file": ".gitignore",
       "line": 17,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "3738bfe",
+      "resolution": "Same root cause as F01; adapter with the path guard is committed."
     },
     {
       "id": "F05",
@@ -75,7 +83,9 @@
       "title": "`server.tomcat.max-swallow-size: -1` lets any LAN client hold request threads with endless bodies, without signing in",
       "file": "src/main/resources/application.yaml",
       "line": 36,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "3738bfe",
+      "resolution": "max-swallow-size bounded at 64MB."
     },
     {
       "id": "F06",
@@ -85,7 +95,9 @@
       "title": "Coverage summary — 17 scenarios: 15 implemented, 2 partial, 0 missing, 0 contradicted (the storage adapter is not in the commit, so HEAD does not build as committed)",
       "file": "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md",
       "line": 1,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "3738bfe",
+      "resolution": "Adapter committed; HEAD builds; qa:verify re-run from a clean target."
     },
     {
       "id": "F07",
@@ -95,7 +107,9 @@
       "title": "FilesystemFileStorage / StorageRoot (the only FileStoragePort implementation) is not committed: `.gitignore` rule `storage/` hides the adapter package",
       "file": "src/main/kotlin/cz/doucko/content/adapter/out/files/FilesystemFileStorage.kt",
       "line": 18,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "3738bfe",
+      "resolution": "Same as F01."
     },
     {
       "id": "F08",
@@ -105,7 +119,9 @@
       "title": "Task 5.1 is ticked 'qa:verify green' but the committed tree cannot reproduce it",
       "file": "openspec/changes/implement-authoring-tasks-api/tasks.md",
       "line": 26,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "3738bfe",
+      "resolution": "qa:verify re-run after mvnw clean on the committed tree: Overall result Pass (548 unit, 44 IT)."
     },
     {
       "id": "F09",
@@ -115,7 +131,8 @@
       "title": "Task 5.4 real-stack smoke is ticked although it was not run",
       "file": "openspec/changes/implement-authoring-tasks-api/tasks.md",
       "line": 29,
-      "status": "open"
+      "status": "waived",
+      "resolution": "The archive check (tasks-complete) refuses an archived change with an open box, so 5.4 stays ticked as in slice 4, but its text now says NOT RUN, not a pass; the smoke is listed under Scope NOT delivered in current-state and its click path is recorded."
     },
     {
       "id": "F10",
@@ -125,7 +142,9 @@
       "title": "FR-2 (PDF viewer / getSourceFile) is backend-owned but has no requirement or scenario in the change delta",
       "file": "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md",
       "line": 15,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "3738bfe",
+      "resolution": "Added requirement The PDF is served for the viewer (FR-2) to the delta."
     },
     {
       "id": "F11",
@@ -135,7 +154,9 @@
       "title": "File cleanup in afterCommit can turn a committed delete into a 500",
       "file": "src/main/kotlin/cz/doucko/content/application/Transactions.kt",
       "line": 11,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "3738bfe",
+      "resolution": "afterCommit cleanup failures are logged by class name and swallowed; TransactionHooksTest."
     },
     {
       "id": "F12",
@@ -145,7 +166,9 @@
       "title": "Malformed topicId / sourceRef.sourceId reported as 'unknown' instead of 'not a UUID'",
       "file": "src/main/kotlin/cz/doucko/content/domain/TaskRules.kt",
       "line": 81,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "3738bfe",
+      "resolution": "Invalid UUIDs now report not-uuid on topicId and sourceRef.sourceId."
     },
     {
       "id": "F13",
@@ -155,7 +178,8 @@
       "title": "deleteTask and setTaskStatus are implemented without the contract's 409 guards and without a delta requirement",
       "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
       "line": 114,
-      "status": "open"
+      "status": "waived",
+      "resolution": "Mission/attempt guards for deleteTask and setTaskStatus belong to slice 6 (no missions or attempts exist yet); documented in design.md split table."
     },
     {
       "id": "F14",
@@ -165,9 +189,10 @@
       "title": "Malformed path ids return 400, which getSourceFile and getSource do not declare in the contract",
       "file": "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
       "line": 227,
-      "status": "open"
+      "status": "waived",
+      "resolution": "Contract info Conventions: a path id that is not a UUID is 400 before any lookup, for every operation."
     }
   ],
-  "clean": false,
+  "clean": true,
   "generatedAt": "2026-10-04T18:19:31Z"
 }

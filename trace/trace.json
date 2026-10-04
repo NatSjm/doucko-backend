@@ -101,7 +101,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/content-authoring/spec.md",
-        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -134,7 +134,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/content-authoring/spec.md",
-        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -151,7 +151,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/content-authoring/spec.md",
-        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -190,7 +190,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/content-authoring/spec.md",
-        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -209,7 +209,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/content-authoring/spec.md",
-        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -294,7 +294,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/content-authoring/spec.md",
-        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -331,7 +331,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/content-authoring/spec.md",
-        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -352,7 +352,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/content-authoring/spec.md",
-        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -1406,10 +1406,6 @@
     {
       "check": "test-trace",
       "msg": "FR-44 (owned by backend) has no test annotated \"@trace FR-44\""
-    },
-    {
-      "check": "active-changes",
-      "msg": "active change \"implement-authoring-tasks-api\" is not archived"
     }
   ]
 }
