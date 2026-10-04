@@ -29,5 +29,5 @@
 - [x] 5.2 `npx openspec validate implement-admin-access-api --strict`.
 - [ ] 5.3 review-gate workflow; disposition the findings in `review-findings.json`; re-run 5.1.
 - [x] 5.4 Smoke: `npm run stack:up` with `ADMIN_PASSWORD` in `.env`; through 8081: `GET /api/admin/session` 401, sign in 204 with `SESSION` and `XSRF-TOKEN`, `GET` 204, `DELETE` without header 403, with header 204, `GET` 401. Evidence: `docs/qa/evidence/slice2-compose-smoke.md`.
-- [ ] 5.5 Update `docs/current-state.md`.
+- [x] 5.5 Update `docs/current-state.md`.
 - [ ] 5.6 Archive; commit with `Slice: implement-admin-access-api` + `Refs: NFR-1, NFR-15, NFR-16`.

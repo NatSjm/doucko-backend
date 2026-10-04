@@ -8,19 +8,19 @@
 - **Date and time:** 2026-10-04 (Europe/Prague)
 - **Current phase:** Phase 4
 - **Last completed gate:** G3
-- **Active change:** `implement-admin-access-api` (slice 2, branch `slice2-admin-access`, not committed). Tasks
-  done up to the review gate. Next: the review-gate workflow, dispositions in `review-findings.json`,
-  archive and commit. Slice 1 (`implement-platform-foundation-api`) archived 2026-10-04.
+- **Active change:** `implement-admin-access-api` (slice 2, branch `slice2-admin-access`, committed, not pushed or
+  merged). Review gate run 2026-10-04; findings fixed in `513a886` or waived with reasons in
+  `openspec/changes/implement-admin-access-api/review-findings.json`. Next: archive.
 - **Contract pin:** `contract/` submodule (`url = ../docs`) at docs `4c87d67`, API 0.5.1
 - **Progress:** Spring Boot 4.1.1 / Kotlin 2.3 / JVM 21 scaffold (ADR-0003) plus slice 1 platform
   foundation: Compose stack (db, backend, frontend; only the frontend's 8081 published, on
   `DOUCKO_BIND_ADDRESS`, checked by `npm run stack:up`), backup/restore tooling, problem+json for
   undeclared paths and refusals, actuator health only,
   request content never logged (log guard incl. Tomcat parser), DNS-rebinding Host allowlist
-  (`StrictHttpFirewall`), fixture provenance test. Slice 2 (uncommitted): module `cz.doucko.admin` with
+  (`StrictHttpFirewall`), fixture provenance test. Slice 2: module `cz.doucko.admin` with
   its own chain for `/api/admin/**` (sign-in, session check, sign-out, CSRF, 401 before 403, 8 h idle
   expiry on an injectable `Clock`, startup password policy).
-- **Next task:** slice 2 review gate (task 5.3 of `openspec/changes/implement-admin-access-api/tasks.md`), then archive.
+- **Next task:** archive slice 2, then slice 3 (answer-checker) or 4 (child-profile) per the capability plan.
 - **Claims:**
   - Slice 2 QA battery passes (108 unit, 25 integration tests incl. `AdminSessionIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
   - Slice 2 RED run — evidence: `docs/qa/evidence/slice2-red-run.md`; real-stack smoke — evidence: `docs/qa/evidence/slice2-compose-smoke.md`
