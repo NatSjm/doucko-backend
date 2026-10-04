@@ -21,7 +21,6 @@ class ComposeConfigurationTest {
     @Test
     fun `every published port binds the configurable address, loopback by default`() {
         val published = services.flatMap { (name, svc) -> (svc["ports"] as List<*>? ?: emptyList<Any>()).map { name to it.toString() } }
-        published.map { it.first } shouldContain "backend"
         published.map { it.first } shouldContain "frontend"
         val bindPrefix = "\${DOUCKO_BIND_ADDRESS:-127.0.0.1}:"
         for ((name, port) in published) {
@@ -29,6 +28,13 @@ class ComposeConfigurationTest {
                 "$name publishes $port; expected $bindPrefix<host port>:<container port>"
             }
         }
+    }
+
+    // @trace NFR-2
+    @Test
+    fun `the backend port is not published, the browser reaches the API only through the frontend's nginx`() {
+        val backend = services["backend"].shouldNotBeNull()
+        backend["ports"] shouldBe null
     }
 
     // @trace NFR-2

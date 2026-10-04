@@ -50,8 +50,41 @@ class DouckoBackendApplicationIT {
             HttpResponse.BodyHandlers.ofString(),
         )
 
+    /** Sends a GET with [host] as the Host header over a raw socket (HttpClient refuses to set Host). */
+    private fun getWithHost(
+        host: String,
+        rawPath: String = "/api/child/does-not-exist",
+    ): Pair<Int, String> =
+        java.net.Socket("localhost", port).use { socket ->
+            socket.getOutputStream().write(
+                "GET $rawPath HTTP/1.1\r\nHost: $host\r\nAccept: application/json\r\nConnection: close\r\n\r\n".toByteArray(),
+            )
+            val text = socket.getInputStream().readAllBytes().toString(Charsets.UTF_8)
+            text.substringAfter(' ').substringBefore(' ').toInt() to text
+        }
+
     @Test
     fun `context starts against Postgres 16 with Flyway applied`() {
+    }
+
+    // @trace NFR-2
+    @ParameterizedTest
+    @CsvSource("localhost, 404", "127.0.0.1, 404", "192.168.1.20:8081, 404", "backend:8080, 404")
+    fun `the backend answers localhost, IPv4 addresses and its Compose name`(
+        host: String,
+        status: Int,
+    ) {
+        getWithHost(host).first shouldBe status
+    }
+
+    // @trace NFR-2
+    @ParameterizedTest
+    @CsvSource("evil.example", "127.0.0.1.evil.example", "localhost.evil.example", "backend.evil.example")
+    fun `any other Host is refused as problem+json, so a rebound DNS name cannot reach the API`(host: String) {
+        val (status, text) = getWithHost(host)
+        status shouldBe 400
+        text shouldContain "application/problem+json"
+        text shouldContain "\"title\":\"Bad request\""
     }
 
     // @trace NFR-2

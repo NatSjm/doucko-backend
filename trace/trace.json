@@ -763,11 +763,14 @@
       "ownedHere": true,
       "tests": [
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
+        "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
+        "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
         "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
         "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
         "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
         "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
+        "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt",
         "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt",
         "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt"
       ]

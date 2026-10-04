@@ -2,7 +2,8 @@
 # address that is not loopback or a private LAN address (NFR-2) before calling `docker compose up`.
 # It checks the ports `docker compose config` renders. A plain `docker compose up` skips that check.
 #
-# - Every published port binds DOUCKO_BIND_ADDRESS (default 127.0.0.1). Set it in .env to the
+# - Only the frontend (8081) is published, on DOUCKO_BIND_ADDRESS (default 127.0.0.1); the backend
+#   and the database are reachable only on the Compose network. Set it in .env to the
 #   laptop's RFC 1918 address (e.g. 192.168.1.20) to reach the app from the home LAN.
 # - The database is never published to the host (admin-access "Database not published").
 # - Data lives on the named volume doucko-pgdata (NFR-10); `npm run backup` dumps it to
@@ -35,8 +36,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8080:8080"
+    # Not published: the browser reaches the API only through the frontend's nginx (one origin, Host
+    # guard against DNS rebinding). A published 8080 would be a second door without that guard.
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
       interval: 5s

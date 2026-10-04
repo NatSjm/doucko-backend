@@ -18,9 +18,15 @@ authentication (slice 2), the first table (slice 4).
    loopback or canonical RFC 1918 (`10/8`, `172.16/12`, `192.168/16`). It
    never re-parses `.env`: compose accepts `export`, lets a later duplicate
    win and lets the process environment override the file. `up` refuses
-   `--env-file`, so it starts exactly what it checked. The database
-   publishes no port (admin-access "Database not published"). Actuator
-   exposes only `health` (the compose healthcheck).
+   `--env-file`, so it starts exactly what it checked. Only the frontend
+   (8081) is published: the backend and the database publish no port
+   (admin-access "Database not published"), so the browser reaches the API
+   only through the frontend's nginx and its Host guard. Actuator exposes
+   only `health` (the compose healthcheck, run inside the container).
+2a. **DNS rebinding guard.** The security firewall (`StrictHttpFirewall`)
+   answers only `localhost`, a bare IPv4 address and the Compose name
+   `backend`; any other Host is 400 problem+json. It backs up nginx's rule
+   for anything that reaches the backend directly (dev runs on 8080).
 3. **Backup through `docker compose exec`.** `pg_dump -Fc` streams to the
    host as binary, which avoids Windows newline and console code-page
    mangling. Output defaults to `~/doucko-backups/` (outside every repo,
