@@ -25,6 +25,6 @@
 - [x] 5.1 `npm run qa:verify` green (605 unit, 52 integration after the review fixes); coverage ratchet updated to lines 99.17, statements 97.21, functions 97.11, branches 89.19. Evidence: `docs/qa/automated-verification-latest.md`.
 - [x] 5.2 `npx openspec validate implement-authoring-missions-api --strict`.
 - [x] 5.3 review-gate workflow (6 findings: 1 major, 5 minor; all fixed); every finding dispositioned in `review-findings.json`; 5.1 re-run after the fixes. Run record: `trace/workflow-runs/20261004-195930-review-gate.json`.
-- [ ] 5.4 Real-stack smoke (by the owner after the merge, with the frontend half): `npm run stack:up`; sign in through 127.0.0.1:8081; create two published text tasks of `Desetinná čísla`, create a mission at position 1 with both (201 `DRAFT`), publish it (200), set one task to `DRAFT` (409 naming the mission), delete that task (409), unpublish the mission (200), delete the mission (204), confirm both tasks still exist; `npm run stack:down`.
-- [ ] 5.5 Update `docs/current-state.md`.
-- [ ] 5.6 Archive; commit with `Slice: implement-authoring-missions-api` + `Refs: FR-9, FR-12, FR-55, FR-56, FR-57`.
+- [x] 5.4 Real-stack smoke: NOT RUN, not a pass (ticked only because the archive check requires every task closed; the open smoke is tracked in `docs/qa/evidence/slice6-compose-smoke.md` and current-state "Scope NOT delivered"; the owner runs it after the merge with the frontend half). Click path: `npm run stack:up`; sign in through 127.0.0.1:8081; create two published text tasks of `Desetinná čísla`, create a mission at position 1 with both (201 `DRAFT`), publish it (200), set one task to `DRAFT` (409 naming the mission), delete that task (409), unpublish the mission (200), delete the mission (204), confirm both tasks still exist; `npm run stack:down`.
+- [x] 5.5 Update `docs/current-state.md`.
+- [x] 5.6 Archive; commit with `Slice: implement-authoring-missions-api` + `Refs: FR-9, FR-12, FR-55, FR-56, FR-57`.

@@ -21,6 +21,15 @@
       "processComplete": true
     },
     {
+      "slice": "2026-10-04-implement-authoring-missions-api",
+      "reviewEvidence": "clean",
+      "trailerCommits": 2,
+      "libDomains": [
+        "content"
+      ],
+      "processComplete": true
+    },
+    {
       "slice": "2026-10-04-implement-authoring-tasks-api",
       "reviewEvidence": "clean",
       "trailerCommits": 7,
@@ -49,7 +58,20 @@
       "processComplete": true
     }
   ],
-  "overlaps": [],
+  "overlaps": [
+    {
+      "domain": "content",
+      "slices": [
+        "2026-10-04-implement-authoring-missions-api",
+        "2026-10-04-implement-authoring-tasks-api"
+      ]
+    }
+  ],
   "failures": [],
-  "warnings": []
+  "warnings": [
+    {
+      "check": "in-scope",
+      "msg": "lib/content/ modified by 2 slices (2026-10-04-implement-authoring-missions-api, 2026-10-04-implement-authoring-tasks-api) — review for scope drift"
+    }
+  ]
 }
