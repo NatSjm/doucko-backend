@@ -1,22 +1,35 @@
 package cz.doucko.shared
 
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
-import io.kotest.matchers.collections.shouldBeIn
+import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.MessageSource
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
-import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.request
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.resource.NoResourceFoundException
+import java.net.URI
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 
-/** Contract `info` → Conventions: an undeclared path is 404 problem+json (NFR-9: title from the catalog). */
+/**
+ * Contract `info` → Conventions: an undeclared path is 404 problem+json (NFR-9: title from the catalog).
+ * Until admin-access, every `/api/admin/` request is refused as problem+json and no handler runs.
+ */
 @WebMvcTest
-@Import(SecurityConfiguration::class)
+@Import(SecurityConfiguration::class, UndeclaredPathTest.AdminProbe::class)
 class UndeclaredPathTest {
     @Autowired
     lateinit var mvc: MockMvc
@@ -24,39 +37,65 @@ class UndeclaredPathTest {
     @Autowired
     lateinit var messages: MessageSource
 
-    private val notFoundTitle: String
-        get() = messages.getMessage("problemDetail.title.${NoResourceFoundException::class.java.name}", null, Locale.ENGLISH)
+    /** A handler under the admin area: the security chain must refuse before it is reached. */
+    @TestConfiguration
+    @RestController
+    class AdminProbe {
+        @RequestMapping("/api/admin/probe")
+        fun probe() {
+            calls.incrementAndGet()
+        }
+
+        companion object {
+            val calls = AtomicInteger()
+        }
+    }
+
+    private fun title(exception: Class<*>) = messages.getMessage("problemDetail.title.${exception.name}", null, Locale.ENGLISH)
+
+    private fun ResultActionsDsl.isProblem(
+        status: Int,
+        title: String,
+    ) = andExpect {
+        status { isEqualTo(status) }
+        content { contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON) }
+        jsonPath("$.title") { value(title) }
+        jsonPath("$.status") { value(status) }
+        jsonPath("$.trace") { doesNotExist() }
+        jsonPath("$.exception") { doesNotExist() }
+    }
+
+    private fun send(
+        method: String,
+        path: String,
+    ) = mvc.request(HttpMethod.valueOf(method), URI(path)) {
+        contentType = MediaType.APPLICATION_JSON
+        content = "{}"
+    }
 
     // @trace NFR-9
     @Test
     fun `an undeclared child path is 404 problem+json titled from the message catalog`() {
-        mvc.get("/api/child/does-not-exist").andExpect {
-            status { isNotFound() }
-            content { contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON) }
-            jsonPath("$.title") { value(notFoundTitle) }
-            jsonPath("$.status") { value(404) }
-            jsonPath("$.trace") { doesNotExist() }
-            jsonPath("$.exception") { doesNotExist() }
+        mvc.get("/api/child/does-not-exist").isProblem(404, title(NoResourceFoundException::class.java))
+    }
+
+    // @trace NFR-9
+    @ParameterizedTest
+    @ValueSource(strings = ["POST", "PUT", "DELETE"])
+    fun `a write to an undeclared path needs no CSRF token and is 404 problem+json`(method: String) {
+        for (path in listOf("/api/child/does-not-exist", "/api/does-not-exist", "/does-not-exist")) {
+            send(method, path).isProblem(404, title(NoResourceFoundException::class.java))
         }
     }
 
     // @trace NFR-9
-    @Test
-    fun `a POST to an undeclared child path needs no CSRF token and is 404`() {
-        mvc
-            .post("/api/child/does-not-exist") {
-                contentType = MediaType.APPLICATION_JSON
-                content = "{}"
-            }.andExpect { status { isNotFound() } }
-    }
-
-    @Test
-    fun `the admin area is closed until admin-access`() {
-        for (path in listOf("/api/admin/sources", "/api/admin/does-not-exist")) {
-            mvc
-                .get(path)
-                .andReturn()
-                .response.status shouldBeIn listOf(401, 403)
+    @ParameterizedTest
+    @ValueSource(strings = ["GET", "POST", "PUT", "DELETE"])
+    fun `the admin area is closed until admin-access, as problem+json, and no handler runs`(method: String) {
+        AdminProbe.calls.set(0)
+        for (path in listOf("/api/admin/probe", "/api/admin/sources", "/api/admin/does-not-exist")) {
+            send(method, path).isProblem(403, title(AccessDeniedException::class.java))
         }
+        AdminProbe.calls.get() shouldBe 0
     }
 }

@@ -19,16 +19,21 @@ class BackupRestoreIT {
     private val backupDir: File = Files.createTempDirectory("doucko-backup-it").toFile()
     private val env = mapOf("DOUCKO_DB_PASSWORD" to "it-only-password")
 
-    private fun run(
+    private fun exec(
         vararg command: String,
         timeoutSec: Long = 180,
-    ): String {
+    ): Pair<Int, String> {
         val builder = ProcessBuilder(*command).redirectErrorStream(true)
         builder.environment().putAll(env)
         val process = builder.start()
         val output = process.inputStream.bufferedReader().readText()
         check(process.waitFor(timeoutSec, TimeUnit.SECONDS)) { "timed out: ${command.joinToString(" ")}" }
-        check(process.exitValue() == 0) { "exit ${process.exitValue()}: ${command.joinToString(" ")}\n$output" }
+        return process.exitValue() to output
+    }
+
+    private fun run(vararg command: String): String {
+        val (exit, output) = exec(*command)
+        check(exit == 0) { "exit $exit: ${command.joinToString(" ")}\n$output" }
         return output
     }
 
@@ -55,8 +60,51 @@ class BackupRestoreIT {
 
         compose("down", "-v")
         compose("up", "-d", "--wait", "db")
-        run("node", "tools/restore.mjs", "--project", project, "--yes", file.path)
+        run("node", "tools/restore.mjs", "--project", project, "--yes", "--backup-dir", backupDir.path, file.path)
 
         sql("SELECT label FROM it_probe WHERE id = 1") shouldBe "round-trip"
+    }
+
+    // @trace NFR-10
+    @Test
+    fun `a broken dump leaves the live data untouched and a safety backup is taken first`() {
+        compose("up", "-d", "--wait", "db")
+        // Enough incompressible rows that the dump is mostly table data: the cut lands after the TOC,
+        // i.e. after pg_restore --clean has already dropped the table.
+        sql(
+            "CREATE TABLE it_probe (id int PRIMARY KEY, label text NOT NULL); " +
+                "INSERT INTO it_probe SELECT g, CASE WHEN g = 1 THEN 'live' ELSE md5(g::text) END FROM generate_series(1, 20000) g",
+        )
+        val dumpDir = File(backupDir, "dumps").apply { mkdirs() }
+        run("node", "tools/backup.mjs", "--project", project, "--out", dumpDir.path)
+        val dump = dumpDir.listFiles()!!.single()
+        val truncated = File(backupDir, "truncated.dump").apply { writeBytes(dump.readBytes().copyOf((dump.length() * 2 / 3).toInt())) }
+        val safetyDir = File(backupDir, "safety")
+
+        val (exit, output) =
+            exec(
+                "node",
+                "tools/restore.mjs",
+                "--project",
+                project,
+                "--yes",
+                "--backup-dir",
+                safetyDir.path,
+                truncated.path,
+            )
+
+        (exit != 0) shouldBe true
+        output shouldContain "restore:"
+        sql("SELECT label FROM it_probe WHERE id = 1") shouldBe "live"
+        (safetyDir.listFiles()?.size ?: 0) shouldBe 1
+    }
+
+    // @trace NFR-10
+    @Test
+    fun `restore without --yes refuses and changes nothing`() {
+        val dump = File(backupDir, "any.dump").apply { writeText("not used") }
+        val (exit, output) = exec("node", "tools/restore.mjs", "--project", project, dump.path)
+        exit shouldBe 1
+        output shouldContain "--yes"
     }
 }

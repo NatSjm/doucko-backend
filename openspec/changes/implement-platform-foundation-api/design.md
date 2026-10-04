@@ -13,20 +13,30 @@ authentication (slice 2), the first table (slice 4).
    side by side, the same layout `contract/` already assumes.
 2. **Bind address is one variable.** Every published port is
    `${DOUCKO_BIND_ADDRESS:-127.0.0.1}:<host>:<container>`. Compose cannot
-   validate it, so `tools/stack.mjs` refuses to start unless the address is
-   loopback or RFC 1918 (`10/8`, `172.16/12`, `192.168/16`). The database
-   publishes no port (admin-access "Database not published").
+   validate it, so `tools/stack.mjs` refuses to start unless every published
+   port in the configuration compose renders (`docker compose config`) binds
+   loopback or canonical RFC 1918 (`10/8`, `172.16/12`, `192.168/16`). It
+   never re-parses `.env`: compose accepts `export`, lets a later duplicate
+   win and lets the process environment override the file. The database
+   publishes no port (admin-access "Database not published"). Actuator
+   exposes only `health` (the compose healthcheck).
 3. **Backup through `docker compose exec`.** `pg_dump -Fc` streams to the
    host as binary, which avoids Windows newline and console code-page
    mangling. Output defaults to `~/doucko-backups/` (outside every repo,
-   because the pre-commit hook forbids `backups/` paths). `restore` uses
-   `pg_restore --clean --if-exists`.
+   because the pre-commit hook forbids `backups/` paths), owner-only (0700
+   directory, 0600 file, never overwritten). `restore` needs `--yes`,
+   checks the archive with `pg_restore --list`, takes a safety backup, then
+   runs `pg_restore --clean --if-exists --single-transaction`, so a failing
+   dump rolls back instead of leaving dropped tables.
 4. **Baseline security without auth.** With Spring Security on the
    classpath and no configuration, every request needs HTTP Basic with a
    generated password. The baseline chain permits everything except
-   `/api/admin/**` (`denyAll` until slice 2) and turns CSRF off for
-   `/api/child/**`, which has no session (contract `info`). Slice 2 replaces
-   the admin rule.
+   `/api/admin/**` (`denyAll` until slice 2). CSRF applies only to
+   `/api/admin/**`: nothing else has a session (contract `info`), and a
+   CSRF refusal elsewhere would turn an undeclared write into a 403 instead
+   of the contract's 404. The entry point and the access-denied handler write
+   403 problem+json titled from `messages.properties`, never Boot's
+   `/error` JSON. Slice 2 replaces the admin rule.
 5. **Problem titles from `messages.properties`.** Spring's
    `ResponseEntityExceptionHandler` resolves `problemDetail.title.<exception>`
    and `problemDetail.<exception>` through the `MessageSource`, so no code
@@ -37,9 +47,11 @@ authentication (slice 2), the first table (slice 4).
    ("Securing POST /path?query") includes the query string, so `application.yaml` pins `org.springframework.web` and
    `org.springframework.security` at INFO. The NFR-3 test runs twice: at
    TRACE with the sentinel in body and header, and at the configured levels
-   with the sentinel in body, query and header. Later slices add their
-   endpoints to the second case. A real controller logs the bound body at
-   DEBUG ("Read … to …"), so that case is the one that must stay green.
+   with the sentinel in body, query and header sent to a test endpoint that
+   binds the body. A real controller logs the bound body at DEBUG ("Read … to
+   …"), so the TRACE case covers only unbound content, and a negative control
+   at DEBUG proves the capture sees that leak. Each case sets the root level
+   itself, because log levels are JVM-global across cached test contexts.
 
 ## Module + hexagon placement
 
@@ -58,9 +70,14 @@ None. `compose.yaml` declares the volume `doucko-pgdata`.
 
 An undeclared path is 404 problem+json with the title from
 `messages.properties`; no stack trace and no exception class appear in the
-response (`server.error.include-*`). `/api/admin/**` is 403 until slice 2.
+response (`server.error.include-*`). `/api/admin/**` is 403 problem+json until slice 2.
 
 ## Risks & mitigations
+
+- A plain `docker compose up` bypasses the NFR-2 guard: compose cannot
+  validate an interpolated address. The documented start is
+  `npm run stack:up` (compose.yaml header, current-state); the default is
+  still `127.0.0.1`.
 
 - Docker must run for the IT suite and the backup round trip. Without it
   the battery stops red; it never skips silently.

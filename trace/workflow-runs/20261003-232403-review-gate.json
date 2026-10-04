@@ -1,0 +1,105 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-03T23:24:03.690Z",
+  "finishedAt": "2026-10-03T23:26:39.528Z",
+  "args": {
+    "scope": "slice 1 platform-foundation (backend): openspec/changes/implement-platform-foundation-api",
+    "baseRef": "6e13f53",
+    "headRef": "HEAD",
+    "focus": "Check against the change's spec delta (openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md) and the store specs admin-access ('Database not published') and content-authoring (CA-D21). Pay attention to: tools/stack.mjs --check-bind accepting anything outside loopback/RFC 1918 (IPv6 forms, IPv4-mapped, leading zeros, hostnames, 0.0.0.0 spellings); compose.yaml ports that bypass DOUCKO_BIND_ADDRESS; backup/restore writing inside a repository, leaking the DB password on the command line or in logs, or restore destroying data without a guard; any path where request body, query or headers reach logs (filters, actuator httpexchanges, Spring debug settings); the security config leaving /api/admin/** or actuator endpoints open; undeclared paths returning anything other than problem+json without driver internals; FixtureProvenanceTest missing fixture roots; the Dockerfile and .dockerignore copying .env or secrets; the .editorconfig ktlint package-name rule disabled."
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": null,
+    "budgetPerAgentUsd": 2,
+    "maxTotalUsd": 10,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "failed",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 2.1123,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": false,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --agent code-reviewer --json-schema <…>",
+      "promptChars": 1476,
+      "durationMs": 152068,
+      "sessionId": "0ddad50c-f447-4c60-a68b-724b5b9e5f94",
+      "costUsd": 0.5899445999999999,
+      "numTurns": 8,
+      "error": "result did not contain JSON for the requested schema"
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": false,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --agent security-reviewer --json-schema <…>",
+      "promptChars": 1504,
+      "durationMs": 155812,
+      "sessionId": "961e893a-a95a-4b21-a9c0-f6ef7eb93685",
+      "costUsd": 0.7701562,
+      "numTurns": 13,
+      "error": "result did not contain JSON for the requested schema"
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": false,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --agent spec-compliance-auditor --json-schema <…>",
+      "promptChars": 1447,
+      "durationMs": 155121,
+      "sessionId": "0222e3c3-0a99-4789-9356-c5fe7a8711f3",
+      "costUsd": 0.6353996,
+      "numTurns": 10,
+      "error": "result did not contain JSON for the requested schema"
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1716,
+      "durationMs": 18701,
+      "sessionId": "69501255-8e0f-475c-8ff5-2a8248fac72b",
+      "costUsd": 0.11678140000000001,
+      "numTurns": 4,
+      "result": {
+        "findings": []
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "0 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 0, contested: 0, rejected: 0"
+    }
+  ],
+  "returned": {
+    "scope": "slice 1 platform-foundation (backend): openspec/changes/implement-platform-foundation-api",
+    "summary": "Review gate for slice 1 platform-foundation (backend): openspec/changes/implement-platform-foundation-api: 0 confirmed, 0 contested (treat as confirmed unless trivially wrong), 0 rejected.",
+    "confirmed": [],
+    "contested": [],
+    "rejected": [],
+    "reviewEvidence": null
+  }
+}

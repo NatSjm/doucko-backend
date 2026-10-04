@@ -1,5 +1,6 @@
 # Doučko stack on the home laptop (TC-5). Start it with `npm run stack:up`, which refuses a bind
 # address that is not loopback or a private LAN address (NFR-2) before calling `docker compose up`.
+# It checks the ports `docker compose config` renders. A plain `docker compose up` skips that check.
 #
 # - Every published port binds DOUCKO_BIND_ADDRESS (default 127.0.0.1). Set it in .env to the
 #   laptop's RFC 1918 address (e.g. 192.168.1.20) to reach the app from the home LAN.

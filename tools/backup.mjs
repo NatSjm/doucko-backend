@@ -1,6 +1,6 @@
 // NFR-10: dump the Doučko database to a file OUTSIDE every repository.
 //
-//   npm run backup                          # → ~/doucko-backups/doucko-<UTC timestamp>.dump
+//   npm run backup                          # → ~/doucko-backups/doucko-<UTC timestamp, ms>.dump
 //   node tools/backup.mjs --out <dir> [--project <compose project>]
 //
 // pg_dump runs inside the db container (`docker compose exec`) in custom format (-Fc). The binary
@@ -24,10 +24,12 @@ for (let dir = outDir; ; dir = dirname(dir)) {
   if (dirname(dir) === dir) break;
 }
 
-mkdirSync(outDir, { recursive: true });
-const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..*$/, "").replace("T", "-");
+// Owner-only directory and file (POSIX modes; on Windows the profile ACL applies). "wx" never
+// overwrites an earlier dump; the millisecond stamp keeps two runs in one second apart.
+mkdirSync(outDir, { recursive: true, mode: 0o700 });
+const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "-").replace(".", "-").replace("Z", "");
 const file = join(outDir, `doucko-${stamp}.dump`);
-const fd = openSync(file, "w");
+const fd = openSync(file, "wx", 0o600);
 const result = spawnSync("docker", [...composeArgs(opts.project), "exec", "-T", "db", "pg_dump", "-U", "doucko", "-d", "doucko", "-Fc"], {
   stdio: ["ignore", fd, "inherit"],
 });

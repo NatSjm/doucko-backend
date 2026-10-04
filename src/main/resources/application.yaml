@@ -40,4 +40,5 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,modulith
+        # NFR-2: only the compose healthcheck needs actuator; nothing else is reachable from the LAN.
+        include: health

@@ -1,0 +1,7 @@
+{
+  "scope": "slice 1 platform-foundation (backend): openspec/changes/implement-platform-foundation-api",
+  "baseRef": "6e13f53",
+  "headRef": "HEAD",
+  "focus": "Check against the change's spec delta (openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md) and the store specs admin-access ('Database not published') and content-authoring (CA-D21). Pay attention to: tools/stack.mjs --check-bind accepting anything outside loopback/RFC 1918 (IPv6 forms, IPv4-mapped, leading zeros, hostnames, 0.0.0.0 spellings); compose.yaml ports that bypass DOUCKO_BIND_ADDRESS; backup/restore writing inside a repository, leaking the DB password on the command line or in logs, or restore destroying data without a guard; any path where request body, query or headers reach logs (filters, actuator httpexchanges, Spring debug settings); the security config leaving /api/admin/** or actuator endpoints open; undeclared paths returning anything other than problem+json without driver internals; FixtureProvenanceTest missing fixture roots; the Dockerfile and .dockerignore copying .env or secrets; the .editorconfig ktlint package-name rule disabled.",
+  "change": "implement-platform-foundation-api"
+}
