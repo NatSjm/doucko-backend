@@ -8,7 +8,7 @@
 - **Date and time:** 2026-10-04 (Europe/Prague)
 - **Current phase:** Phase 4
 - **Last completed gate:** G3
-- **Active change:** `implement-child-profile-api` (slice 4, branch `slice4-child-profile`, based on `slice2-admin-access`; not pushed or merged). Slice 2 archived 2026-10-04.
+- **Active change:** none. Slice 4 `implement-child-profile-api` archived 2026-10-04 (branch `slice4-child-profile`, based on `slice2-admin-access`; not pushed or merged).
 - **Contract pin:** `contract/` submodule (`url = ../docs`) at docs `4c87d67`, API 0.5.1
 - **Progress:** Spring Boot 4.1.1 / Kotlin 2.3 / JVM 21 scaffold (ADR-0003) plus slice 1 platform
   foundation: Compose stack (db, backend, frontend; only the frontend's 8081 published, on
@@ -21,10 +21,11 @@
   migration `V1__child_profile.sql` (single-row `child_profile`), profile created on first start from
   `DOUCKO_CHILD_DISPLAY_NAME` (validated, startup refusal never echoes it), `getProfileSettings` /
   `updateProfileSettings` login-free with presence-aware PATCH, configured task locales (`uk`).
-- **Next task:** finish slice 4 (review gate, archive), then the next slice per the capability plan.
+- **Next task:** the next slice per the capability plan (slice 4 compose smoke when the stack is free).
 - **Claims:**
   - Slice 4 QA battery passes (194 unit, 33 integration tests incl. `ProfileSettingsIT`, `ChildProfileStartupIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
-  - Slice 4 RED run — evidence: `docs/qa/evidence/slice4-red-run.md`; compose smoke skipped (main checkout stack running) — reason: `openspec/changes/implement-child-profile-api/tasks.md` task 5.4
+  - Slice 4 review gate clean (8 findings: 6 fixed in `de80c7a`, 2 waived) — evidence: `openspec/changes/archive/2026-10-04-implement-child-profile-api/review-findings.json`
+  - Slice 4 RED run — evidence: `docs/qa/evidence/slice4-red-run.md`; compose smoke skipped (main checkout stack running) — evidence: `docs/qa/evidence/slice4-compose-smoke.md`
   - Slice 2 QA battery passes (108 unit, 25 integration tests incl. `AdminSessionIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
   - Slice 2 RED run — evidence: `docs/qa/evidence/slice2-red-run.md`; real-stack smoke — evidence: `docs/qa/evidence/slice2-compose-smoke.md`
   - QA battery passes — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
@@ -33,7 +34,7 @@
     `openspec/changes/archive/*implement-platform-foundation-api/review-findings.json`
   - G0, G2, G4, G5, G6, G8 PASS (G4 audits the archived slice); G1 and G3 need the owner's sign-off; G7 (release) fails until every
     MVP slice is archived. Evidence: `npm run gate:status`
-- **Scope NOT delivered:** slice 4 parts that need later slices or other repos (HQ `displayName`, XP/resolved tasks surviving a restart, e2e profile count, translation toggle, privacy scan, recordings; see `openspec/changes/implement-child-profile-api/design.md` Non-goals) and the slice 4 compose smoke (stack busy); the "Child write is limited to its own practice" scenario (needs slice 7 attempts); every product capability after slice 1 (authoring, practice, gamification,
+- **Scope NOT delivered:** slice 4 parts that need later slices or other repos (HQ `displayName`, XP/resolved tasks surviving a restart, e2e profile count, translation toggle, privacy scan, recordings; see `openspec/changes/archive/2026-10-04-implement-child-profile-api/design.md` Non-goals) and the slice 4 compose smoke (stack busy); the "Child write is limited to its own practice" scenario (needs slice 7 attempts); every product capability after slice 1 (authoring, practice, gamification,
   admin-access, stats); Modulith JPA event registry (deferred, ADR-0003); the round-3 review fixes
   were not re-confirmed by a further review round (owner's choice).
 
