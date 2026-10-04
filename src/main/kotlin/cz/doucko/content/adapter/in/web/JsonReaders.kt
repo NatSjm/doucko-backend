@@ -6,6 +6,7 @@ import cz.doucko.content.application.InvalidContent
 import cz.doucko.content.domain.FieldError
 import cz.doucko.content.domain.In
 import cz.doucko.content.domain.Limits
+import cz.doucko.content.domain.MissionDraft
 import cz.doucko.content.domain.Modality
 import cz.doucko.content.domain.OptionDraft
 import cz.doucko.content.domain.PartDraft
@@ -64,6 +65,14 @@ internal object JsonReaders {
             partLabels = node.get("partLabels").entries { it.text() },
             hints = node.get("hints").list { it.text() },
             options = node.get("options").entries { it.text() },
+        )
+
+    /** `createMission` / `updateMission` body (contract `MissionInput`); the mission rules decide the messages. */
+    fun mission(node: JsonNode) =
+        MissionDraft(
+            topicId = node.get("topicId").uuid(),
+            position = node.get("position").int(),
+            taskIds = node.get("taskIds").list { it.uuid() },
         )
 
     /** `updateSource` body: closed (`additionalProperties: false`), so `file` or any unknown field is 400. */

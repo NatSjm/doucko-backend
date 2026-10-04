@@ -1,16 +1,23 @@
 package cz.doucko.content
 
 import cz.doucko.admin.Admin
+import cz.doucko.content.ContentUsage
 import cz.doucko.content.adapter.`in`.web.ContentProblems
 import cz.doucko.content.adapter.out.pdf.PdfBoxInspector
+import cz.doucko.content.application.Conflicts
 import cz.doucko.content.application.ContentConfiguration
+import cz.doucko.content.application.ContentLock
 import cz.doucko.content.application.FileStoragePort
+import cz.doucko.content.application.MissionService
+import cz.doucko.content.application.MissionStore
 import cz.doucko.content.application.ReferenceService
+import cz.doucko.content.application.ServedContentService
 import cz.doucko.content.application.SourceService
 import cz.doucko.content.application.SourceStore
 import cz.doucko.content.application.TaskService
 import cz.doucko.content.application.TaskStore
 import cz.doucko.content.application.TopicStore
+import cz.doucko.content.domain.Mission
 import cz.doucko.content.domain.PublishStatus
 import cz.doucko.content.domain.Source
 import cz.doucko.content.domain.Task
@@ -224,6 +231,71 @@ class InMemoryTaskStore : TaskStore {
     }
 }
 
+/** Missions in memory, ordered like the JDBC store: topic order, then position. */
+class InMemoryMissionStore(
+    private val topics: InMemoryTopicStore,
+) : MissionStore {
+    val missions = linkedMapOf<UUID, Mission>()
+
+    private fun order(list: Collection<Mission>) =
+        list.sortedWith(compareBy({ m -> topics.all().indexOfFirst { it.id == m.content.topicId } }, { it.content.position }))
+
+    override fun list() = order(missions.values)
+
+    override fun find(id: UUID) = missions[id]
+
+    override fun insert(mission: Mission) {
+        missions[mission.id] = mission
+    }
+
+    override fun update(mission: Mission) {
+        missions[mission.id] = mission.copy(status = missions.getValue(mission.id).status)
+    }
+
+    override fun setStatus(
+        id: UUID,
+        status: PublishStatus,
+    ) {
+        missions[id] = missions.getValue(id).copy(status = status)
+    }
+
+    override fun delete(id: UUID) {
+        missions.remove(id)
+    }
+
+    override fun containing(taskId: UUID) = order(missions.values.filter { taskId in it.content.taskIds })
+
+    override fun positionsTaken(
+        topicId: UUID,
+        excluding: UUID?,
+    ) = missions.values
+        .filter { it.content.topicId == topicId && it.id != excluding }
+        .map { it.content.position }
+        .toSet()
+
+    override fun removeTask(taskId: UUID) {
+        missions.replaceAll { _, m -> m.copy(content = m.content.copy(taskIds = m.content.taskIds - taskId)) }
+    }
+}
+
+/** Practice usage as a test sets it (the real adapter is slice 7): attempts, reports and opened hints per task. */
+class FakeContentUsage : ContentUsage {
+    val attempts = mutableMapOf<UUID, Int>()
+    val reports = mutableSetOf<UUID>()
+    val openedHints = mutableSetOf<UUID>()
+
+    fun clear() {
+        attempts.clear()
+        reports.clear()
+        openedHints.clear()
+    }
+
+    override fun attemptCounts(taskIds: Collection<UUID>) = attempts.filterKeys { it in taskIds }
+
+    override fun usedTasks(taskIds: Collection<UUID>) =
+        taskIds.filter { (attempts[it] ?: 0) > 0 || it in reports || it in openedHints }.toSet()
+}
+
 class InMemoryFileStorage : FileStoragePort {
     val files = ConcurrentHashMap<String, ByteArray>()
 
@@ -249,6 +321,9 @@ class InMemoryFileStorage : FileStoragePort {
     ContentConfiguration::class,
     SourceService::class,
     TaskService::class,
+    MissionService::class,
+    ServedContentService::class,
+    Conflicts::class,
     ReferenceService::class,
     PdfBoxInspector::class,
     ContentProblems::class,
@@ -265,6 +340,15 @@ class ContentWebTestBeans {
 
     @Bean
     fun fileStorage() = InMemoryFileStorage()
+
+    @Bean
+    fun missionStore(topics: InMemoryTopicStore) = InMemoryMissionStore(topics)
+
+    @Bean
+    fun contentLock() = ContentLock {}
+
+    @Bean
+    fun contentUsage() = FakeContentUsage()
 }
 
 private fun MockHttpServletRequestDsl.asAdmin(

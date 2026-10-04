@@ -32,7 +32,9 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
  * first, so Spring's generic problem handler never answers these operations without `errors`.
  */
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = [SourceController::class, TaskController::class, ReferenceController::class])
+@RestControllerAdvice(
+    assignableTypes = [SourceController::class, TaskController::class, MissionController::class, ReferenceController::class],
+)
 class ContentProblemAdvice(
     private val problems: ContentProblems,
 ) {
@@ -153,7 +155,7 @@ class ContentProblems(
     /** A query, path or multipart parameter that is missing, malformed or out of range. */
     fun parameterError(name: String): FieldError =
         when (name) {
-            "taskId", "sourceId", "imageId", "topicId" -> FieldError(name, "not-uuid")
+            "taskId", "sourceId", "imageId", "topicId", "missionId" -> FieldError(name, "not-uuid")
             "grade" -> FieldError(name, "grade-allowed", listOf(properties.grades.joinToString(", ")))
             "page" -> FieldError(name, "page-whole")
             "status" -> FieldError(name, "status")

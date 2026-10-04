@@ -47,24 +47,24 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-56": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-57": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-14": [

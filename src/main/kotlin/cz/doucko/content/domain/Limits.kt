@@ -24,6 +24,8 @@ object Limits {
     const val OPTIONS_MAX = 10
     const val DIFFICULTY_MAX = 3
     const val BULK_PUBLISH = 100
+    const val MISSION_TASKS = 50
+    const val POSITION_MAX = 999
     const val DECIMALS = 6
     const val PDF_BYTES = 50L * 1024 * 1024
     const val IMAGE_BYTES = 5L * 1024 * 1024

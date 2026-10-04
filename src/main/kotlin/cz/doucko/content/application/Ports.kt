@@ -1,5 +1,6 @@
 package cz.doucko.content.application
 
+import cz.doucko.content.domain.Mission
 import cz.doucko.content.domain.PublishStatus
 import cz.doucko.content.domain.Source
 import cz.doucko.content.domain.Task
@@ -88,4 +89,48 @@ interface TaskStore {
         taskId: UUID,
         imageIds: List<UUID>,
     )
+}
+
+/**
+ * Missions (FR-9): a topic, a position unique within the topic, and an ordered task list in which a task
+ * appears at most once (CA-D12, CA-D17).
+ */
+interface MissionStore {
+    /** Every mission, by topic order and then position. */
+    fun list(): List<Mission>
+
+    fun find(id: UUID): Mission?
+
+    fun insert(mission: Mission)
+
+    /** Stores topic, position and the whole task list in the given order. */
+    fun update(mission: Mission)
+
+    fun setStatus(
+        id: UUID,
+        status: PublishStatus,
+    )
+
+    fun delete(id: UUID)
+
+    /** The missions whose task list holds the task, by topic order and then position. */
+    fun containing(taskId: UUID): List<Mission>
+
+    /** Positions used by the topic's missions, except [excluding]. */
+    fun positionsTaken(
+        topicId: UUID,
+        excluding: UUID?,
+    ): Set<Int>
+
+    /** Removes the task from every mission's list, keeping the order of the others. */
+    fun removeTask(taskId: UUID)
+}
+
+/**
+ * Serializes the content writes whose rules read other entities (publishing rules, delete guards), so a
+ * check and its write never interleave with another such write (design decision 1). Held until the
+ * transaction ends.
+ */
+fun interface ContentLock {
+    fun exclusive()
 }

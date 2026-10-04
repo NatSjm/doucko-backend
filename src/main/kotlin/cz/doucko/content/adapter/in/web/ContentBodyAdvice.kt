@@ -2,6 +2,7 @@ package cz.doucko.content.adapter.`in`.web
 
 import cz.doucko.api.model.AttemptRequest
 import cz.doucko.api.model.BulkPublishTasksRequest
+import cz.doucko.api.model.MissionInput
 import cz.doucko.api.model.ReorderTaskImagesRequest
 import cz.doucko.api.model.SourceMetadataUpdate
 import cz.doucko.api.model.StatusChange
@@ -103,6 +104,7 @@ class ContentBodyAdvice(
                 BulkPublishTasksRequest::class.java to """{"taskIds":[$ID]}""",
                 ReorderTaskImagesRequest::class.java to """{"imageIds":[]}""",
                 StatusChange::class.java to """{"status":"DRAFT"}""",
+                MissionInput::class.java to """{"topicId":$ID,"position":1,"taskIds":[]}""",
             )
 
         fun body(request: HttpServletRequest): JsonNode = checkNotNull(request.getAttribute(BODY) as? JsonNode)
