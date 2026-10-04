@@ -4,7 +4,7 @@
     {
       "slice": "2026-10-04-implement-platform-foundation-api",
       "reviewEvidence": "clean",
-      "trailerCommits": 7,
+      "trailerCommits": 8,
       "libDomains": [
         "shared"
       ],

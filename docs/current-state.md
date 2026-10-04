@@ -23,7 +23,7 @@
   - Real-stack smoke (task 4.4) — evidence: `docs/qa/evidence/slice1-compose-smoke.md`
   - Review gate clean (13 findings, all fixed in `d2cb340`) — evidence:
     `openspec/changes/archive/*implement-platform-foundation-api/review-findings.json`
-  - G0, G2, G5, G6, G8 PASS; G1 and G3 need the owner's sign-off; G7 (release) fails until every
+  - G0, G2, G4, G5, G6, G8 PASS (G4 audits the archived slice); G1 and G3 need the owner's sign-off; G7 (release) fails until every
     MVP slice is archived. Evidence: `npm run gate:status`
 - **Scope NOT delivered:** every product capability after slice 1 (authoring, practice, gamification,
   admin-access, stats); Modulith JPA event registry (deferred, ADR-0003); the round-3 review fixes
