@@ -8,24 +8,26 @@
 - **Date and time:** 2026-10-04 (Europe/Prague)
 - **Current phase:** Phase 4
 - **Last completed gate:** G3
-- **Active change:** `implement-platform-foundation-api` (slice 1, in progress)
+- **Active change:** none. Slice 1 `implement-platform-foundation-api` archived 2026-10-04
+  (branch `slice1-platform-foundation`, not pushed or merged).
 - **Contract pin:** `contract/` submodule (`url = ../docs`) at docs `4c87d67`, API 0.5.1
-- **Progress:** Harness installed. Spring Boot **4.1.1** scaffold (ADR-0003 in docs amends
-  TC-1 from 3.x): Kotlin 2.3, JVM 21, Maven wrapper 3.9.16, Web MVC, Security, Validation,
-  JPA, Flyway, Postgres, Actuator, Spring Modulith 2.1. Plugins: openapi-generator 7.25
-  (`kotlin-spring`, `interfaceOnly`, `useSpringBoot4` → `cz.doucko.api[.model]`, an OPEN
-  Modulith module), Spotless 3.10 (ktlint 1.8, reads .editorconfig), JaCoCo 0.8.15 (unit + IT
-  merged → `target/site/jacoco/jacoco.xml`), Failsafe (`*IT.kt`, Testcontainers `postgres:16-alpine`).
-  Tests: `ModularityTest` (Modulith verify) and `DouckoBackendApplicationIT` (context against real
-  Postgres). `.env.example` added. No product code beyond the app class yet.
-- **Next task:** Phase 0 step 5, pin `contract/` (`git submodule add <docs-url> contract`) once
-  the docs repo has a remote. Then Phase 1 in docs.
+- **Progress:** Spring Boot 4.1.1 / Kotlin 2.3 / JVM 21 scaffold (ADR-0003) plus slice 1 platform
+  foundation: Compose stack (db, backend, frontend; only the frontend's 8081 published, on
+  `DOUCKO_BIND_ADDRESS`, checked by `npm run stack:up`), backup/restore tooling, problem+json for
+  undeclared paths and refusals, admin area closed (403) until admin-access, actuator health only,
+  request content never logged (log guard incl. Tomcat parser), DNS-rebinding Host allowlist
+  (`StrictHttpFirewall`), fixture provenance test.
+- **Next task:** slice 2 per the capability plan (`contract/docs/mvp-capability-plan.md`).
 - **Claims:**
-  - Harness installed and not drifted — evidence: `npm run factory:check`
-  - Scaffold builds and passes compile, ktlint, unit, IT, Modulith and JaCoCo. Evidence: `npm run verify` (exit 0, 2026-09-28)
-  - G0 PASS, G1+ not started. Evidence: `npm run gate:status`
-- **Scope NOT delivered:** `contract/` submodule (the docs repo has no remote), Docker Compose stack
-  (Phase 5), admin security config (admin-access slice), Modulith JPA event registry (deferred, ADR-0003).
+  - QA battery passes — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
+  - Real-stack smoke (task 4.4) — evidence: `docs/qa/evidence/slice1-compose-smoke.md`
+  - Review gate clean (13 findings, all fixed in `d2cb340`) — evidence:
+    `openspec/changes/archive/*implement-platform-foundation-api/review-findings.json`
+  - G0, G2, G5, G6, G8 PASS; G1 and G3 need the owner's sign-off; G7 (release) fails until every
+    MVP slice is archived. Evidence: `npm run gate:status`
+- **Scope NOT delivered:** every product capability after slice 1 (authoring, practice, gamification,
+  admin-access, stats); Modulith JPA event registry (deferred, ADR-0003); the round-3 review fixes
+  were not re-confirmed by a further review round (owner's choice).
 
 ## Validation
 

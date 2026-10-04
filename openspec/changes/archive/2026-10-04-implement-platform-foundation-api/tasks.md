@@ -26,8 +26,8 @@
 
 - [x] 4.1 `npm run qa:verify` green (needs Docker).
 - [x] 4.2 `npx openspec validate implement-platform-foundation-api --strict`.
-- [ ] 4.3 review-gate workflow; fix confirmed findings; `review-findings.json` (clean: true); re-run 4.1.
+- [x] 4.3 review-gate workflow; fix confirmed findings; `review-findings.json` (clean: true); re-run 4.1. Round 3 (2026-10-04): 13 findings, all fixed in `d2cb340`; 4.1 re-run PASS.
 - [x] 4.4 Smoke: `npm run stack:up`; `docker compose ps` shows only `127.0.0.1` bindings and no db port; `curl http://127.0.0.1:8080/actuator/health` → UP; `curl -i http://127.0.0.1:8080/api/child/nope` → 404 problem+json; `npm run backup`; `npm run stack:down`. Evidence: `docs/qa/evidence/slice1-compose-smoke.md`.
   - 2026-10-04: re-run after the backend port stopped being published (DNS rebinding): API through the frontend on 8081 (404 problem+json, 403 admin, 421 foreign host), backend firewall 400 in-network, health via the in-container check, backup written. Same evidence file.
-- [ ] 4.5 Update `docs/current-state.md`.
-- [ ] 4.6 Archive; commit with `Slice: implement-platform-foundation-api` + `Refs: NFR-2, NFR-3, NFR-4, NFR-9, NFR-10, NFR-11, NFR-12`.
+- [x] 4.5 Update `docs/current-state.md`.
+- [x] 4.6 Archive; commit with `Slice: implement-platform-foundation-api` + `Refs: NFR-2, NFR-3, NFR-4, NFR-9, NFR-10, NFR-11, NFR-12`.
