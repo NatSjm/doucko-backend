@@ -1,6 +1,7 @@
 package cz.doucko.admin
 
 import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
+import cz.doucko.profile.ProfileWebTestBeans
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -13,7 +14,7 @@ import java.time.Duration
 
 /** Store spec admin-access "Admin session idle timeout": 8 h on the backend's clock (NFR-15). */
 @WebMvcTest
-@Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, AdminWebTestBeans::class)
+@Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, AdminWebTestBeans::class, ProfileWebTestBeans::class)
 class AdminIdleTimeoutTest {
     @Autowired
     lateinit var mvc: MockMvc

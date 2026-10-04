@@ -59,3 +59,9 @@ management:
       # path like any other (404 problem+json).
       discovery:
         enabled: false
+
+doucko:
+  profile:
+    # child-profile: the task locales a profile may pick as secondaryTaskLocale (FR-43). Configuration,
+    # not code: an empty list refuses every locale. MVP: Ukrainian only.
+    task-locales: uk

@@ -215,8 +215,8 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/profile/ChildProfileStartupIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-44": [

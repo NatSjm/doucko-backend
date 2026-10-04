@@ -1,6 +1,7 @@
 package cz.doucko.shared
 
 import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
+import cz.doucko.profile.ProfileWebTestBeans
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -17,6 +18,8 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -34,6 +37,7 @@ class RequestContentNotLoggedTest {
     private companion object {
         const val SENTINEL = "PII-SENTINEL-7f3a9c"
         const val ECHO = "/test/echo"
+        const val SETTINGS = "/api/child/profile/settings"
     }
 
     /** Test-only endpoint that binds the request body. */
@@ -63,6 +67,27 @@ class RequestContentNotLoggedTest {
             content = """{"password":"$SENTINEL"}"""
         }.andExpect { status { isUnauthorized() } }
 
+    /**
+     * child-profile (NFR-3, plan §2.1 slice 4): the settings endpoints. A valid change with an extra
+     * field, and refusals that carry the sentinel as a locale, an answer mode and a malformed body.
+     */
+    private fun MockMvc.settingsWithSentinel() {
+        for (body in listOf(
+            """{"secondaryTaskLocale":"uk","displayName":"$SENTINEL"}""",
+            """{"secondaryTaskLocale":"$SENTINEL"}""",
+            """{"answerMode":"$SENTINEL"}""",
+            """{"answerMode":"GUIDED","x":"$SENTINEL"}""",
+            """{"answerMode": "$SENTINEL""",
+        )) {
+            patch("$SETTINGS?q=$SENTINEL") {
+                contentType = MediaType.APPLICATION_JSON
+                content = body
+                header("X-Probe", SENTINEL)
+            }
+        }
+        get(SETTINGS) { header("X-Probe", SENTINEL) }.andExpect { status { isOk() } }
+    }
+
     @Nested
     @WebMvcTest(
         properties = [
@@ -72,7 +97,7 @@ class RequestContentNotLoggedTest {
             "logging.level.cz.doucko=TRACE",
         ],
     )
-    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, Echo::class)
+    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, Echo::class, ProfileWebTestBeans::class)
     @ExtendWith(OutputCaptureExtension::class)
     inner class AtTrace {
         @Autowired
@@ -84,13 +109,14 @@ class RequestContentNotLoggedTest {
             mvc.postWithSentinel(ECHO).andExpect { status { isNoContent() } }
             mvc.postWithSentinel("/api/child/does-not-exist")
             mvc.signInWithSentinel()
+            mvc.settingsWithSentinel()
             output.all shouldNotContain SENTINEL
         }
     }
 
     @Nested
     @WebMvcTest(properties = ["logging.level.root=INFO"])
-    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, Echo::class)
+    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, Echo::class, ProfileWebTestBeans::class)
     @ExtendWith(OutputCaptureExtension::class)
     inner class AtConfiguredLevels {
         @Autowired
@@ -102,6 +128,7 @@ class RequestContentNotLoggedTest {
             mvc.postWithSentinel(ECHO).andExpect { status { isNoContent() } }
             mvc.postWithSentinel("/api/child/does-not-exist")
             mvc.signInWithSentinel()
+            mvc.settingsWithSentinel()
             output.all shouldNotContain SENTINEL
         }
     }
@@ -119,7 +146,7 @@ class RequestContentNotLoggedTest {
             "logging.level.org.springframework.security=DEBUG",
         ],
     )
-    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, Echo::class)
+    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, Echo::class, ProfileWebTestBeans::class)
     @ExtendWith(OutputCaptureExtension::class)
     inner class CaptureControl {
         // @trace NFR-3

@@ -770,10 +770,64 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/child-profile/spec.md"
+        "contract/openspec/specs/child-profile/spec.md",
+        "openspec/specs/child-profile/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupIT.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupIT.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupIT.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupIT.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt",
+        "src/test/kotlin/cz/doucko/profile/DisplayNamePolicyTest.kt",
+        "src/test/kotlin/cz/doucko/profile/DisplayNamePolicyTest.kt",
+        "src/test/kotlin/cz/doucko/profile/DisplayNamePolicyTest.kt",
+        "src/test/kotlin/cz/doucko/profile/DisplayNamePolicyTest.kt",
+        "src/test/kotlin/cz/doucko/profile/DisplayNamePolicyTest.kt",
+        "src/test/kotlin/cz/doucko/profile/DisplayNamePolicyTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileContractTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsIT.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsIT.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsIT.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/SettingsValidatorTest.kt",
+        "src/test/kotlin/cz/doucko/profile/SettingsValidatorTest.kt",
+        "src/test/kotlin/cz/doucko/profile/SettingsValidatorTest.kt",
+        "src/test/kotlin/cz/doucko/profile/SettingsValidatorTest.kt",
+        "src/test/kotlin/cz/doucko/profile/SettingsValidatorTest.kt",
+        "src/test/kotlin/cz/doucko/profile/SettingsValidatorTest.kt",
+        "src/test/kotlin/cz/doucko/profile/SettingsValidatorTest.kt",
+        "src/test/kotlin/cz/doucko/profile/SettingsValidatorTest.kt",
+        "src/test/kotlin/cz/doucko/profile/SettingsValidatorTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -811,7 +865,9 @@
         "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
         "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
         "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
-        "src/test/kotlin/cz/doucko/admin/ChildOperationsContractTest.kt"
+        "src/test/kotlin/cz/doucko/admin/ChildOperationsContractTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt"
       ]
     },
     {
@@ -846,6 +902,17 @@
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/platform/DockerContextTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileEntityTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupIT.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupIT.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt",
+        "src/test/kotlin/cz/doucko/profile/DisplayNamePolicyTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsIT.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
+        "src/test/kotlin/cz/doucko/profile/SettingsValidatorTest.kt",
         "src/test/kotlin/cz/doucko/shared/RequestContentNotLoggedTest.kt",
         "src/test/kotlin/cz/doucko/shared/RequestContentNotLoggedTest.kt",
         "src/test/kotlin/cz/doucko/shared/RequestContentNotLoggedTest.kt"
@@ -1237,10 +1304,6 @@
     {
       "check": "test-trace",
       "msg": "FR-42 (owned by backend) has no test annotated \"@trace FR-42\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-43 (owned by backend) has no test annotated \"@trace FR-43\""
     },
     {
       "check": "test-trace",

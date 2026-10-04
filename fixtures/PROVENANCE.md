@@ -11,5 +11,5 @@ does not have the shape below.
 
 | Path | Origin | Author | What it is |
 |---|---|---|---|
-| `src/test/resources/application.properties` | self-authored | Doučko maintainers | Test-only `ADMIN_PASSWORD`, the example value from the admin-access spec scenarios. Not a real password. |
+| `src/test/resources/application.properties` | self-authored | Doučko maintainers | Test-only `ADMIN_PASSWORD`, the example value from the admin-access spec scenarios. Not a real password. Also the fictional `DOUCKO_CHILD_DISPLAY_NAME` (`Hrdinka`) of the child-profile spec scenarios, never a real name. |
 | `src/test/resources/checking/golden-table.jsonl` | self-authored | Doučko maintainers | Answer-checker golden table (FR-23): answer specs, raw inputs and expected verdicts written for the answer-checking spec scenarios. No workbook content. |
