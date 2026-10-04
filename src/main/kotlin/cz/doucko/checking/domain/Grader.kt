@@ -35,7 +35,7 @@ internal object Grader {
         }
     }
 
-    private fun tolerance(spec: AnswerSpec): Rational =
+    fun tolerance(spec: AnswerSpec): Rational =
         spec.tolerance
             ?.let { NumericNotation.parse(Whitespace.trim(it))?.value }
             ?.takeIf { it >= Rational.ZERO } ?: Rational.ZERO

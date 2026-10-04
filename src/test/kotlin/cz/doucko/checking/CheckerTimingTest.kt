@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test
  */
 class CheckerTimingTest {
     // @trace FR-23
+    // @trace NFR-5
     @Test
     fun `p95 of one part check is below 5 ms`() {
         val cases = GoldenTable.cases

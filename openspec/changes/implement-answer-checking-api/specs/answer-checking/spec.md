@@ -23,8 +23,9 @@ module's `AnswerType` and `Verdict` values SHALL equal the pinned contract's.
 
 Format tips SHALL be read from `messages.properties` (keys `checking.tip.*`)
 through `java.util.ResourceBundle`, never hard-coded (NFR-9). The numeric
-tips' example SHALL be the first candidate that the same part grades
-`WRONG`.
+tips' example SHALL be one fixed value per type, or, when the part does not
+grade that value `WRONG`, a computed value outside every accepted value plus
+the tolerance; every example SHALL be graded `WRONG` before it is shown.
 
 #### Scenario: Tip for an unreadable decimal
 

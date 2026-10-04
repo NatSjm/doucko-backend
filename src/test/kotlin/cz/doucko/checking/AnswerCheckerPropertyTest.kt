@@ -133,13 +133,14 @@ class AnswerCheckerPropertyTest {
                 config,
                 Arb.int(-20..20),
                 Arb.int(0..2),
-                Arb.element(listOf(AnswerType.INTEGER, AnswerType.DECIMAL)),
+                Arb.element(listOf(AnswerType.INTEGER, AnswerType.DECIMAL, AnswerType.FRACTION, AnswerType.NUMBER_WITH_UNIT)),
             ) { n, scale, type ->
                 val accepted =
                     java.math.BigDecimal
                         .valueOf(n.toLong(), scale)
-                        .toPlainString()
-                val spec = AnswerSpec(type, listOf(accepted), tolerance = if (n % 3 == 0) "1" else null)
+                        .toPlainString() + (if (type == AnswerType.NUMBER_WITH_UNIT) " m²" else "")
+                val spec =
+                    AnswerSpec(type, listOf(accepted), tolerance = listOf(null, "1", "0,5", "1000000", "99999999")[Math.floorMod(n, 5)])
                 val result = AnswerChecker.check(spec, "x")
                 result.verdict shouldBe Verdict.UNPARSEABLE
                 TipRules.violations(spec, result.formatTip).shouldBeEmpty()

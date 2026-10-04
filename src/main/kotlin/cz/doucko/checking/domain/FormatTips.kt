@@ -3,64 +3,102 @@ package cz.doucko.checking.domain
 import cz.doucko.checking.AnswerSpec
 import cz.doucko.checking.AnswerType
 import cz.doucko.checking.RawInput
+import java.math.BigDecimal
+import java.math.BigInteger
+import java.math.RoundingMode
 import java.util.Locale
 import java.util.ResourceBundle
 
 /**
  * Czech format tips for UNPARSEABLE parts (answer-checking "Format tip for unreadable input"). The text comes
- * from the backend message catalog `messages.properties`, keys `checking.tip.<TYPE>` (NFR-9), read with
- * `ResourceBundle` so the module needs no Spring. A numeric tip's `{0}` is filled with the first example
- * that the same part grades WRONG, so it is readable and never reveals an accepted answer.
+ * from the backend message catalog `messages.properties`, keys `checking.tip.<TYPE>` (NFR-9), read once with
+ * `ResourceBundle` when this object initializes, so the module needs no Spring and no check reads a file.
+ *
+ * A numeric tip's `{0}` is one fixed, deliberately unusual example per type. Only when the part grades that
+ * example as not WRONG (it lies in the accepted region) is it replaced by a computed example that lies outside
+ * every accepted value plus the tolerance and is graded WRONG before use. There is no list of candidates to
+ * skip through, so the example does not act as an oracle over a set of values, and an ungraded example is
+ * never returned. When the tip would exceed 120 characters, the short template `checking.tip.short` is used.
  */
 internal object FormatTips {
-    private val TIPS: Map<AnswerType, String> =
+    private const val MAX_LENGTH = 120
+    private val TIPS: Map<String, String> =
         ResourceBundle
             .getBundle(
                 "messages",
                 Locale.ROOT,
                 FormatTips::class.java.classLoader,
                 ResourceBundle.Control.getNoFallbackControl(ResourceBundle.Control.FORMAT_PROPERTIES),
-            ).let { bundle -> AnswerType.entries.associateWith { bundle.getString("checking.tip.${it.name}") } }
+            ).let { bundle -> (AnswerType.entries.map { it.name } + "short").associateWith { bundle.getString("checking.tip.$it") } }
 
-    private val DECIMAL_EXAMPLES = listOf("5,2", "3,75", "12,4", "0,6", "-8,25", "987,65")
-    private val NUMBER_EXAMPLES =
-        mapOf(
-            AnswerType.INTEGER to listOf("12", "305", "48", "-7", "9999", "-271828"),
-            AnswerType.FRACTION to listOf("3/4", "2/5", "5/7", "1 1/3", "-11/13", "9876/5"),
-            AnswerType.NUMBER_WITH_UNIT to listOf("5,2", "3,75", "12", "-48", "987,65", "-271828"),
-        )
-    private const val FRACTION_DIGITS = "253197"
+    private val FIXED_INTEGER = BigInteger.valueOf(4827)
+    private const val FIXED_FRACTION = "48/29"
+    private const val FRACTION_DIGITS = "273951"
 
     fun tipFor(spec: AnswerSpec): String {
-        val template = TIPS.getValue(spec.type)
-        return if (template.contains("{0}")) template.replace("{0}", example(spec)) else template
+        val template = TIPS.getValue(spec.type.name)
+        if (!template.contains("{0}")) return template
+        val example = example(spec)
+        val tip = template.replace("{0}", example)
+        return if (tip.length <= MAX_LENGTH) tip else TIPS.getValue("short").replace("{0}", example)
     }
 
     private fun example(spec: AnswerSpec): String {
-        val candidates =
-            when (spec.type) {
-                AnswerType.DECIMAL -> {
-                    decimalExamples(spec.exactDecimals)
-                }
-
-                AnswerType.NUMBER_WITH_UNIT -> {
-                    val unit = spec.accepted.firstNotNullOfOrNull { UnitNotation.parse(Whitespace.trim(it))?.unit }
-                    NUMBER_EXAMPLES.getValue(spec.type).map { if (unit == null) it else "$it ${unit.display}" }
-                }
-
-                else -> {
-                    NUMBER_EXAMPLES.getValue(spec.type)
-                }
-            }
-        return candidates.firstOrNull { Grader.grade(spec, RawInput.Text(it))?.correct == false } ?: candidates.last()
+        val fixed = render(spec, FIXED_INTEGER, fixed = true)
+        if (isWrong(spec, fixed)) return fixed
+        val far = render(spec, farInteger(spec), fixed = false)
+        check(isWrong(spec, far)) { "no WRONG example for a ${spec.type} part" }
+        return far
     }
 
-    private fun decimalExamples(exactDecimals: Int?): List<String> =
-        if (exactDecimals == null) {
-            DECIMAL_EXAMPLES
-        } else {
-            listOf("5", "3", "12", "-8", "47", "-806").map { whole ->
-                if (exactDecimals == 0) whole else whole + "," + FRACTION_DIGITS.take(exactDecimals)
+    private fun isWrong(
+        spec: AnswerSpec,
+        example: String,
+    ): Boolean = Grader.grade(spec, RawInput.Text(example))?.correct == false
+
+    /** A whole number larger than every accepted magnitude plus the tolerance. */
+    private fun farInteger(spec: AnswerSpec): BigInteger {
+        val accepted =
+            spec.accepted.mapNotNull { raw ->
+                val text = Whitespace.trim(raw)
+                when (spec.type) {
+                    AnswerType.FRACTION -> FractionNotation.parse(text)?.value
+                    AnswerType.NUMBER_WITH_UNIT -> UnitNotation.parse(text)?.number?.value
+                    else -> NumericNotation.parse(text)?.value
+                }
+            }
+        val bound =
+            accepted.fold(Grader.tolerance(spec)) { acc, value ->
+                val candidate = value.abs() + Grader.tolerance(spec)
+                if (candidate > acc) candidate else acc
+            }
+        val ceiling =
+            BigDecimal(bound.numerator).divide(BigDecimal(bound.denominator), 0, RoundingMode.CEILING).toBigIntegerExact()
+        return ceiling + FIXED_INTEGER
+    }
+
+    private fun render(
+        spec: AnswerSpec,
+        whole: BigInteger,
+        fixed: Boolean,
+    ): String =
+        when (spec.type) {
+            AnswerType.INTEGER -> {
+                whole.toString()
+            }
+
+            AnswerType.DECIMAL -> {
+                val decimals = (spec.exactDecimals ?: 2).coerceIn(0, FRACTION_DIGITS.length)
+                if (decimals == 0) whole.toString() else "$whole,${FRACTION_DIGITS.take(decimals)}"
+            }
+
+            AnswerType.FRACTION -> {
+                if (fixed) FIXED_FRACTION else "${whole * BigInteger.TWO + BigInteger.ONE}/2"
+            }
+
+            else -> {
+                val unit = spec.accepted.firstNotNullOfOrNull { UnitNotation.parse(Whitespace.trim(it))?.unit }
+                "$whole,${FRACTION_DIGITS.take(2)}" + (unit?.let { " ${it.display}" } ?: "")
             }
         }
 }

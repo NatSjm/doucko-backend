@@ -7,6 +7,9 @@ internal class Rational private constructor(
     val numerator: BigInteger,
     val denominator: BigInteger,
 ) : Comparable<Rational> {
+    operator fun plus(other: Rational): Rational =
+        of(numerator * other.denominator + other.numerator * denominator, denominator * other.denominator)
+
     operator fun minus(other: Rational): Rational =
         of(numerator * other.denominator - other.numerator * denominator, denominator * other.denominator)
 

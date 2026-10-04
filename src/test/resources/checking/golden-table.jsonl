@@ -210,3 +210,8 @@
 {"id":"FT-08","req":"Format tip for unreadable input","spec":{"type":"CHOICE_MULTI","accepted":["A","B"],"options":["A","B","C"]},"input":["Z"],"verdict":"UNPARSEABLE","normalized":null}
 {"id":"FT-09","req":"Format tip for unreadable input","spec":{"type":"DECIMAL","accepted":["5.25"],"exactDecimals":2},"input":"5,2x","verdict":"UNPARSEABLE","normalized":null}
 {"id":"FT-10","req":"Format tip for unreadable input","spec":{"type":"NUMBER_WITH_UNIT","accepted":["5.2 kg"],"unitRequired":false},"input":"kg","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-11","req":"Format tip for unreadable input","spec":{"type":"INTEGER","accepted":["0"],"tolerance":"1000000"},"input":"x","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-12","req":"Format tip for unreadable input","spec":{"type":"DECIMAL","accepted":["4827.27"],"tolerance":"5000"},"input":"4,8,2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-13","req":"Format tip for unreadable input","spec":{"type":"NUMBER_WITH_UNIT","accepted":["7 kilogramumetrunasekundunadruhouakelvinunactvrtoukandelatrochudelsijednotkaprotest"]},"input":"7 kg m","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-14","req":"Format tip for unreadable input","spec":{"type":"FRACTION","accepted":["48/29"],"allowEquivalent":false},"input":"48//29","verdict":"UNPARSEABLE","normalized":null}
+{"id":"DI-23","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["1.5"],"exactDecimals":-1},"input":"1,5","verdict":"WRONG","normalized":"1.5"}

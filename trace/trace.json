@@ -473,6 +473,7 @@
       "tests": [
         "src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt",
         "src/test/kotlin/cz/doucko/checking/CheckingPurityTest.kt",
+        "src/test/kotlin/cz/doucko/checking/GoldenScenarioCoverageTest.kt",
         "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
         "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
         "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
@@ -867,7 +868,9 @@
         "frontend"
       ],
       "ownedHere": true,
-      "tests": []
+      "tests": [
+        "src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt"
+      ]
     },
     {
       "id": "NFR-6",

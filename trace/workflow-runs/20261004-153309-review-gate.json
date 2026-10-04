@@ -1,0 +1,1078 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-04T15:33:09.941Z",
+  "finishedAt": "2026-10-04T15:39:27.809Z",
+  "args": {
+    "scope": "slice 3 answer-checking backend (implement-answer-checking-api)",
+    "baseRef": "slice2-admin-access",
+    "headRef": "HEAD",
+    "change": "implement-answer-checking-api"
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": null,
+    "budgetPerAgentUsd": 2,
+    "maxTotalUsd": 20,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 6.6282,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 459,
+      "durationMs": 197831,
+      "sessionId": "886dcc91-a8c3-436a-9df3-765f1595b56c",
+      "costUsd": 0.9852242000000001,
+      "numTurns": 14,
+      "result": {
+        "findings": [
+          {
+            "title": "Format-tip fallback can return an example that is CORRECT (it reveals an answer) or UNPARSEABLE",
+            "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+            "line": 55,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "`return candidates.firstOrNull { Grader.grade(spec, RawInput.Text(it))?.correct == false } ?: candidates.last()` falls back to the last candidate without grading it. If no candidate grades WRONG, that last candidate is either CORRECT or unreadable. This can happen with a wide tolerance, for example INTEGER accepted `0` with tolerance `1000000`, which makes every example from `-271828` to `9999` CORRECT. The tip would then show an accepted answer to the child. That breaks spec rule 3 ('checking <example> against the part gives WRONG … never reveals an accepted answer'). The property test only uses tolerance `1`, so it never reaches the fallback.",
+            "suggestion": "Never return an example that has not been graded. When every candidate is CORRECT, build one that is guaranteed to be outside the tolerance (for example max(accepted) + tolerance + 1, written in the part's notation and unit and checked as WRONG). If even that fails, use a tip template with no example. Add a golden or property case with a large tolerance."
+          },
+          {
+            "title": "A negative `exactDecimals` makes the checker throw, despite its documented 'never throws for any spec' guarantee",
+            "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+            "line": 63,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`whole + \",\" + FRACTION_DIGITS.take(exactDecimals)`: Kotlin's `String.take(n)` throws IllegalArgumentException when n < 0. So a DECIMAL spec with `exactDecimals = -1` and any unreadable input throws from `AnswerChecker.check`. design.md and the AnswerChecker KDoc both promise it never throws for any input or spec. The contract caps the value at 0..6, but `AnswerSpec` in the domain does not enforce that. For values above 6, `take` silently gives only 6 digits, so the tip example has the wrong number of decimals: it grades WRONG for its format and misleads the child.",
+            "suggestion": "Either validate `exactDecimals in 0..6` when the domain `AnswerSpec` is built (an `init { require(...) }` that the slice 5/7 adapters map to a 400), or clamp/coerce in `decimalExamples` so the example always has exactly `exactDecimals` digits. Add a property case that uses random `exactDecimals`."
+          },
+          {
+            "title": "Unit value matching ignores which accepted entry the unit belongs to; correctness depends on an authoring invariant the checker never checks",
+            "file": "src/main/kotlin/cz/doucko/checking/domain/Grader.kt",
+            "line": 80,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`val partUnit = accepted.firstOrNull()?.unit` takes the part's unit from the first accepted value only. Then `accepted.any { Rational.within(input.number.value, it.number.value, tolerance) }` compares the number against every accepted value without checking that value's unit. With accepted `[\"5 m\", \"500 cm\"]`, the input `500 m` is CORRECT and `500 cm` is WRONG. The contract says all accepted values share one unit (400 at authoring), but authoring validation is out of scope until slice 5, and design.md says 'the checker trusts its spec'.",
+            "suggestion": "Compare the input only against accepted entries whose unit key equals the input's (or the part's) unit. Alternatively, have the checker treat accepted values with a different unit as unreadable, so they never match, and document the invariant at the domain boundary."
+          },
+          {
+            "title": "The catalog loads lazily inside the first UNPARSEABLE check, so a missing key surfaces at runtime as an initializer error and not at startup",
+            "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+            "line": 16,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`private val TIPS ... ResourceBundle.getBundle(\"messages\", ...).let { bundle -> AnswerType.entries.associateWith { bundle.getString(...) } }` runs in the static initializer of `FormatTips`, and the first `tipFor` call triggers it. If a key is missing, that first check throws ExceptionInInitializerError and every later check throws NoClassDefFoundError: a raw 500 on the child submission path, not the fail-fast at boot that design.md describes. It also means the first check of a running JVM does classpath file I/O, which works against the spec's 'no … file access while checking'.",
+            "suggestion": "Load the tips eagerly when the application starts, for example by touching `FormatTips` from a startup hook in the module that wires the checker in slice 7. Alternatively, expose an `AnswerChecker.selfCheck()` that a Spring context test and startup call, so a broken catalog fails the boot rather than the first child answer."
+          },
+          {
+            "title": "The space-character set is defined twice, as a regex class and as a hand-coded predicate",
+            "file": "src/main/kotlin/cz/doucko/checking/domain/FractionNotation.kt",
+            "line": 107,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "`private fun isSpace(c: Char): Boolean = c.code == 0x20 || c.code == 0xA0 || c.code == 0x2009` duplicates `NumericNotation.SPACE_CLASS = \"[   ]\"`, which the same file already uses for `MIXED`. If the allowed separators change (for example adding U+202F narrow no-break space), the grouping rule and the around-the-slash rule will drift apart without anyone noticing.",
+            "suggestion": "Define the separator set once in NumericNotation (for example a `SPACE_CHARS` string plus a predicate derived from it), and build both the regex class and the slash trimming from it."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 487,
+      "durationMs": 62587,
+      "sessionId": "60fda4da-9fee-44be-aab7-241e890e642e",
+      "costUsd": 0.40534240000000005,
+      "numTurns": 9,
+      "result": {
+        "findings": [
+          {
+            "title": "The format-tip example works as an answer-key oracle: skipped examples show the child which values are correct, and the fallback example can be a correct answer (FR-27)",
+            "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+            "line": 57,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "example() goes through a fixed, public list of candidates (INTEGER: 12, 305, 48, -7, …; DECIMAL: 5,2, 3,75, …) and uses the first one the same part grades WRONG. If every candidate is CORRECT (for example a broad tolerance), it falls back to candidates.last(), which is an accepted answer. A child can type something unreadable like 'x', which is free because UNPARSEABLE never uses up an attempt (FR-22). Usually the tip says 'třeba 12'. When it says 'třeba 305' instead, 12 is the correct answer. For a NUMBER_WITH_UNIT part the tip also shows the expected unit (taken from accepted[0]). The checker is pure, but AnswerChecker.check returns this formatTip in the PartResult. The planned slice 7 child submission endpoint will pass it to the unauthenticated child as it is. The store spec requirement 'first candidate that the same part grades WRONG' prescribes this behavior, so the docs store needs fixing too.",
+            "suggestion": "Make the tip example independent of the answer key. Use one fixed example per type, or pick it from a source that doesn't depend on the spec (for DECIMAL, the exactDecimals format is fine). Never return a candidate that grades CORRECT; if none qualifies, leave the example out of the tip. Change the store spec ('Format tips from the message catalog') first, then add golden or property tests showing that the tip text is the same for every accepted value of a given type and format."
+          },
+          {
+            "title": "Checklist results for the rest of this slice: no endpoints, so authz, auth/session, upload, exposure and CORS are not applicable; no issues in injection, secrets, privacy or dependencies",
+            "file": "src/main/kotlin/cz/doucko/checking/AnswerChecker.kt",
+            "line": 11,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "The diff (slice2-admin-access..HEAD, commit 0120326) adds only the pure cz.doucko.checking module: an AnswerChecker facade, domain parsers and messages.properties tips. (1) Authz/IDOR/mass assignment/rate limits: no controller, *Api implementation or DTO was added, so there's no new route. Content can't be changed through it, and only formatTip carries any answer-key leak (see the finding above). (2) Auth/session/CSRF: SecurityConfig and admin code are unchanged. (3) Injection: no SQL, JSONB, file or path I/O, and nothing is rendered as HTML. ReDoS and BigInteger blow-up are limited because Grader.kt:29 rejects text over 100 code points before any regex or parsing runs. NumericNotation's grouped-digit regex is unambiguous. The accepted and tolerance values are admin-authored and trusted. (4) Exposure: compose and CORS are unchanged. (5) Privacy/legal: golden-table.jsonl holds self-authored words (pes, Žirafa, pravý úhel) and numbers, is listed in fixtures/PROVENANCE.md, and contains no PII or workbook content; nothing is logged. (6) Secrets: none were added; no .env or VITE_ changes. (7) Dependencies: pom.xml is unchanged in this diff, so there are no new advisories to check. I didn't run npm audit or Maven advisory checks here.",
+            "suggestion": "Nothing to do now. When slice 7 wires the checker to a child endpoint, re-check its PartResult mapping for FR-27 and add a size limit on RawInput.Selection.keys, which is currently unbounded and only checked through a List membership scan."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 430,
+      "durationMs": 195364,
+      "sessionId": "26f14ea7-2aeb-451c-b115-c8f3d8d54d67",
+      "costUsd": 1.3546980000000002,
+      "numTurns": 27,
+      "result": {
+        "findings": [
+          {
+            "title": "NFR-5 travels with slice 3 but has no traced enforcement point (trace.json tests: [], acceptance status 'planned')",
+            "file": "src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt",
+            "line": 275,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "The capability plan row for slice 3 lists 'NFR-5 (checker share of the budget)'. The store spec says 'It SHALL decide one answer part in under 5 ms at p95 … SHALL make no network, database, file or AI calls while checking (NFR-5)'. The mechanisms exist (CheckerTimingTest asserts p95 < 5 ms, and CheckingPurityTest), but both are annotated only `// @trace FR-23` (CheckerTimingTest.kt:275, CheckingPurityTest.kt:319). So trace/trace.json:864-870 has NFR-5 `\"tests\": []`, and trace/acceptance-contracts.json:262-268 has NFR-5 `\"artifact\": null, \"status\": \"planned\"`. tasks.md 2.3 itself says '(FR-23, NFR-5 derived budget)'.",
+            "suggestion": "Add `// @trace NFR-5` to CheckerTimingTest and CheckingPurityTest, regenerate trace.json and acceptance-contracts.json, and confirm NFR-5 resolves to an artifact-ok mechanism (keep the round-trip half 'planned' for slice 7 if the gate tooling needs that split)."
+          },
+          {
+            "title": "Format-tip example falls back to a CORRECT (answer-revealing) or non-WRONG candidate when no candidate grades WRONG",
+            "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+            "line": 264,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "Store spec, Format tip rule 3: 'When `<example>` … is checked against the same part, the verdict is `WRONG`. So the example … never reveals an accepted answer.' Code: `return candidates.firstOrNull { Grader.grade(spec, RawInput.Text(it))?.correct == false } ?: candidates.last()`. The contract allows any tolerance ≥ 0 with no upper bound (openapi.yaml:1608). So INTEGER accepted ['12'] with tolerance '1000000' makes all six candidates (12, 305, 48, -7, 9999, -271828) CORRECT, and the tip shows '-271828', which is an accepted value. The property test only uses tolerance '1' around accepted values from -20 to 20, so this path is never tested.",
+            "suggestion": "Build a guaranteed-WRONG example instead of falling back. For example, take an accepted value plus (tolerance + 1), formatted in the part's notation and exactDecimals; for DECIMAL with exactDecimals you can also violate the form. Add a property or golden case with a huge tolerance. If some spec makes rule 3 impossible, amend the store spec to say what happens in that case."
+          },
+          {
+            "title": "Golden-table scenario clause 'every scenario input is present with its verdict' is not mechanically checked",
+            "file": "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
+            "line": 33,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "Store scenario 'Golden table size and coverage': '…AND every input named in a scenario of those requirements is present with that scenario's verdict'. GoldenTableTest only asserts the size (≥150), unique ids, at least 5 cases per requirement, and the one NBSP regression case. Nothing compares the table against the spec's scenario inputs. I checked by hand that today all scenario inputs are present (including NBSP, thin space, U+2212, U+2013, U+2014 and the decomposed caron), so the data complies. But if a case is deleted or edited, the build stays green as long as the counts still hold.",
+            "suggestion": "Add a test that keeps a pinned list of (requirement, type, spec, input, verdict) tuples taken from the store spec scenarios and asserts each one is in golden-table.jsonl. Or tag cases with `scenario:` ids and check that every scenario id appears."
+          },
+          {
+            "title": "Format tips read a classpath file during the first check, and the purity test cannot detect file/process access",
+            "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+            "line": 225,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "Store spec: 'The checker SHALL make no network, database, file or AI calls while checking (NFR-5).' FormatTips.TIPS is initialized when the object is first used, i.e. inside the first AnswerChecker.check that returns UNPARSEABLE, so `ResourceBundle.getBundle(\"messages\", …)` reads messages.properties during a check. CheckingPurityTest allows all of `java.lang..` and `java.util..`, which includes ClassLoader resource loading, ResourceBundle, ProcessBuilder and Runtime. So the 'no file calls' rule is not actually enforced.",
+            "suggestion": "Load the catalog eagerly at module start (or accept the one-off load and record it as a spec decision in the delta). Tighten CheckingPurityTest with explicit denies, e.g. no dependency on java.lang.ProcessBuilder/Runtime, java.io, java.nio, java.net, or ResourceBundle outside FormatTips."
+          },
+          {
+            "title": "NUMBER_WITH_UNIT tip can exceed 120 characters for long unit spellings",
+            "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+            "line": 257,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "Rule 1: 'It is Czech and at most 120 characters long.' The template 'Tohle neumím přečíst. Napiš číslo a jednotku bez mezer v ní, třeba {0}.' is about 70 characters before the example. The example appends `unit.display`, which comes from the accepted values, and neither the checker nor the visible contract limits their length. A unit display longer than about 40 characters makes the tip break rule 1. No golden or property case uses a long unit.",
+            "suggestion": "Cap the example (drop the unit or fall back to a shorter template when the result would exceed 120), or have authoring validation bound the unit length and cite that limit in the spec. Add a test case for it."
+          },
+          {
+            "title": "Undocumented behavior: an input shape that does not match the part type is UNPARSEABLE, and invalid tolerance silently means exact",
+            "file": "src/main/kotlin/cz/doucko/checking/domain/Grader.kt",
+            "line": 92,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "Grader returns null (UNPARSEABLE, with a tip) for RawInput.Text on CHOICE_* parts and for RawInput.Selection on text and numeric parts (lines 92 and 94). tolerance() at lines 104-107 turns an unreadable or negative tolerance into ZERO. The store spec gives the API 400 for malformed request shapes ('They are not checker verdicts') and authoring-time 400 for a bad tolerance. No spec or delta requirement covers how the checker behaves here; design.md only says 'The checker trusts its spec'.",
+            "suggestion": "Add a short scenario to the change delta ('Pure checker module') for both behaviors. Alternatively make the mismatch a programming error that slices 5 and 7 must rule out at their adapters, so a shape mismatch can never reach the child as a format tip."
+          },
+          {
+            "title": "Store-spec endpoint requirements (FR-22 refusal, who can trigger a check) are not covered and are deferred outside this change's tasks",
+            "file": "contract/openspec/specs/answer-checking/spec.md",
+            "line": 719,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "The store spec has 'Unreadable submissions are refused at the submission endpoint' (4 scenarios) and 'Who can trigger a check' (3 scenarios, e.g. 'Answer tester without an admin session … HTTP 401'). This repo is responsible for both, and neither is implemented here. The deferral is legitimate: the plan assigns FR-22 to slice 7, and design.md Non-goals and the current-state 'Scope NOT delivered' entry record it. But no tasks.md item or spec delta in slices 5, 7 or 9 points back to these answer-checking scenarios, so they could get lost.",
+            "suggestion": "Add a forward reference in the slice 5/7/9 change templates (or this change's tasks.md under 4.1) that names the 7 answer-checking endpoint scenarios, so the later slices pick them up."
+          },
+          {
+            "title": "Ticked task 5.2 (openspec validate --strict) has no recorded evidence; 5.3 review gate still open while 5.1/5.4 are ticked",
+            "file": "openspec/changes/implement-answer-checking-api/tasks.md",
+            "line": 28,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "'- [x] 5.2 `npx openspec validate implement-answer-checking-api --strict`.' The slice evidence files (slice3-checker-run.md, slice3-red-run.md) do not record a validate run. Tasks 2.6, 5.1, 5.4 and 5.5 do have artifacts (docs/qa/evidence/slice3-red-run.md, automated-verification-latest.md, slice3-checker-run.md, current-state.md). Task 5.3 says to re-run 5.1 after the review findings are dispositioned, so 5.1 being ticked now is provisional.",
+            "suggestion": "Record the `openspec validate --strict` output (or confirm qa:verify includes it and cite that line in the evidence). Re-run and re-tick 5.1 after 5.3."
+          },
+          {
+            "title": "Coverage summary",
+            "file": "openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md",
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "94 scenarios (89 store + 5 delta): 86 implemented, 1 partial (golden-table 'every scenario input present' clause not asserted), 7 missing (endpoint refusal ×4 and who-can-trigger ×3, deferred to slices 5/7/9 per the plan), 0 contradicted. FR-14 to FR-21 and FR-23 each have a traced test. NFR-4 is enforced by fixtures/PROVENANCE.md:15 plus FixtureProvenanceTest. NFR-5 has no traced mechanism (see the first finding). No OpenAPI drift: the slice adds no endpoints, CheckingContractAlignmentTest pins the AnswerType and Verdict enums, and the AnswerSpec defaults match openapi.yaml:1609-1614.",
+            "suggestion": "Fix the NFR-5 trace gap and the tip-example fallback before the review gate closes."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 699,
+      "durationMs": 22767,
+      "sessionId": "de67d20a-337d-4ad5-a981-1d66b223e126",
+      "costUsd": 0.11851900000000001,
+      "numTurns": 4,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1669,
+      "durationMs": 22246,
+      "sessionId": "e97a9e8f-9408-4feb-b884-1c6019165720",
+      "costUsd": 0.10439480000000001,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. At FormatTips.kt:55, `candidates.firstOrNull { Grader.grade(...)?.correct == false } ?: candidates.last()` falls back to `candidates.last()` without grading it. Nothing upstream prevents that path. In Grader.kt:38-41 the tolerance is any parsed non-negative rational with no upper bound, so INTEGER accepted=[\"0\"] with tolerance \"1000000\" makes all six INTEGER examples (12…-271828) CORRECT. The fallback then puts -271828, an accepted answer, into the tip. That is the reveal the KDoc on lines 12-13 says must never happen. Wide tolerance is not the only way in: an accepted list that includes every candidate also triggers it. Severity stays minor because only admins author specs and such a spec is unusual, but the mechanism is real and nothing guards against it.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1702,
+      "durationMs": 24013,
+      "sessionId": "ca7381ee-4b23-4dd4-b17f-90a5d74f27d8",
+      "costUsd": 0.096475,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The bug is real, but it is hard to reach.\n\n**What the code does.** `FormatTips.kt:55` returns `candidates.last()` without grading it when no candidate grades WRONG.\n\n**Nothing upstream stops it.**\n- `AnswerSpec.tolerance` (`CheckingModel.kt:17`) is a free `String?`.\n- `Grader` only converts it to a `Rational`.\n- `Rational.within` checks `|value - target| <= tolerance` with no upper bound.\n- There is no check of tolerance size anywhere in `src/main`.\n\n**The example in the finding works.** Take an INTEGER part with accepted `0` and tolerance `1000000`. All six candidates (`12`, `305`, `48`, `-7`, `9999`, `-271828`) are within 1,000,000 of 0, so they all grade CORRECT. The fallback then puts `-271828`, an accepted answer, into the tip. That breaks the documented rule that the tip \"never reveals an accepted answer\" (class KDoc, spec rule 3). The same thing happens for NUMBER_WITH_UNIT and DECIMAL with a wide tolerance.\n\n**Who can trigger it.** A child cannot make this happen on purpose. The tip only appears after an UNPARSEABLE input, and the spec comes from the admin-authored answer key. So it is not exploitable by an attacker. It is a data-dependent leak: a careless or unusual admin spec (a very large tolerance, or a small accepted set that covers every candidate) would show an accepted value to the child.\n\n**Severity.** It stays at minor. No test covers it, because the property test only uses tolerance 1. The suggested fix is sound: never return an ungraded example, and fall back to a tip with no example if needed.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1550,
+      "durationMs": 34153,
+      "sessionId": "ac82e92d-fb2c-443f-85d3-669f959c581c",
+      "costUsd": 0.1137512,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. FormatTips.kt:63 calls `FRACTION_DIGITS.take(exactDecimals)` whenever `exactDecimals` is not null and not 0. Kotlin's `String.take` throws IllegalArgumentException for a negative n. The domain `AnswerSpec` (CheckingModel.kt:14-24) is a plain data class with `exactDecimals: Int? = null`. It has no init/require guard, and nothing in the checking module checks the value; a grep for `require(` finds only the one in Rational. The call path is real: `AnswerChecker.check` calls `Grader.grade`. If that returns null (UNPARSEABLE), it calls `FormatTips.tipFor(spec)`, then `example`, then `decimalExamples(spec.exactDecimals)`. So a DECIMAL spec with exactDecimals = -1 and unreadable input throws. That breaks design.md:61 (\"never throws for any input or spec\"). The KDoc itself only says \"any input\". The >6 point also holds: `take(7)` returns all 6 digits. Grader.kt:52 then marks every candidate WRONG because the decimal count doesn't match, so the first candidate is chosen. The tip example then has the wrong number of decimals and misleads the child. Mitigation: the contract caps the value at 0..6, and no adapter builds AnswerSpec from user data yet in this slice. So today this is only reachable through bad admin content or a future adapter that skips validation. That fits the minor severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1583,
+      "durationMs": 25567,
+      "sessionId": "bd380fba-8110-45cc-b3c2-6819ac01e141",
+      "costUsd": 0.1078924,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The mechanism is real, but no real user or attacker can trigger it. In `FormatTips.kt:63`, `FRACTION_DIGITS.take(exactDecimals)` would throw IllegalArgumentException for a negative value. For values above 6 it would quietly give a shorter example. `AnswerSpec` (CheckingModel.kt:14) is a plain data class with no `init` validation.\n\nThe path is not reachable today:\n1. Nothing in `src/main` builds an `AnswerSpec` or calls `AnswerChecker.check`. The only production use of `FormatTips.tipFor` is inside `AnswerChecker` itself, and `checking` is a pure library with no web or persistence adapter yet. No HTTP endpoint, stored content or user input can reach it. Only tests can build a spec with `exactDecimals = -1`.\n2. A spec will only come from outside once the slice 5/7 adapters exist. Those adapters will receive admin-authored content through the contract, and the finding itself admits the contract caps `exactDecimals` at 0..6. The generated OpenAPI models and validation reject values outside that range before any domain object is built.\n3. Even then, only the authenticated admin writes answer specs, and the child never does. A child's input can only cause the throw if the spec is already invalid, which the contract prevents.\n\nSo this is a hardening gap: the KDoc's 'never throws' promise does not hold for specs the contract already forbids. An `init { require(exactDecimals in 0..6) }` would be cheap defence in depth. But it is not an exploitable or reproducible defect for any real user, so I am refuting it under the exploitability lens. If it is kept at all, it should be treated as a hardening nit.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/Grader.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1513,
+      "durationMs": 20742,
+      "sessionId": "42b254ea-f197-48bc-b1f3-48c36706cdca",
+      "costUsd": 0.11212659999999999,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute it: the code works exactly as the finding describes. In `Grader.numberWithUnit` (`Grader.kt:78-88`), line 80 takes the part's unit from the first parsed accepted entry only. Line 86 checks the input's unit against that one unit. Line 88 then compares the input's number against every accepted entry's number and ignores each entry's own unit. So with accepted `[\"5 m\", \"500 cm\"]`, the input `500 m` passes the unit check and matches 500 numerically, giving CORRECT. The input `500 cm` fails the unit check, giving WRONG. Nothing else in the `checking` module catches this. `AnswerSpec` (`CheckingModel.kt`) has no init/require validation, and its KDoc only says the unit \"is derived from `accepted`\". The checker therefore relies entirely on the authoring rule that all accepted values share one unit, which is not enforced anywhere in this repo yet.\n\nThere is also a related inconsistency in the same area. `FormatTips.kt:47` uses `firstNotNullOfOrNull` to pick the first entry that has a unit. `Grader` uses `accepted.firstOrNull()?.unit`. With accepted `[\"5\", \"5 m\"]`, the format tips would show \"m\", but the grader's part unit would be null, so any input written with a unit would be graded WRONG.\n\nWhy it stays minor and low-confidence: a spec only breaks the checker if it violates the contract invariant, which authoring is supposed to reject with a 400. No production path creates such specs in this slice, so this is defensive hardening, not a live bug. The current minor severity fits.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/Grader.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1546,
+      "durationMs": 15431,
+      "sessionId": "1f472627-8322-40ec-87c3-d2b12f79cc0d",
+      "costUsd": 0.0915032,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code behaves as described: Grader.kt:80 takes the unit from the first accepted entry, and line 88 compares the number against every accepted entry without looking at that entry's unit. But nobody can actually trigger the problem. In src/main, nothing outside the checking module builds an AnswerSpec or calls AnswerChecker; only tests and FormatTips use it. There is no endpoint that lets a child or an attacker supply an answer spec. Specs come only from admin-authored content, and the contract requires authoring to reject accepted values with mixed units (400). The bad case only happens if the admin writes a spec the contract already forbids, and the authoring path that would let them do that doesn't exist yet (slice 5). design.md also says the checker trusts its spec. At most this is a defensive-hardening note to carry into slice 5's authoring validation, not a defect a real user or attacker can hit today.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1616,
+      "durationMs": 25502,
+      "sessionId": "94d6a957-f926-45d8-a5ef-0537b98e08f0",
+      "costUsd": 0.1673136,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The JVM behaviour the finding describes is real, but the defect isn't reachable as claimed, and it misreads the design.\n\nWhat is accurate: `FormatTips` is a Kotlin `object`. `TIPS` is set in its static initializer, which runs on first use. A `getString` that throws `MissingResourceException` there would surface as `ExceptionInInitializerError`, and every later use would throw `NoClassDefFoundError`.\n\nWhy it doesn't hold up:\n1. **It misquotes the design.** design.md:67-69 does not promise a fail-fast at boot. It says `FormatTips` \"reads every key once when the class loads and fails fast, and the golden table exercises every tip key.\" The code does exactly that. The design puts the mitigation at build/test time, not at application startup.\n2. **A missing key can't reach a running JVM.** `messages.properties` ships in the same jar as the class (src/main/resources, lines 25-31). It has a key for all seven `AnswerType` entries. Because `associateWith` iterates over every `AnswerType.entries`, any test that touches `FormatTips` loads all keys at once. The golden table, property and timing tests hit UNPARSEABLE paths through `AnswerChecker.check`. So a missing or renamed key, or a new enum value, fails `mvn verify` before any artifact exists. Runtime classpath drift isn't plausible for a resource bundled in the same jar.\n3. **There's no child submission path yet.** Nothing in src/main calls `AnswerChecker`; the finding itself says the wiring comes in slice 7. The \"raw 500 on the child submission path\" has no caller in this code.\n4. **The \"file access while checking\" point is weak.** It's a one-time classpath read during class initialization, not per-check I/O. The same kind of lazy init applies to every Kotlin object and regex in the module.\n\nAt most this is a hardening suggestion for slice 7 (warm the checker at startup). It is not a correctness defect in this code.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1649,
+      "durationMs": 18960,
+      "sessionId": "89b301e5-5374-4519-868b-e903602054f8",
+      "costUsd": 0.14307979999999998,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The lazy loading is real: `FormatTips` is a Kotlin `object`, so `TIPS` loads on its first use, from `AnswerChecker.kt:16`. If a key were missing, the first check would throw ExceptionInInitializerError and later checks would throw NoClassDefFoundError. But no real user or attacker can trigger this.\n\n1. A missing key cannot reach a shipped build. The initializer reads the key for every `AnswerType.entries` value at once, not only the one being checked. The golden table has many UNPARSEABLE cases (VN-07, NN-04…, II-*, DI-*, FI-*), so loading the class with any one missing key fails `mvnw verify`. The design.md mitigation (\"reads every key once when the class loads and fails fast, and the golden table exercises every tip key\") says the same thing, and the build-time gate enforces it. For the bug to appear, someone would have to change the `messages.properties` inside the packaged jar after the build. That is a deploy-tampering scenario, not something a user can cause with input.\n2. No child endpoint calls the checker yet. Wiring it into the web layer is slice 7, so no 500 is reachable on any request path today.\n3. A child's input cannot change which keys exist. Every input, hostile or not, triggers the same one-time load of a catalog that the tests have already proved complete.\n4. The \"file access while checking\" point applies only once per JVM: one classpath resource read on first use. That is a minor style concern, not a correctness bug.\n\nThe startup self-check is a reasonable hardening idea for slice 7, but the claimed failure cannot be reproduced against this build.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FractionNotation.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1211,
+      "durationMs": 14373,
+      "sessionId": "2dca88b7-120d-486b-a95e-93a6b91fbca7",
+      "costUsd": 0.0921396,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The duplication is real. `FractionNotation.kt:107` hand-codes `isSpace` as U+0020, U+00A0 and U+2009. `NumericNotation.kt:20` defines `SPACE_CLASS = \"[   ]\"`, and `FractionNotation` uses it for `MIXED` (line 54) and indirectly through `INTEGER_DIGITS` (`NumericNotation.kt:24`).\n\nThrough a correctness lens, though, nothing is wrong. Both definitions cover exactly the same three code points, so the slash trimming (lines 60–61) and the grouping/mixed-number regex accept the same separators. No input gets a different result because of this, and no path is wrong today.\n\nThe finding's mechanism is hypothetical. It only becomes a problem if someone later edits one set and not the other. That is a maintainability or DRY concern, not a correctness defect.\n\nThe codebase has a third separator predicate, `Whitespace.isSpace` in `TextMatching.kt:8`. It is broader on purpose (`Character.isWhitespace || isSpaceChar`) and is used for text and units, so the narrower numeric set looks like a deliberate design choice rather than an accidental split.\n\nRefactoring to a single `SPACE_CHARS` source is a reasonable cleanup. But the claim that this code is incorrect does not hold, so it does not stand as a correctness finding.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FractionNotation.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1244,
+      "durationMs": 26646,
+      "sessionId": "263375de-9e4e-4493-a079-5af079a66943",
+      "costUsd": 0.09725020000000001,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The duplication is real. `FractionNotation.kt:107` hand-codes `isSpace` as U+0020, U+00A0 and U+2009. `NumericNotation.kt:20` defines `SPACE_CLASS = \"[   ]\"`, and `FractionNotation` reuses that class through `SPACE` (line 52) and `MIXED` (line 54), which builds on `INTEGER_DIGITS`. The private predicate trims spaces around the slash at lines 60–61. So the same three-character set lives in two places.\n\nFrom an exploitability and reproducibility angle, though, nothing goes wrong for a user today. The two definitions match exactly, so no input is handled differently by the grouping rule and the around-the-slash rule. The drift the finding describes could only happen after someone edits one definition and not the other. That makes this a maintainability issue, not a correctness bug, and the 'correctness' label overstates it.\n\nOne more point: a third, broader space definition (`Whitespace.isSpace` in `TextMatching.kt:8`, which uses Character.isWhitespace/isSpaceChar) is already used by UnitNotation. So the module doesn't have a single source of truth for spaces anyway. The suggested refactor is reasonable cleanup, but no user or attacker can trigger a problem from the current code.\n\nVerdict: the mechanism is confirmed but only as a hypothetical future risk. I'm not refuting it, and I'm downgrading it to a nit / maintainability note."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2127,
+      "durationMs": 17993,
+      "sessionId": "415d1e69-671e-4025-858f-6fda195ac0e5",
+      "costUsd": 0.09419580000000001,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this finding. The code works the way the finding says, and the problem is real.\n\n**How the example is picked.** `FormatTips.example()` (FormatTips.kt:39-56) goes through a fixed list of candidates and picks the first one that `Grader.grade(spec, …)` marks wrong (`correct == false`). If none is wrong, it falls back to `candidates.last()`. So the example shown depends on the answer key:\n- **Normal case:** the tip shows `12` (INTEGER), or `5,2` / `5,253…` (DECIMAL).\n- **First candidate is correct:** the tip shows the next candidate, which tells the child the first one is the answer. For example, \"třeba 305\" means the answer is 12.\n- **Every candidate is correct** (for example a wide tolerance): the fallback returns a value that grades correct. The KDoc on lines 12-13 promises the example \"never reveals an accepted answer\", and this case breaks that promise.\n\n**Unit leak.** For NUMBER_WITH_UNIT, line 47 takes the unit from the first accepted answer whose unit can be parsed, so the tip shows the expected unit.\n\n**How it reaches the child.** `AnswerChecker.kt:16` returns `FormatTips.tipFor(spec)` in the result for every UNPARSEABLE input. `CheckingModel.kt:37-41` documents that `formatTip` maps to the contract's `PartResult`. FR-22 says unreadable input never uses up an attempt, so a child can type `x` again and again to probe the tip at no cost.\n\n**Why it isn't refuted.** No child endpoint exists yet in this slice (it is planned for slice 7), so this is not exploitable today. But the problem sits in the pure domain logic and in the contract shape that the endpoint is meant to pass through as it is, and no guard anywhere filters it. The behavior also contradicts its own documented invariant. Keeping severity at major for FR-27 (answer keys must not leak before the reveal) is justified.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2160,
+      "durationMs": 21768,
+      "sessionId": "9cb78afc-8a03-4bf1-bbfa-d4b36069b2c7",
+      "costUsd": 0.1286292,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The mechanism is confirmed. FormatTips.kt:55 uses the first candidate in a fixed public list that the same spec grades WRONG. If none qualifies, it falls back to candidates.last() with no check, so it can return a value that grades CORRECT. AnswerChecker.kt:16 puts this tip into the UNPARSEABLE result. Per the contract (openapi.yaml:1369-1403 PartResult.formatTip; practice-flow spec:356), the tip goes to the child, and an UNPARSEABLE submission uses no attempt. So the oracle works: when the answer is 12, the INTEGER tip changes from 'třeba 12' to 'třeba 305', and the child can trigger this for free by sending 'x'. The NUMBER_WITH_UNIT tip also shows the accepted unit (line 47). The class KDoc claims it 'never reveals an accepted answer', and the fallback breaks that. What limits the impact: (1) No child endpoint calls AnswerChecker yet; it is only used inside the checking module, and the submission endpoint comes in slice 7, so nobody can exploit this today. (2) The leak only happens when an accepted answer is one of about 6 fixed values per type (like 12, 3/4, 5,2), or when a tolerance is broad enough to accept every candidate. (3) The unit leak is arguably part of the format help, not the graded value. The issue is real and reproducible once the endpoint is wired up, but its reach is narrow and it is not exposed yet, so I'd downgrade it from major."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/AnswerChecker.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2232,
+      "durationMs": 19699,
+      "sessionId": "a9c055e9-9877-40ee-a0fc-ea20617d5ca4",
+      "costUsd": 0.09956920000000001,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "This finding reports that nothing is wrong. It is a checklist summary, not a defect claim, so there is no faulty mechanism to disprove. I checked the factual claims it rests on and they hold:\n(1) The checking module has no web layer. No controller or *Api implementation exists under src/main/kotlin/cz/doucko/checking; it contains only CheckingModel, CheckingModule, AnswerChecker and domain/*.\n(2) The 100-code-point limit is real. Grader.kt:19 sets MAX_CODE_POINTS = 100, and Grader.kt:29 rejects longer text after Whitespace.trim. That happens before number(), fraction(), numberWithUnit() or text() parses anything, so the regex and BigInteger parsing only ever see at most 100 code points. The trim runs on the full untrimmed input, but it is linear, so this is not a ReDoS path.\n(3) RawInput.Selection.keys really has no size limit. It is a plain List<String> (CheckingModel.kt:33) and is passed straight to choice(), which calls keys.distinct() (Grader.kt:100-102). The forward-looking suggestion is therefore accurate.\n(4) The admin, security and shared code is in separate modules, and this slice adds no routes.\nNothing here is incorrect. But a \"no issues found\" checklist is not an actionable defect, so it should be informational rather than a minor-severity finding. Hence: not refuted, severity downgraded.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/AnswerChecker.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2265,
+      "durationMs": 16385,
+      "sessionId": "f6cae2f7-4fc8-4e29-9ca2-968958a9e9df",
+      "costUsd": 0.07595779999999999,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "This finding is a checklist summary, and its own evidence says there is no issue. Its only concrete concern is the forward-looking note that `RawInput.Selection.keys` has no size limit (`CheckingModel.kt:32-33`, used through `Grader.kt:100-102`, which calls `keys.distinct()`). Nobody can reach that today. The `cz.doucko.checking` module is pure Kotlin and was added without any controller, `*Api` implementation or DTO, so no user or attacker can submit a Selection. The rest of the evidence checks out in the code: `Grader.kt:19` sets `MAX_CODE_POINTS = 100`, which caps text input before any regex or parsing runs. Choice input is handled separately at `Grader.kt:26`. An unbounded list processed with `distinct()` and a membership scan would cost at most O(n·m) on an internal call, and HTTP body-size limits would also apply once an endpoint exists. No exploitable or reproducible problem exists in this slice, so this is not a real defect. At most it is a note for slice 7, when the checker gets a child endpoint.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1577,
+      "durationMs": 19519,
+      "sessionId": "fb548716-79a1-446f-8460-30b281bb3dc7",
+      "costUsd": 0.12209439999999999,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism holds, though the cited line numbers are wrong. The tag is at CheckerTimingTest.kt:12, not :275, and at CheckingPurityTest.kt:21, not :319. Every @trace tag in src/test/kotlin/cz/doucko/checking names an FR id; none names NFR-5. The two NFR-5 mechanisms (the p95 timing test and the purity test) are tagged only `// @trace FR-23`. As a result, trace/trace.json:864-870 shows NFR-5 with `ownedHere: true` and `tests: []`, and trace/acceptance-contracts.json:262-268 shows NFR-5 with `artifact: null, status: planned`. That is inconsistent with three other places: the capability-plan slice-3 row ('NFR-5 (checker share of the budget)'), tasks.md 2.3 ('FR-23, NFR-5 derived budget'), and the change spec, which cites NFR-5 for the purity rule. The repo owns NFR-5 (ownedHere true; owners backend and frontend), so adding the tag is allowed under the rule 'only ids this repo owns'.\n\nI recommend a downgrade. NFR-5's primary owner capability is practice-flow (capability plan line 300). Its acceptance mechanism is the end-to-end round-trip p95 < 300 ms timing test in slice 7 (line 208). So 'planned' is a legitimately accurate status for the requirement as a whole, and the timing and purity behaviour itself is enforced and tested. The gap is traceability bookkeeping: a missing tag for the checker share. It is not a correctness defect, so minor fits better than major.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1610,
+      "durationMs": 17285,
+      "sessionId": "b6984d48-dc7a-4739-953f-b4c1fcc0a194",
+      "costUsd": 0.08242079999999999,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The traceability gap is real, but the cited line numbers are wrong. CheckerTimingTest.kt and CheckingPurityTest.kt each have a single `// @trace FR-23` annotation, at line 12 and line 21, not at lines 275 and 319. Neither file has an `@trace NFR-5` annotation; CheckerTimingTest mentions NFR-5 only in a KDoc comment at line 8. The trace data matches the finding: trace/trace.json:864-870 lists NFR-5 with ownedHere: true and tests: [], and trace/acceptance-contracts.json:262-268 has NFR-5 with artifact: null and status \"planned\". So the gate tooling sees no evidence for NFR-5, even though the slice claims it.\n\nThrough the exploitability lens, nothing here can affect a user or attacker. The timing (p95 < 5 ms) and purity (no network, database, file or AI calls) checks exist and run under Surefire. The defect is only that the evidence isn't linked in the traceability ledger. That makes it a process and gate-integrity problem, not a runtime one. It still matters for this harness: with no linked test, NFR-5 reads as having no proof in the gates, and the AGENTS.md rules treat claims without linked evidence as defects. The fix is trivial: add the NFR-5 annotation and regenerate the trace files. I'm confirming the finding, but \"major\" overstates it.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1707,
+      "durationMs": 28119,
+      "sessionId": "c5935ca4-7833-4f0f-a624-b6549fdfcbb8",
+      "costUsd": 0.1544064,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real, but the line number is wrong: the code is at FormatTips.kt:55, not 264 (the file has 67 lines). Line 55 is `candidates.firstOrNull { Grader.grade(spec, RawInput.Text(it))?.correct == false } ?: candidates.last()`. Nothing upstream guards this. In the checking module, tolerance is only parsed and passed to `Rational.within`, which checks |value - target| <= tolerance with no upper bound. The contract (openapi.yaml:1608) and the content-authoring spec (:441) only require tolerance ≥ 0. With INTEGER accepted ['12'] and tolerance '1000000', all six candidates fall within tolerance. The largest distance is |-271828 - 12| = 271840 ≤ 1e6, so all six grade CORRECT and the fallback returns '-271828', which is an accepted value. That breaks answer-checking spec rule 3 (spec.md:682-684): the example, checked against the same part, must be WRONG and must never reveal an accepted answer. The same fallback can be reached for DECIMAL, FRACTION and NUMBER_WITH_UNIT when tolerance is large. I'm downgrading severity because you only get there with an unusually large tolerance that the admin (the parent) sets. The tip also only appears after UNPARSEABLE input, so in practice this rarely reveals an answer. It is still a SHALL violation that no test covers.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1740,
+      "durationMs": 22091,
+      "sessionId": "ce43aa35-00da-40fa-a17d-b407f00e2ea3",
+      "costUsd": 0.1120934,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism, but the cited line number is wrong. The code is at FormatTips.kt:55, not line 264: `candidates.firstOrNull { Grader.grade(spec, RawInput.Text(it))?.correct == false } ?: candidates.last()`.\n\nNothing upstream stops this case:\n- Tolerance has no upper bound in the main code. CheckingModel.kt:17 is a plain `String?`, and Grader.kt:38 parses it.\n- `Rational.within` is a plain `|value - target| <= tolerance` check.\n- So INTEGER with accepted ['12'] and tolerance '1000000' grades all six fixed candidates CORRECT, and the tip shows '-271828', which is an accepted value. That breaks store-spec rule 3 (\"the example is WRONG… never reveals an accepted answer\").\n- The fallback also returns a candidate that grades UNPARSEABLE (null) when no candidate is WRONG. For example, a NUMBER_WITH_UNIT spec with no parseable unit would get an unreadable example, which also breaks rule 3.\n\nWhy I recommend a downgrade:\n- Only an admin can trigger this, by writing a spec with an extreme tolerance. A child or attacker cannot create the condition.\n- When it does happen, the leak tells the child almost nothing. If ±1,000,000 around 12 is accepted, almost any number passes, so showing one accepted value hardly helps.\n- The rest of the finding holds: the spec is violated, a fallback path exists, and the property test (tolerance 1, values −20..20) never reaches it. It is a real correctness and spec-compliance gap with low practical impact, so minor rather than major.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1516,
+      "durationMs": 18367,
+      "sessionId": "502289c0-c0de-48ab-9d2a-5e16bc662344",
+      "costUsd": 0.1064114,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. GoldenTableTest.kt checks only four things: the table has at least 150 cases with unique ids (lines 22-28); the case counts per requirement match REQUIREMENTS with at least 5 each (lines 33-37); there is exactly one INTEGER '1 000' → '1000' CORRECT case (lines 41-49); and each case's recorded verdict matches the checker (lines 61-76). Nothing compares golden-table.jsonl against a pinned list of the store-spec scenario inputs. I searched the other checking tests (CheckerTimingTest, CheckingPurityTest, CheckingContractAlignmentTest, AnswerCheckerPropertyTest) and none pins specific scenario inputs such as NBSP, U+2212 or the en/em dashes. The dynamic test also can't catch this: it checks each row against its own recorded verdict, so if someone deletes a scenario row, or edits its input and verdict together, the build stays green as long as the counts still hold. The spec's 'every input named in a scenario … is present with that scenario's verdict' clause therefore isn't enforced by any executable check. I'm downgrading the severity because the reviewer confirmed the data complies today, so there is no current wrong behaviour, only a missing regression guard.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1549,
+      "durationMs": 23349,
+      "sessionId": "8d1e2bef-6820-4e47-aca9-2bcb23d940e2",
+      "costUsd": 0.1016378,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding's factual claim holds. contract/openspec/specs/answer-checking/spec.md:847 does require \"every input named in a scenario of those requirements is present with that scenario's verdict\". GoldenTableTest.kt checks only four things: size ≥150 and unique ids (L22-29), the 12-requirement set with ≥5 cases each (L33-37), the single NBSP \"1 000\" regression case (L41-49), and that each case matches the checker's output (L61-76). None of the other checking tests (property, purity, timing, contract-alignment, TipRules) refers to the scenario inputs either: grepping for U+2212, U+2009, U+030C and \"scenario\" finds nothing. So deleting or editing a scenario case (for example the U+2212 minus case) would keep the build green as long as the counts still hold. The gap is real.\n\nThrough the exploitability lens, though, nothing goes wrong for a real user or attacker today. The reviewer checked that the current data meets the clause. The gap only matters if someone later removes or edits a scenario case, so it is a missing guard against future regressions, not a reachable defect. Major overstates that, so I recommend downgrading.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1499,
+      "durationMs": 19827,
+      "sessionId": "52e0b319-5fd7-4dd9-b3a7-85361f25490f",
+      "costUsd": 0.11999040000000001,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is confirmed, but the line reference is wrong: FormatTips.kt has only 67 lines, so line 225 doesn't exist. The code in question is at lines 16–23.\n\n1. **The file read happens during a check.** `FormatTips` is a Kotlin `object` whose `private val TIPS` calls `ResourceBundle.getBundle(\"messages\", Locale.ROOT, classLoader, NoFallbackControl(FORMAT_PROPERTIES))`. Kotlin `object` initialisation is lazy: it runs the first time the class is accessed. The only access is in `AnswerChecker.kt:16` (`Grader.grade(spec, input) ?: return CheckResult(Verdict.UNPARSEABLE, null, FormatTips.tipFor(spec))`). A grep found no other reference, warm-up or eager initialisation anywhere in `src/main`. So the first UNPARSEABLE check loads `messages.properties` from the classpath.\n\n2. **The purity test cannot catch it.** `CheckingPurityTest` uses `onlyDependOnClassesThat().resideInAnyPackage(\"java.lang..\", \"java.math..\", \"java.text..\", \"java.util..\", \"kotlin..\", ...)`. `java.util.ResourceBundle` is allowed, and so are `java.lang.ClassLoader`, `ProcessBuilder` and `Runtime`. The test does block `java.io`, `java.nio` and `java.net` directly. But resource loading through `ResourceBundle` or `ClassLoader` and process spawning through `java.lang` go undetected. That matches the finding's claim that the \"no file calls\" rule isn't enforced for these paths.\n\nThe impact is limited: it's a one-off read from the classpath, after which the result is cached. That fits the \"minor\" severity. I'm keeping the finding with its severity unchanged; only the line number needs correcting.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1532,
+      "durationMs": 22962,
+      "sessionId": "bc79c71c-3394-40d8-bdfe-4f1850f35d58",
+      "costUsd": 0.1013508,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real, although the cited line is wrong: the file has 66 lines and the code in question is at FormatTips.kt:16-23, not line 225. `FormatTips` is a Kotlin `object`, and its `private val TIPS` is set in the static initializer. That initializer calls `ResourceBundle.getBundle(\"messages\", Locale.ROOT, classLoader, noFallbackControl(FORMAT_PROPERTIES))`, which reads messages.properties from the classpath. A JVM object initializes the first time it is used, so the read happens inside the first check that calls `tipFor`, meaning the first UNPARSEABLE check. That is a file/resource read during checking, which goes against the literal NFR-5 wording (\"no ... file ... calls while checking\"). The test gap is also real: CheckingPurityTest.kt:32-39 whitelists all of `java.lang..` and `java.util..`. That covers ClassLoader, ResourceBundle, ProcessBuilder and Runtime, so the test would not catch file or process access through those classes.\n\nHowever, nobody can exploit this or notice it. The read happens once per JVM and pulls a fixed resource from the app's own jar. No part of the read depends on input, so no user or attacker can choose the path or the contents, trigger it again, or change the result. After the first load, every check is pure. The one way it could fail is a missing key or bundle, which would throw ExceptionInInitializerError and give a 500. That would be a packaging or build bug, not something input can cause, and the first test that produces an UNPARSEABLE result would catch it. So this is a valid spec-compliance and test-hardening note (eager load, or record the decision, and tighten the ArchUnit denies), not a defect a real user can hit. I'm downgrading it from minor to a nit and noting the wrong line number.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1299,
+      "durationMs": 36943,
+      "sessionId": "540e5da5-694b-4f71-a33d-33286e7a42fc",
+      "costUsd": 0.22614259999999997,
+      "numTurns": 11,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the mechanism. The cited line is wrong, though: FormatTips.kt has only 67 lines. The real code is at FormatTips.kt:47-48 and 36.\n\nHow the overflow happens:\n- `tipFor` puts `example(spec)` into the template 'Tohle neumím přečíst. Napiš číslo a jednotku bez mezer v ní, třeba {0}.' (messages.properties:28). Without the placeholder the template is about 68 characters.\n- For NUMBER_WITH_UNIT, the example is \"<number> ${unit.display}\". The unit comes from `UnitNotation.parse(accepted[i])`.\n- `UnitNotation.unit()` (UnitNotation.kt:32-53) takes any letter-started run without whitespace as the unit, unchanged apart from turning exponents into superscripts. There is no unit whitelist and no length cap.\n- Nothing in the code limits the result: `AnswerSpec` (CheckingModel.kt:14) has no validation, and `tipFor` neither truncates nor falls back to a shorter text.\n\nWhy the contract doesn't prevent it:\n- The contract's only bound is `x-maxCodePoints: 100` per accepted item (openapi.yaml:1607). So the admin can author a unit of about 98 characters, e.g. \"5 \" plus a 98-letter word.\n- The shortest example, \"5,2 <unit>\", then gives a tip of about 68 + 4 + 98 = 170 characters. Any unit longer than about 48 characters already goes over 120.\n- That breaks the spec scenario \"at most 120 characters\" (openspec/changes/.../answer-checking/spec.md:33). It also breaks the contract's `PartResult.formatTip maxLength: 120` (openapi.yaml:1378).\n\nTests: TipRules.kt:45 checks the 120 limit, but only on the generated or golden specs, and none of them uses a long unit.\n\nSo the mechanism is real and reachable through valid authoring input. Real units are short, so it is unlikely in practice, and \"minor\" is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1332,
+      "durationMs": 32166,
+      "sessionId": "239ea9e5-cdf5-45f5-8f00-f254fbc7417a",
+      "costUsd": 0.2091874,
+      "numTurns": 12,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism. `FormatTips.tipFor` (FormatTips.kt:34-56; the cited line 257 is wrong because the file has only 67 lines) builds the NUMBER_WITH_UNIT tip as the template \"Tohle neumím přečíst. Napiš číslo a jednotku bez mezer v ní, třeba {0}.\" (messages.properties:28, about 68 characters without the placeholder) plus `\"$it ${unit.display}\"`. The number part can be up to 8 characters (\"-271828\"). `UnitNotation.parse`/`unit()` takes everything after the first letter as the unit, as long as it has no whitespace, and never limits its length. Nothing in the checking module truncates the tip or checks its length.\n\nThe upstream contract also allows long units. openapi.yaml:1599-1607 limits each `accepted` item only to `x-maxCodePoints: 100`, and it requires only that all items share one normalized unit. So an admin can save an accepted value like \"5 \" followed by about 90 letters, which is a valid NUMBER_WITH_UNIT. The child then types anything unreadable, such as \"abc def\", gets UNPARSEABLE, and the tip comes out at about 68 + 8 + 1 + 90 ≈ 167 characters. That breaks answer-checking spec rule 1 (\"at most 120 characters\", spec.md:675), which the spec says is \"checked mechanically\".\n\nThis is reachable and reproducible, but only through trusted admin authoring with an unrealistic unit (more than about 44 characters). It is not a security problem, and real units such as \"km/h\" or \"m²\" never come close. I'm keeping the severity at minor.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/Grader.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1442,
+      "durationMs": 26421,
+      "sessionId": "1e4507ac-d5e2-47c4-950b-28cfa356d5e6",
+      "costUsd": 0.1581388,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The described behavior is real, but the line numbers are wrong. In Grader.kt, a shape mismatch returns null (UNPARSEABLE) at line 26 (`(input as? RawInput.Selection)?.keys ?: return null` for CHOICE_*) and line 28 (`(input as? RawInput.Text)?.value ?: return null` for the other types). The finding cites lines 92 and 94, which are in numberWithUnit's shownUnit block. The tolerance fallback is at lines 38-41, not 104-107: an unparseable or negative tolerance becomes Rational.ZERO, so the comparison is exact. The change delta (specs/answer-checking/spec.md) has no scenario for either behavior; it covers only dependency purity, contract enums, the tip catalog and the golden table. design.md:13 only says 'The checker trusts its spec; an accepted value it cannot read never matches.' The golden table's input parser (GoldenTable.kt:75-77) builds Selection or Text, and I found no test that pairs a mismatched shape with a part type. So the gap the finding describes is real.\n\nSeen as a correctness problem, though, the code is not wrong. Both paths are defensive fallbacks for conditions that are ruled out upstream. The store spec makes request-shape errors an API 400 (slices 5/7), and tolerance is checked at authoring time (slice 5). design.md:13 explicitly hands spec validity to the authoring side. A missing tolerance and a bad one both mean exact, which matches the 'trusts its spec' principle. Returning UNPARSEABLE never consumes an attempt (FR-22), so even if a mismatch reached the checker, the child would lose nothing. The real risk is that a confusing format tip could reach the child if a later adapter fails to validate shapes. That makes this a documentation or test gap with no wrong verdict today. I'm not refuting it, because the mechanism exists and is undocumented, but it should be downgraded to a nit/minor documentation item and the line references corrected (26/28 and 38-41).",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/Grader.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1475,
+      "durationMs": 16139,
+      "sessionId": "66c1d709-b8e6-4d89-a66f-6bc4a374520e",
+      "costUsd": 0.0967078,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The behavior is in the code, but the line numbers are wrong. The shape mismatch is at Grader.kt:26 and :28, and tolerance() is at :38-41, not at 92/94/104-107. Through an exploitability lens, nobody can reach either path today:\n1) The only caller in src/main is AnswerChecker.check, which is called only from inside the checking module (FormatTips calls Grader directly, and only with RawInput.Text). No web adapter or practice code calls the checker yet. Slices 5 and 7 have not been built, and the store spec says the API returns 400 for malformed request shapes before the checker runs. A real user or attacker cannot send a Text input to a CHOICE part, or a Selection to a text part.\n2) Per the cited spec, a negative or unreadable tolerance is rejected with a 400 when content is authored. A child cannot supply one, so falling back to exact is only a safety net for specs that should never exist.\n3) Even if either path were reached, the result is safe. The answer comes back UNPARSEABLE, which by FR-22 does not use up an attempt, and the answer key does not leak. An exact-match fallback is stricter, not more lenient, so it cannot be used to get a wrong answer marked correct.\nWhat is left is a gap in the spec text (an undocumented defensive default), not a problem that can happen to a user. At most it is a documentation nit for a later slice's adapter contract.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:contract/openspec/specs/answer-checking/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1423,
+      "durationMs": 27694,
+      "sessionId": "42c7a0a6-b2da-4028-903c-2fda8e715f1f",
+      "costUsd": 0.15994540000000002,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "The facts in the finding hold. At contract/openspec/specs/answer-checking/spec.md:719 the store spec has \"Unreadable submissions are refused at the submission endpoint\" with 4 scenarios, and at :762 \"Who can trigger a check\" with 3 scenarios: tester 401, re-evaluation 401, and child submission needs no credentials. This change implements neither. tasks.md 4.1 only says \"None in this slice (no endpoint; slices 5 and 7 add them)\", which names no scenarios and no requirements. The deferral itself is recorded in two places: docs/current-state.md:35 under \"Scope NOT delivered\", and in proposal.md/design.md. So the deferral is legitimate, as the finding says.\n\nI could not find any forward-tracking mechanism. A search of openspec/** finds no slice 5, 7 or 9 change that references these requirements, because those changes don't exist yet in this repo. Nothing in tasks.md lists the 7 scenarios either.\n\nThe best counter-argument is that slice 7 will pick up FR-22 from the capability plan anyway, and the plan points to the answer-checking spec. But \"Who can trigger a check\" is split across content-authoring and admin-access, so its 401 scenarios could easily fall between slices. This same pattern was already raised as a finding in slice 2's review-findings.json: \"Child write is limited to its own practice\" was deferred to slice 7 with nothing tracking it there. That makes the risk concrete and recurring.\n\nThis is a traceability/spec-compliance gap, not a code defect, and the finding correctly rates it minor. The suggested fix is cheap: name the 7 scenarios in tasks.md 4.1 or in current-state. Not refuted; severity stays minor.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:contract/openspec/specs/answer-checking/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1456,
+      "durationMs": 14543,
+      "sessionId": "48cfc8e5-d3ac-4af9-971f-803ec4d43a2f",
+      "costUsd": 0.09121679999999999,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "Through an exploitability lens, nobody can trigger this. Slice 3 ships only the pure `checking` domain. No endpoint for submissions or the answer tester exists yet, so no user or attacker can send an unreadable submission or reach an unauthenticated check. Nothing is unguarded at runtime.\n\nWhat the finding actually claims is a process risk: the work \"could get lost\". The repo already tracks the deferral in several durable places:\n- `docs/current-state.md:35` lists, under \"Scope NOT delivered\", the FR-22 whole-submission refusal, the answer tester and re-evaluation, mapped to slices 5, 7 and 9.\n- `proposal.md:6` and the `design.md` Non-goals record the same deferral.\n- The capability plan assigns FR-22 to slice 7.\n- The store spec stays in `contract/`, and the handoff protocol requires each later slice to read the store spec it cites.\n\nSo the scenarios can't silently vanish. The suggested forward reference in other slices' templates is a nice-to-have bookkeeping tweak, not a defect that can be reproduced. The finding even concedes the deferral is legitimate. No concrete failure mechanism exists, so it is refuted.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-answer-checking-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1287,
+      "durationMs": 16695,
+      "sessionId": "7bcdf9fe-6fb4-41cc-b98e-78a6484bcd0c",
+      "costUsd": 0.09990779999999999,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding says task 5.2 has no recorded evidence. That is wrong. In `docs/qa/automated-verification-latest.md` (the qa:verify output from task 5.1, run 2026-10-04 15:28Z), line 19 lists the check `openspec-all`, which runs `npx openspec validate --all --strict`, as PASS with exit code 0. Line 8124 of the same file shows `✓ change/implement-answer-checking-api` in that output, with totals of 3 passed and 0 failed. So the strict validation of this exact change was run, recorded and passed. It is evidenced inside the 5.1 artifact, not in the slice-3-specific evidence files the finding searched.\n\nThe second claim, that 5.1 is \"provisional\" because 5.3 is still open, is not a defect either. Task 5.3 is unticked, and the re-run of 5.1 is part of 5.3 itself, so the open checkbox already tracks it. A first qa:verify pass being green before the review gate is the normal order. Nothing is falsely claimed as done.\n\nThere is no mechanism of error here. At most, the 5.2 line could cite the evidence path, which is cosmetic.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-answer-checking-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1320,
+      "durationMs": 13778,
+      "sessionId": "0be7116f-a1c6-4c99-b2d0-4edc4a266f70",
+      "costUsd": 0.100829,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding's main claim is wrong: evidence for 5.2 does exist. `docs/qa/automated-verification-latest.md:8113-8130` (the qa:verify output already cited for 5.1) records `npx openspec validate --all --strict` with exit code 0. Its output includes `✓ change/implement-answer-checking-api` under strict mode. That is the same check task 5.2 asks for, run across all items. The finding only looked in slice3-checker-run.md and slice3-red-run.md, so it missed this. The second point, that 5.1 is \"provisional\" while 5.3 is open, is not a defect either. Task 5.3 itself says to re-run 5.1 after the findings are dispositioned, so the workflow already plans for it, and 5.3 is correctly left unticked. Nothing here can affect a user or attacker, and the bookkeeping gap it describes is not real.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1272,
+      "durationMs": 19122,
+      "sessionId": "0dbfab10-4448-4fd1-8acb-a89e2b550e8e",
+      "costUsd": 0.12270779999999999,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "This is a summary of the review, not a claim about one defect. I checked every claim I could against the code:\n- **FR-14 to FR-21 and FR-23:** each has a `@trace` test. See `GoldenTableTest.kt:51-59`, `AnswerCheckerPropertyTest.kt` and `CheckingPurityTest.kt`.\n- **NFR-4:** enforced by `FixtureProvenanceTest`, with six `@trace NFR-4` tests.\n- **NFR-5 trace gap:** confirmed. `CheckerTimingTest.kt` names NFR-5 only in its KDoc, and its sole annotation is `// @trace FR-23` (line 12). `docs/qa/traceability-report.md:69` also shows NFR-5 with no test (`-`). Yet `mvp-capability-plan.md:46` assigns NFR-5 (the checker's share of the budget) to this slice.\n- **OpenAPI alignment:** `CheckingContractAlignmentTest` exists, and `contract/api/openapi.yaml:1610-1614` holds the AnswerSpec defaults the finding cites.\n\nThe deferral of the endpoint and trigger scenarios matches the plan's slice split. Nothing I found contradicts the summary. The real gap it points to (NFR-5 has no trace) is confirmed, and \"minor\" is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1305,
+      "durationMs": 15634,
+      "sessionId": "54b041a2-5dfc-4f01-acb1-bcf40aa8904a",
+      "costUsd": 0.0749504,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "I'm refuting this as a finding. It is a coverage roll-up, not a defect: no user or attacker can trigger anything from it.\n\n- **No failure mechanism of its own.** The two problems it mentions are already reported separately: the NFR-5 trace gap (\"see the first finding\") and the tip-example fallback. Counting the summary as a third issue would double-count them.\n- **The NFR-5 gap is real but is about bookkeeping.** `CheckerTimingTest.kt:8` already exercises the NFR-5 timing budget. It is only traced as `// @trace FR-23` (line 12), so what's missing is the trace label, not a check. That belongs to the separate finding anyway.\n- **The 7 \"missing\" scenarios are deliberately deferred.** The endpoint refusal and who-can-trigger scenarios are scheduled for slices 5, 7 and 9 in the capability plan. This slice adds no endpoints, so those paths can't be reached here.\n- **The \"partial\" golden-table clause is test thoroughness.** It is not a behaviour anyone can reproduce.\n\nNothing in the summary can occur for a real user or attacker.",
+        "severityAdjustment": "downgrade"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "16 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 7, contested: 7, rejected: 2"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/implement-answer-checking-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "slice 3 answer-checking backend (implement-answer-checking-api)",
+    "summary": "Review gate for slice 3 answer-checking backend (implement-answer-checking-api): 7 confirmed, 7 contested (treat as confirmed unless trivially wrong), 2 rejected.",
+    "confirmed": [
+      {
+        "title": "Format-tip fallback can return an example that is CORRECT (it reveals an answer) or UNPARSEABLE",
+        "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+        "line": 55,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "`return candidates.firstOrNull { Grader.grade(spec, RawInput.Text(it))?.correct == false } ?: candidates.last()` falls back to the last candidate without grading it. If no candidate grades WRONG, that last candidate is either CORRECT or unreadable. This can happen with a wide tolerance, for example INTEGER accepted `0` with tolerance `1000000`, which makes every example from `-271828` to `9999` CORRECT. The tip would then show an accepted answer to the child. That breaks spec rule 3 ('checking <example> against the part gives WRONG … never reveals an accepted answer'). The property test only uses tolerance `1`, so it never reaches the fallback.",
+        "suggestion": "Never return an example that has not been graded. When every candidate is CORRECT, build one that is guaranteed to be outside the tolerance (for example max(accepted) + tolerance + 1, written in the part's notation and unit and checked as WRONG). If even that fails, use a tip template with no example. Add a golden or property case with a large tolerance.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds. At FormatTips.kt:55, `candidates.firstOrNull { Grader.grade(...)?.correct == false } ?: candidates.last()` falls back to `candidates.last()` without grading it. Nothing upstream prevents that path. In Grader.kt:38-41 the tolerance is any parsed non-negative rational with no upper bound, so INTEGER accepted=[\"0\"] with tolerance \"1000000\" makes all six INTEGER examples (12…-271828) CORRECT. The fallback then puts -271828, an accepted answer, into the tip. That is the reveal the KDoc on lines 12-13 says must never happen. Wide tolerance is not the only way in: an accepted list that includes every candidate also triggers it. Severity stays minor because only admins author specs and such a spec is unusual, but the mechanism is real and nothing guards against it.",
+          "The bug is real, but it is hard to reach.\n\n**What the code does.** `FormatTips.kt:55` returns `candidates.last()` without grading it when no candidate grades WRONG.\n\n**Nothing upstream stops it.**\n- `AnswerSpec.tolerance` (`CheckingModel.kt:17`) is a free `String?`.\n- `Grader` only converts it to a `Rational`.\n- `Rational.within` checks `|value - target| <= tolerance` with no upper bound.\n- There is no check of tolerance size anywhere in `src/main`.\n\n**The example in the finding works.** Take an INTEGER part with accepted `0` and tolerance `1000000`. All six candidates (`12`, `305`, `48`, `-7`, `9999`, `-271828`) are within 1,000,000 of 0, so they all grade CORRECT. The fallback then puts `-271828`, an accepted answer, into the tip. That breaks the documented rule that the tip \"never reveals an accepted answer\" (class KDoc, spec rule 3). The same thing happens for NUMBER_WITH_UNIT and DECIMAL with a wide tolerance.\n\n**Who can trigger it.** A child cannot make this happen on purpose. The tip only appears after an UNPARSEABLE input, and the spec comes from the admin-authored answer key. So it is not exploitable by an attacker. It is a data-dependent leak: a careless or unusual admin spec (a very large tolerance, or a small accepted set that covers every candidate) would show an accepted value to the child.\n\n**Severity.** It stays at minor. No test covers it, because the property test only uses tolerance 1. The suggested fix is sound: never return an ungraded example, and fall back to a tip with no example if needed."
+        ]
+      },
+      {
+        "title": "The format-tip example works as an answer-key oracle: skipped examples show the child which values are correct, and the fallback example can be a correct answer (FR-27)",
+        "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+        "line": 57,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "example() goes through a fixed, public list of candidates (INTEGER: 12, 305, 48, -7, …; DECIMAL: 5,2, 3,75, …) and uses the first one the same part grades WRONG. If every candidate is CORRECT (for example a broad tolerance), it falls back to candidates.last(), which is an accepted answer. A child can type something unreadable like 'x', which is free because UNPARSEABLE never uses up an attempt (FR-22). Usually the tip says 'třeba 12'. When it says 'třeba 305' instead, 12 is the correct answer. For a NUMBER_WITH_UNIT part the tip also shows the expected unit (taken from accepted[0]). The checker is pure, but AnswerChecker.check returns this formatTip in the PartResult. The planned slice 7 child submission endpoint will pass it to the unauthenticated child as it is. The store spec requirement 'first candidate that the same part grades WRONG' prescribes this behavior, so the docs store needs fixing too.",
+        "suggestion": "Make the tip example independent of the answer key. Use one fixed example per type, or pick it from a source that doesn't depend on the spec (for DECIMAL, the exactDecimals format is fine). Never return a candidate that grades CORRECT; if none qualifies, leave the example out of the tip. Change the store spec ('Format tips from the message catalog') first, then add golden or property tests showing that the tip text is the same for every accepted value of a given type and format.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute this finding. The code works the way the finding says, and the problem is real.\n\n**How the example is picked.** `FormatTips.example()` (FormatTips.kt:39-56) goes through a fixed list of candidates and picks the first one that `Grader.grade(spec, …)` marks wrong (`correct == false`). If none is wrong, it falls back to `candidates.last()`. So the example shown depends on the answer key:\n- **Normal case:** the tip shows `12` (INTEGER), or `5,2` / `5,253…` (DECIMAL).\n- **First candidate is correct:** the tip shows the next candidate, which tells the child the first one is the answer. For example, \"třeba 305\" means the answer is 12.\n- **Every candidate is correct** (for example a wide tolerance): the fallback returns a value that grades correct. The KDoc on lines 12-13 promises the example \"never reveals an accepted answer\", and this case breaks that promise.\n\n**Unit leak.** For NUMBER_WITH_UNIT, line 47 takes the unit from the first accepted answer whose unit can be parsed, so the tip shows the expected unit.\n\n**How it reaches the child.** `AnswerChecker.kt:16` returns `FormatTips.tipFor(spec)` in the result for every UNPARSEABLE input. `CheckingModel.kt:37-41` documents that `formatTip` maps to the contract's `PartResult`. FR-22 says unreadable input never uses up an attempt, so a child can type `x` again and again to probe the tip at no cost.\n\n**Why it isn't refuted.** No child endpoint exists yet in this slice (it is planned for slice 7), so this is not exploitable today. But the problem sits in the pure domain logic and in the contract shape that the endpoint is meant to pass through as it is, and no guard anywhere filters it. The behavior also contradicts its own documented invariant. Keeping severity at major for FR-27 (answer keys must not leak before the reveal) is justified.",
+          "The mechanism is confirmed. FormatTips.kt:55 uses the first candidate in a fixed public list that the same spec grades WRONG. If none qualifies, it falls back to candidates.last() with no check, so it can return a value that grades CORRECT. AnswerChecker.kt:16 puts this tip into the UNPARSEABLE result. Per the contract (openapi.yaml:1369-1403 PartResult.formatTip; practice-flow spec:356), the tip goes to the child, and an UNPARSEABLE submission uses no attempt. So the oracle works: when the answer is 12, the INTEGER tip changes from 'třeba 12' to 'třeba 305', and the child can trigger this for free by sending 'x'. The NUMBER_WITH_UNIT tip also shows the accepted unit (line 47). The class KDoc claims it 'never reveals an accepted answer', and the fallback breaks that. What limits the impact: (1) No child endpoint calls AnswerChecker yet; it is only used inside the checking module, and the submission endpoint comes in slice 7, so nobody can exploit this today. (2) The leak only happens when an accepted answer is one of about 6 fixed values per type (like 12, 3/4, 5,2), or when a tolerance is broad enough to accept every candidate. (3) The unit leak is arguably part of the format help, not the graded value. The issue is real and reproducible once the endpoint is wired up, but its reach is narrow and it is not exposed yet, so I'd downgrade it from major."
+        ]
+      },
+      {
+        "title": "NFR-5 travels with slice 3 but has no traced enforcement point (trace.json tests: [], acceptance status 'planned')",
+        "file": "src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt",
+        "line": 275,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "The capability plan row for slice 3 lists 'NFR-5 (checker share of the budget)'. The store spec says 'It SHALL decide one answer part in under 5 ms at p95 … SHALL make no network, database, file or AI calls while checking (NFR-5)'. The mechanisms exist (CheckerTimingTest asserts p95 < 5 ms, and CheckingPurityTest), but both are annotated only `// @trace FR-23` (CheckerTimingTest.kt:275, CheckingPurityTest.kt:319). So trace/trace.json:864-870 has NFR-5 `\"tests\": []`, and trace/acceptance-contracts.json:262-268 has NFR-5 `\"artifact\": null, \"status\": \"planned\"`. tasks.md 2.3 itself says '(FR-23, NFR-5 derived budget)'.",
+        "suggestion": "Add `// @trace NFR-5` to CheckerTimingTest and CheckingPurityTest, regenerate trace.json and acceptance-contracts.json, and confirm NFR-5 resolves to an artifact-ok mechanism (keep the round-trip half 'planned' for slice 7 if the gate tooling needs that split).",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism holds, though the cited line numbers are wrong. The tag is at CheckerTimingTest.kt:12, not :275, and at CheckingPurityTest.kt:21, not :319. Every @trace tag in src/test/kotlin/cz/doucko/checking names an FR id; none names NFR-5. The two NFR-5 mechanisms (the p95 timing test and the purity test) are tagged only `// @trace FR-23`. As a result, trace/trace.json:864-870 shows NFR-5 with `ownedHere: true` and `tests: []`, and trace/acceptance-contracts.json:262-268 shows NFR-5 with `artifact: null, status: planned`. That is inconsistent with three other places: the capability-plan slice-3 row ('NFR-5 (checker share of the budget)'), tasks.md 2.3 ('FR-23, NFR-5 derived budget'), and the change spec, which cites NFR-5 for the purity rule. The repo owns NFR-5 (ownedHere true; owners backend and frontend), so adding the tag is allowed under the rule 'only ids this repo owns'.\n\nI recommend a downgrade. NFR-5's primary owner capability is practice-flow (capability plan line 300). Its acceptance mechanism is the end-to-end round-trip p95 < 300 ms timing test in slice 7 (line 208). So 'planned' is a legitimately accurate status for the requirement as a whole, and the timing and purity behaviour itself is enforced and tested. The gap is traceability bookkeeping: a missing tag for the checker share. It is not a correctness defect, so minor fits better than major.",
+          "The traceability gap is real, but the cited line numbers are wrong. CheckerTimingTest.kt and CheckingPurityTest.kt each have a single `// @trace FR-23` annotation, at line 12 and line 21, not at lines 275 and 319. Neither file has an `@trace NFR-5` annotation; CheckerTimingTest mentions NFR-5 only in a KDoc comment at line 8. The trace data matches the finding: trace/trace.json:864-870 lists NFR-5 with ownedHere: true and tests: [], and trace/acceptance-contracts.json:262-268 has NFR-5 with artifact: null and status \"planned\". So the gate tooling sees no evidence for NFR-5, even though the slice claims it.\n\nThrough the exploitability lens, nothing here can affect a user or attacker. The timing (p95 < 5 ms) and purity (no network, database, file or AI calls) checks exist and run under Surefire. The defect is only that the evidence isn't linked in the traceability ledger. That makes it a process and gate-integrity problem, not a runtime one. It still matters for this harness: with no linked test, NFR-5 reads as having no proof in the gates, and the AGENTS.md rules treat claims without linked evidence as defects. The fix is trivial: add the NFR-5 annotation and regenerate the trace files. I'm confirming the finding, but \"major\" overstates it."
+        ]
+      },
+      {
+        "title": "Format-tip example falls back to a CORRECT (answer-revealing) or non-WRONG candidate when no candidate grades WRONG",
+        "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+        "line": 264,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "Store spec, Format tip rule 3: 'When `<example>` … is checked against the same part, the verdict is `WRONG`. So the example … never reveals an accepted answer.' Code: `return candidates.firstOrNull { Grader.grade(spec, RawInput.Text(it))?.correct == false } ?: candidates.last()`. The contract allows any tolerance ≥ 0 with no upper bound (openapi.yaml:1608). So INTEGER accepted ['12'] with tolerance '1000000' makes all six candidates (12, 305, 48, -7, 9999, -271828) CORRECT, and the tip shows '-271828', which is an accepted value. The property test only uses tolerance '1' around accepted values from -20 to 20, so this path is never tested.",
+        "suggestion": "Build a guaranteed-WRONG example instead of falling back. For example, take an accepted value plus (tolerance + 1), formatted in the part's notation and exactDecimals; for DECIMAL with exactDecimals you can also violate the form. Add a property or golden case with a huge tolerance. If some spec makes rule 3 impossible, amend the store spec to say what happens in that case.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is real, but the line number is wrong: the code is at FormatTips.kt:55, not 264 (the file has 67 lines). Line 55 is `candidates.firstOrNull { Grader.grade(spec, RawInput.Text(it))?.correct == false } ?: candidates.last()`. Nothing upstream guards this. In the checking module, tolerance is only parsed and passed to `Rational.within`, which checks |value - target| <= tolerance with no upper bound. The contract (openapi.yaml:1608) and the content-authoring spec (:441) only require tolerance ≥ 0. With INTEGER accepted ['12'] and tolerance '1000000', all six candidates fall within tolerance. The largest distance is |-271828 - 12| = 271840 ≤ 1e6, so all six grade CORRECT and the fallback returns '-271828', which is an accepted value. That breaks answer-checking spec rule 3 (spec.md:682-684): the example, checked against the same part, must be WRONG and must never reveal an accepted answer. The same fallback can be reached for DECIMAL, FRACTION and NUMBER_WITH_UNIT when tolerance is large. I'm downgrading severity because you only get there with an unusually large tolerance that the admin (the parent) sets. The tip also only appears after UNPARSEABLE input, so in practice this rarely reveals an answer. It is still a SHALL violation that no test covers.",
+          "I confirmed the mechanism, but the cited line number is wrong. The code is at FormatTips.kt:55, not line 264: `candidates.firstOrNull { Grader.grade(spec, RawInput.Text(it))?.correct == false } ?: candidates.last()`.\n\nNothing upstream stops this case:\n- Tolerance has no upper bound in the main code. CheckingModel.kt:17 is a plain `String?`, and Grader.kt:38 parses it.\n- `Rational.within` is a plain `|value - target| <= tolerance` check.\n- So INTEGER with accepted ['12'] and tolerance '1000000' grades all six fixed candidates CORRECT, and the tip shows '-271828', which is an accepted value. That breaks store-spec rule 3 (\"the example is WRONG… never reveals an accepted answer\").\n- The fallback also returns a candidate that grades UNPARSEABLE (null) when no candidate is WRONG. For example, a NUMBER_WITH_UNIT spec with no parseable unit would get an unreadable example, which also breaks rule 3.\n\nWhy I recommend a downgrade:\n- Only an admin can trigger this, by writing a spec with an extreme tolerance. A child or attacker cannot create the condition.\n- When it does happen, the leak tells the child almost nothing. If ±1,000,000 around 12 is accepted, almost any number passes, so showing one accepted value hardly helps.\n- The rest of the finding holds: the spec is violated, a fallback path exists, and the property test (tolerance 1, values −20..20) never reaches it. It is a real correctness and spec-compliance gap with low practical impact, so minor rather than major."
+        ]
+      },
+      {
+        "title": "Golden-table scenario clause 'every scenario input is present with its verdict' is not mechanically checked",
+        "file": "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
+        "line": 33,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "Store scenario 'Golden table size and coverage': '…AND every input named in a scenario of those requirements is present with that scenario's verdict'. GoldenTableTest only asserts the size (≥150), unique ids, at least 5 cases per requirement, and the one NBSP regression case. Nothing compares the table against the spec's scenario inputs. I checked by hand that today all scenario inputs are present (including NBSP, thin space, U+2212, U+2013, U+2014 and the decomposed caron), so the data complies. But if a case is deleted or edited, the build stays green as long as the counts still hold.",
+        "suggestion": "Add a test that keeps a pinned list of (requirement, type, spec, input, verdict) tuples taken from the store spec scenarios and asserts each one is in golden-table.jsonl. Or tag cases with `scenario:` ids and check that every scenario id appears.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds. GoldenTableTest.kt checks only four things: the table has at least 150 cases with unique ids (lines 22-28); the case counts per requirement match REQUIREMENTS with at least 5 each (lines 33-37); there is exactly one INTEGER '1 000' → '1000' CORRECT case (lines 41-49); and each case's recorded verdict matches the checker (lines 61-76). Nothing compares golden-table.jsonl against a pinned list of the store-spec scenario inputs. I searched the other checking tests (CheckerTimingTest, CheckingPurityTest, CheckingContractAlignmentTest, AnswerCheckerPropertyTest) and none pins specific scenario inputs such as NBSP, U+2212 or the en/em dashes. The dynamic test also can't catch this: it checks each row against its own recorded verdict, so if someone deletes a scenario row, or edits its input and verdict together, the build stays green as long as the counts still hold. The spec's 'every input named in a scenario … is present with that scenario's verdict' clause therefore isn't enforced by any executable check. I'm downgrading the severity because the reviewer confirmed the data complies today, so there is no current wrong behaviour, only a missing regression guard.",
+          "The finding's factual claim holds. contract/openspec/specs/answer-checking/spec.md:847 does require \"every input named in a scenario of those requirements is present with that scenario's verdict\". GoldenTableTest.kt checks only four things: size ≥150 and unique ids (L22-29), the 12-requirement set with ≥5 cases each (L33-37), the single NBSP \"1 000\" regression case (L41-49), and that each case matches the checker's output (L61-76). None of the other checking tests (property, purity, timing, contract-alignment, TipRules) refers to the scenario inputs either: grepping for U+2212, U+2009, U+030C and \"scenario\" finds nothing. So deleting or editing a scenario case (for example the U+2212 minus case) would keep the build green as long as the counts still hold. The gap is real.\n\nThrough the exploitability lens, though, nothing goes wrong for a real user or attacker today. The reviewer checked that the current data meets the clause. The gap only matters if someone later removes or edits a scenario case, so it is a missing guard against future regressions, not a reachable defect. Major overstates that, so I recommend downgrading."
+        ]
+      },
+      {
+        "title": "Format tips read a classpath file during the first check, and the purity test cannot detect file/process access",
+        "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+        "line": 225,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "Store spec: 'The checker SHALL make no network, database, file or AI calls while checking (NFR-5).' FormatTips.TIPS is initialized when the object is first used, i.e. inside the first AnswerChecker.check that returns UNPARSEABLE, so `ResourceBundle.getBundle(\"messages\", …)` reads messages.properties during a check. CheckingPurityTest allows all of `java.lang..` and `java.util..`, which includes ClassLoader resource loading, ResourceBundle, ProcessBuilder and Runtime. So the 'no file calls' rule is not actually enforced.",
+        "suggestion": "Load the catalog eagerly at module start (or accept the one-off load and record it as a spec decision in the delta). Tighten CheckingPurityTest with explicit denies, e.g. no dependency on java.lang.ProcessBuilder/Runtime, java.io, java.nio, java.net, or ResourceBundle outside FormatTips.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is confirmed, but the line reference is wrong: FormatTips.kt has only 67 lines, so line 225 doesn't exist. The code in question is at lines 16–23.\n\n1. **The file read happens during a check.** `FormatTips` is a Kotlin `object` whose `private val TIPS` calls `ResourceBundle.getBundle(\"messages\", Locale.ROOT, classLoader, NoFallbackControl(FORMAT_PROPERTIES))`. Kotlin `object` initialisation is lazy: it runs the first time the class is accessed. The only access is in `AnswerChecker.kt:16` (`Grader.grade(spec, input) ?: return CheckResult(Verdict.UNPARSEABLE, null, FormatTips.tipFor(spec))`). A grep found no other reference, warm-up or eager initialisation anywhere in `src/main`. So the first UNPARSEABLE check loads `messages.properties` from the classpath.\n\n2. **The purity test cannot catch it.** `CheckingPurityTest` uses `onlyDependOnClassesThat().resideInAnyPackage(\"java.lang..\", \"java.math..\", \"java.text..\", \"java.util..\", \"kotlin..\", ...)`. `java.util.ResourceBundle` is allowed, and so are `java.lang.ClassLoader`, `ProcessBuilder` and `Runtime`. The test does block `java.io`, `java.nio` and `java.net` directly. But resource loading through `ResourceBundle` or `ClassLoader` and process spawning through `java.lang` go undetected. That matches the finding's claim that the \"no file calls\" rule isn't enforced for these paths.\n\nThe impact is limited: it's a one-off read from the classpath, after which the result is cached. That fits the \"minor\" severity. I'm keeping the finding with its severity unchanged; only the line number needs correcting.",
+          "The mechanism is real, although the cited line is wrong: the file has 66 lines and the code in question is at FormatTips.kt:16-23, not line 225. `FormatTips` is a Kotlin `object`, and its `private val TIPS` is set in the static initializer. That initializer calls `ResourceBundle.getBundle(\"messages\", Locale.ROOT, classLoader, noFallbackControl(FORMAT_PROPERTIES))`, which reads messages.properties from the classpath. A JVM object initializes the first time it is used, so the read happens inside the first check that calls `tipFor`, meaning the first UNPARSEABLE check. That is a file/resource read during checking, which goes against the literal NFR-5 wording (\"no ... file ... calls while checking\"). The test gap is also real: CheckingPurityTest.kt:32-39 whitelists all of `java.lang..` and `java.util..`. That covers ClassLoader, ResourceBundle, ProcessBuilder and Runtime, so the test would not catch file or process access through those classes.\n\nHowever, nobody can exploit this or notice it. The read happens once per JVM and pulls a fixed resource from the app's own jar. No part of the read depends on input, so no user or attacker can choose the path or the contents, trigger it again, or change the result. After the first load, every check is pure. The one way it could fail is a missing key or bundle, which would throw ExceptionInInitializerError and give a 500. That would be a packaging or build bug, not something input can cause, and the first test that produces an UNPARSEABLE result would catch it. So this is a valid spec-compliance and test-hardening note (eager load, or record the decision, and tighten the ArchUnit denies), not a defect a real user can hit. I'm downgrading it from minor to a nit and noting the wrong line number."
+        ]
+      },
+      {
+        "title": "NUMBER_WITH_UNIT tip can exceed 120 characters for long unit spellings",
+        "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+        "line": 257,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "Rule 1: 'It is Czech and at most 120 characters long.' The template 'Tohle neumím přečíst. Napiš číslo a jednotku bez mezer v ní, třeba {0}.' is about 70 characters before the example. The example appends `unit.display`, which comes from the accepted values, and neither the checker nor the visible contract limits their length. A unit display longer than about 40 characters makes the tip break rule 1. No golden or property case uses a long unit.",
+        "suggestion": "Cap the example (drop the unit or fall back to a shorter template when the result would exceed 120), or have authoring validation bound the unit length and cite that limit in the spec. Add a test case for it.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute the mechanism. The cited line is wrong, though: FormatTips.kt has only 67 lines. The real code is at FormatTips.kt:47-48 and 36.\n\nHow the overflow happens:\n- `tipFor` puts `example(spec)` into the template 'Tohle neumím přečíst. Napiš číslo a jednotku bez mezer v ní, třeba {0}.' (messages.properties:28). Without the placeholder the template is about 68 characters.\n- For NUMBER_WITH_UNIT, the example is \"<number> ${unit.display}\". The unit comes from `UnitNotation.parse(accepted[i])`.\n- `UnitNotation.unit()` (UnitNotation.kt:32-53) takes any letter-started run without whitespace as the unit, unchanged apart from turning exponents into superscripts. There is no unit whitelist and no length cap.\n- Nothing in the code limits the result: `AnswerSpec` (CheckingModel.kt:14) has no validation, and `tipFor` neither truncates nor falls back to a shorter text.\n\nWhy the contract doesn't prevent it:\n- The contract's only bound is `x-maxCodePoints: 100` per accepted item (openapi.yaml:1607). So the admin can author a unit of about 98 characters, e.g. \"5 \" plus a 98-letter word.\n- The shortest example, \"5,2 <unit>\", then gives a tip of about 68 + 4 + 98 = 170 characters. Any unit longer than about 48 characters already goes over 120.\n- That breaks the spec scenario \"at most 120 characters\" (openspec/changes/.../answer-checking/spec.md:33). It also breaks the contract's `PartResult.formatTip maxLength: 120` (openapi.yaml:1378).\n\nTests: TipRules.kt:45 checks the 120 limit, but only on the generated or golden specs, and none of them uses a long unit.\n\nSo the mechanism is real and reachable through valid authoring input. Real units are short, so it is unlikely in practice, and \"minor\" is the right severity.",
+          "I confirmed the mechanism. `FormatTips.tipFor` (FormatTips.kt:34-56; the cited line 257 is wrong because the file has only 67 lines) builds the NUMBER_WITH_UNIT tip as the template \"Tohle neumím přečíst. Napiš číslo a jednotku bez mezer v ní, třeba {0}.\" (messages.properties:28, about 68 characters without the placeholder) plus `\"$it ${unit.display}\"`. The number part can be up to 8 characters (\"-271828\"). `UnitNotation.parse`/`unit()` takes everything after the first letter as the unit, as long as it has no whitespace, and never limits its length. Nothing in the checking module truncates the tip or checks its length.\n\nThe upstream contract also allows long units. openapi.yaml:1599-1607 limits each `accepted` item only to `x-maxCodePoints: 100`, and it requires only that all items share one normalized unit. So an admin can save an accepted value like \"5 \" followed by about 90 letters, which is a valid NUMBER_WITH_UNIT. The child then types anything unreadable, such as \"abc def\", gets UNPARSEABLE, and the tip comes out at about 68 + 8 + 1 + 90 ≈ 167 characters. That breaks answer-checking spec rule 1 (\"at most 120 characters\", spec.md:675), which the spec says is \"checked mechanically\".\n\nThis is reachable and reproducible, but only through trusted admin authoring with an unrealistic unit (more than about 44 characters). It is not a security problem, and real units such as \"km/h\" or \"m²\" never come close. I'm keeping the severity at minor."
+        ]
+      }
+    ],
+    "contested": [
+      {
+        "title": "A negative `exactDecimals` makes the checker throw, despite its documented 'never throws for any spec' guarantee",
+        "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+        "line": 63,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`whole + \",\" + FRACTION_DIGITS.take(exactDecimals)`: Kotlin's `String.take(n)` throws IllegalArgumentException when n < 0. So a DECIMAL spec with `exactDecimals = -1` and any unreadable input throws from `AnswerChecker.check`. design.md and the AnswerChecker KDoc both promise it never throws for any input or spec. The contract caps the value at 0..6, but `AnswerSpec` in the domain does not enforce that. For values above 6, `take` silently gives only 6 digits, so the tip example has the wrong number of decimals: it grades WRONG for its format and misleads the child.",
+        "suggestion": "Either validate `exactDecimals in 0..6` when the domain `AnswerSpec` is built (an `init { require(...) }` that the slice 5/7 adapters map to a 400), or clamp/coerce in `decimalExamples` so the example always has exactly `exactDecimals` digits. Add a property case that uses random `exactDecimals`.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The finding holds. FormatTips.kt:63 calls `FRACTION_DIGITS.take(exactDecimals)` whenever `exactDecimals` is not null and not 0. Kotlin's `String.take` throws IllegalArgumentException for a negative n. The domain `AnswerSpec` (CheckingModel.kt:14-24) is a plain data class with `exactDecimals: Int? = null`. It has no init/require guard, and nothing in the checking module checks the value; a grep for `require(` finds only the one in Rational. The call path is real: `AnswerChecker.check` calls `Grader.grade`. If that returns null (UNPARSEABLE), it calls `FormatTips.tipFor(spec)`, then `example`, then `decimalExamples(spec.exactDecimals)`. So a DECIMAL spec with exactDecimals = -1 and unreadable input throws. That breaks design.md:61 (\"never throws for any input or spec\"). The KDoc itself only says \"any input\". The >6 point also holds: `take(7)` returns all 6 digits. Grader.kt:52 then marks every candidate WRONG because the decimal count doesn't match, so the first candidate is chosen. The tip example then has the wrong number of decimals and misleads the child. Mitigation: the contract caps the value at 0..6, and no adapter builds AnswerSpec from user data yet in this slice. So today this is only reachable through bad admin content or a future adapter that skips validation. That fits the minor severity.",
+          "The mechanism is real, but no real user or attacker can trigger it. In `FormatTips.kt:63`, `FRACTION_DIGITS.take(exactDecimals)` would throw IllegalArgumentException for a negative value. For values above 6 it would quietly give a shorter example. `AnswerSpec` (CheckingModel.kt:14) is a plain data class with no `init` validation.\n\nThe path is not reachable today:\n1. Nothing in `src/main` builds an `AnswerSpec` or calls `AnswerChecker.check`. The only production use of `FormatTips.tipFor` is inside `AnswerChecker` itself, and `checking` is a pure library with no web or persistence adapter yet. No HTTP endpoint, stored content or user input can reach it. Only tests can build a spec with `exactDecimals = -1`.\n2. A spec will only come from outside once the slice 5/7 adapters exist. Those adapters will receive admin-authored content through the contract, and the finding itself admits the contract caps `exactDecimals` at 0..6. The generated OpenAPI models and validation reject values outside that range before any domain object is built.\n3. Even then, only the authenticated admin writes answer specs, and the child never does. A child's input can only cause the throw if the spec is already invalid, which the contract prevents.\n\nSo this is a hardening gap: the KDoc's 'never throws' promise does not hold for specs the contract already forbids. An `init { require(exactDecimals in 0..6) }` would be cheap defence in depth. But it is not an exploitable or reproducible defect for any real user, so I am refuting it under the exploitability lens. If it is kept at all, it should be treated as a hardening nit."
+        ]
+      },
+      {
+        "title": "Unit value matching ignores which accepted entry the unit belongs to; correctness depends on an authoring invariant the checker never checks",
+        "file": "src/main/kotlin/cz/doucko/checking/domain/Grader.kt",
+        "line": 80,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`val partUnit = accepted.firstOrNull()?.unit` takes the part's unit from the first accepted value only. Then `accepted.any { Rational.within(input.number.value, it.number.value, tolerance) }` compares the number against every accepted value without checking that value's unit. With accepted `[\"5 m\", \"500 cm\"]`, the input `500 m` is CORRECT and `500 cm` is WRONG. The contract says all accepted values share one unit (400 at authoring), but authoring validation is out of scope until slice 5, and design.md says 'the checker trusts its spec'.",
+        "suggestion": "Compare the input only against accepted entries whose unit key equals the input's (or the part's) unit. Alternatively, have the checker treat accepted values with a different unit as unreadable, so they never match, and document the invariant at the domain boundary.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "I could not refute it: the code works exactly as the finding describes. In `Grader.numberWithUnit` (`Grader.kt:78-88`), line 80 takes the part's unit from the first parsed accepted entry only. Line 86 checks the input's unit against that one unit. Line 88 then compares the input's number against every accepted entry's number and ignores each entry's own unit. So with accepted `[\"5 m\", \"500 cm\"]`, the input `500 m` passes the unit check and matches 500 numerically, giving CORRECT. The input `500 cm` fails the unit check, giving WRONG. Nothing else in the `checking` module catches this. `AnswerSpec` (`CheckingModel.kt`) has no init/require validation, and its KDoc only says the unit \"is derived from `accepted`\". The checker therefore relies entirely on the authoring rule that all accepted values share one unit, which is not enforced anywhere in this repo yet.\n\nThere is also a related inconsistency in the same area. `FormatTips.kt:47` uses `firstNotNullOfOrNull` to pick the first entry that has a unit. `Grader` uses `accepted.firstOrNull()?.unit`. With accepted `[\"5\", \"5 m\"]`, the format tips would show \"m\", but the grader's part unit would be null, so any input written with a unit would be graded WRONG.\n\nWhy it stays minor and low-confidence: a spec only breaks the checker if it violates the contract invariant, which authoring is supposed to reject with a 400. No production path creates such specs in this slice, so this is defensive hardening, not a live bug. The current minor severity fits.",
+          "The code behaves as described: Grader.kt:80 takes the unit from the first accepted entry, and line 88 compares the number against every accepted entry without looking at that entry's unit. But nobody can actually trigger the problem. In src/main, nothing outside the checking module builds an AnswerSpec or calls AnswerChecker; only tests and FormatTips use it. There is no endpoint that lets a child or an attacker supply an answer spec. Specs come only from admin-authored content, and the contract requires authoring to reject accepted values with mixed units (400). The bad case only happens if the admin writes a spec the contract already forbids, and the authoring path that would let them do that doesn't exist yet (slice 5). design.md also says the checker trusts its spec. At most this is a defensive-hardening note to carry into slice 5's authoring validation, not a defect a real user or attacker can hit today."
+        ]
+      },
+      {
+        "title": "The space-character set is defined twice, as a regex class and as a hand-coded predicate",
+        "file": "src/main/kotlin/cz/doucko/checking/domain/FractionNotation.kt",
+        "line": 107,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "`private fun isSpace(c: Char): Boolean = c.code == 0x20 || c.code == 0xA0 || c.code == 0x2009` duplicates `NumericNotation.SPACE_CLASS = \"[   ]\"`, which the same file already uses for `MIXED`. If the allowed separators change (for example adding U+202F narrow no-break space), the grouping rule and the around-the-slash rule will drift apart without anyone noticing.",
+        "suggestion": "Define the separator set once in NumericNotation (for example a `SPACE_CHARS` string plus a predicate derived from it), and build both the regex class and the slash trimming from it.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The duplication is real. `FractionNotation.kt:107` hand-codes `isSpace` as U+0020, U+00A0 and U+2009. `NumericNotation.kt:20` defines `SPACE_CLASS = \"[   ]\"`, and `FractionNotation` uses it for `MIXED` (line 54) and indirectly through `INTEGER_DIGITS` (`NumericNotation.kt:24`).\n\nThrough a correctness lens, though, nothing is wrong. Both definitions cover exactly the same three code points, so the slash trimming (lines 60–61) and the grouping/mixed-number regex accept the same separators. No input gets a different result because of this, and no path is wrong today.\n\nThe finding's mechanism is hypothetical. It only becomes a problem if someone later edits one set and not the other. That is a maintainability or DRY concern, not a correctness defect.\n\nThe codebase has a third separator predicate, `Whitespace.isSpace` in `TextMatching.kt:8`. It is broader on purpose (`Character.isWhitespace || isSpaceChar`) and is used for text and units, so the narrower numeric set looks like a deliberate design choice rather than an accidental split.\n\nRefactoring to a single `SPACE_CHARS` source is a reasonable cleanup. But the claim that this code is incorrect does not hold, so it does not stand as a correctness finding.",
+          "The duplication is real. `FractionNotation.kt:107` hand-codes `isSpace` as U+0020, U+00A0 and U+2009. `NumericNotation.kt:20` defines `SPACE_CLASS = \"[   ]\"`, and `FractionNotation` reuses that class through `SPACE` (line 52) and `MIXED` (line 54), which builds on `INTEGER_DIGITS`. The private predicate trims spaces around the slash at lines 60–61. So the same three-character set lives in two places.\n\nFrom an exploitability and reproducibility angle, though, nothing goes wrong for a user today. The two definitions match exactly, so no input is handled differently by the grouping rule and the around-the-slash rule. The drift the finding describes could only happen after someone edits one definition and not the other. That makes this a maintainability issue, not a correctness bug, and the 'correctness' label overstates it.\n\nOne more point: a third, broader space definition (`Whitespace.isSpace` in `TextMatching.kt:8`, which uses Character.isWhitespace/isSpaceChar) is already used by UnitNotation. So the module doesn't have a single source of truth for spaces anyway. The suggested refactor is reasonable cleanup, but no user or attacker can trigger a problem from the current code.\n\nVerdict: the mechanism is confirmed but only as a hypothetical future risk. I'm not refuting it, and I'm downgrading it to a nit / maintainability note."
+        ]
+      },
+      {
+        "title": "Checklist results for the rest of this slice: no endpoints, so authz, auth/session, upload, exposure and CORS are not applicable; no issues in injection, secrets, privacy or dependencies",
+        "file": "src/main/kotlin/cz/doucko/checking/AnswerChecker.kt",
+        "line": 11,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "The diff (slice2-admin-access..HEAD, commit 0120326) adds only the pure cz.doucko.checking module: an AnswerChecker facade, domain parsers and messages.properties tips. (1) Authz/IDOR/mass assignment/rate limits: no controller, *Api implementation or DTO was added, so there's no new route. Content can't be changed through it, and only formatTip carries any answer-key leak (see the finding above). (2) Auth/session/CSRF: SecurityConfig and admin code are unchanged. (3) Injection: no SQL, JSONB, file or path I/O, and nothing is rendered as HTML. ReDoS and BigInteger blow-up are limited because Grader.kt:29 rejects text over 100 code points before any regex or parsing runs. NumericNotation's grouped-digit regex is unambiguous. The accepted and tolerance values are admin-authored and trusted. (4) Exposure: compose and CORS are unchanged. (5) Privacy/legal: golden-table.jsonl holds self-authored words (pes, Žirafa, pravý úhel) and numbers, is listed in fixtures/PROVENANCE.md, and contains no PII or workbook content; nothing is logged. (6) Secrets: none were added; no .env or VITE_ changes. (7) Dependencies: pom.xml is unchanged in this diff, so there are no new advisories to check. I didn't run npm audit or Maven advisory checks here.",
+        "suggestion": "Nothing to do now. When slice 7 wires the checker to a child endpoint, re-check its PartResult mapping for FR-27 and add a size limit on RawInput.Selection.keys, which is currently unbounded and only checked through a List membership scan.",
+        "dimension": "security",
+        "verdict": "contested",
+        "verifierNotes": [
+          "This finding reports that nothing is wrong. It is a checklist summary, not a defect claim, so there is no faulty mechanism to disprove. I checked the factual claims it rests on and they hold:\n(1) The checking module has no web layer. No controller or *Api implementation exists under src/main/kotlin/cz/doucko/checking; it contains only CheckingModel, CheckingModule, AnswerChecker and domain/*.\n(2) The 100-code-point limit is real. Grader.kt:19 sets MAX_CODE_POINTS = 100, and Grader.kt:29 rejects longer text after Whitespace.trim. That happens before number(), fraction(), numberWithUnit() or text() parses anything, so the regex and BigInteger parsing only ever see at most 100 code points. The trim runs on the full untrimmed input, but it is linear, so this is not a ReDoS path.\n(3) RawInput.Selection.keys really has no size limit. It is a plain List<String> (CheckingModel.kt:33) and is passed straight to choice(), which calls keys.distinct() (Grader.kt:100-102). The forward-looking suggestion is therefore accurate.\n(4) The admin, security and shared code is in separate modules, and this slice adds no routes.\nNothing here is incorrect. But a \"no issues found\" checklist is not an actionable defect, so it should be informational rather than a minor-severity finding. Hence: not refuted, severity downgraded.",
+          "This finding is a checklist summary, and its own evidence says there is no issue. Its only concrete concern is the forward-looking note that `RawInput.Selection.keys` has no size limit (`CheckingModel.kt:32-33`, used through `Grader.kt:100-102`, which calls `keys.distinct()`). Nobody can reach that today. The `cz.doucko.checking` module is pure Kotlin and was added without any controller, `*Api` implementation or DTO, so no user or attacker can submit a Selection. The rest of the evidence checks out in the code: `Grader.kt:19` sets `MAX_CODE_POINTS = 100`, which caps text input before any regex or parsing runs. Choice input is handled separately at `Grader.kt:26`. An unbounded list processed with `distinct()` and a membership scan would cost at most O(n·m) on an internal call, and HTTP body-size limits would also apply once an endpoint exists. No exploitable or reproducible problem exists in this slice, so this is not a real defect. At most it is a note for slice 7, when the checker gets a child endpoint."
+        ]
+      },
+      {
+        "title": "Undocumented behavior: an input shape that does not match the part type is UNPARSEABLE, and invalid tolerance silently means exact",
+        "file": "src/main/kotlin/cz/doucko/checking/domain/Grader.kt",
+        "line": 92,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "Grader returns null (UNPARSEABLE, with a tip) for RawInput.Text on CHOICE_* parts and for RawInput.Selection on text and numeric parts (lines 92 and 94). tolerance() at lines 104-107 turns an unreadable or negative tolerance into ZERO. The store spec gives the API 400 for malformed request shapes ('They are not checker verdicts') and authoring-time 400 for a bad tolerance. No spec or delta requirement covers how the checker behaves here; design.md only says 'The checker trusts its spec'.",
+        "suggestion": "Add a short scenario to the change delta ('Pure checker module') for both behaviors. Alternatively make the mismatch a programming error that slices 5 and 7 must rule out at their adapters, so a shape mismatch can never reach the child as a format tip.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The described behavior is real, but the line numbers are wrong. In Grader.kt, a shape mismatch returns null (UNPARSEABLE) at line 26 (`(input as? RawInput.Selection)?.keys ?: return null` for CHOICE_*) and line 28 (`(input as? RawInput.Text)?.value ?: return null` for the other types). The finding cites lines 92 and 94, which are in numberWithUnit's shownUnit block. The tolerance fallback is at lines 38-41, not 104-107: an unparseable or negative tolerance becomes Rational.ZERO, so the comparison is exact. The change delta (specs/answer-checking/spec.md) has no scenario for either behavior; it covers only dependency purity, contract enums, the tip catalog and the golden table. design.md:13 only says 'The checker trusts its spec; an accepted value it cannot read never matches.' The golden table's input parser (GoldenTable.kt:75-77) builds Selection or Text, and I found no test that pairs a mismatched shape with a part type. So the gap the finding describes is real.\n\nSeen as a correctness problem, though, the code is not wrong. Both paths are defensive fallbacks for conditions that are ruled out upstream. The store spec makes request-shape errors an API 400 (slices 5/7), and tolerance is checked at authoring time (slice 5). design.md:13 explicitly hands spec validity to the authoring side. A missing tolerance and a bad one both mean exact, which matches the 'trusts its spec' principle. Returning UNPARSEABLE never consumes an attempt (FR-22), so even if a mismatch reached the checker, the child would lose nothing. The real risk is that a confusing format tip could reach the child if a later adapter fails to validate shapes. That makes this a documentation or test gap with no wrong verdict today. I'm not refuting it, because the mechanism exists and is undocumented, but it should be downgraded to a nit/minor documentation item and the line references corrected (26/28 and 38-41).",
+          "The behavior is in the code, but the line numbers are wrong. The shape mismatch is at Grader.kt:26 and :28, and tolerance() is at :38-41, not at 92/94/104-107. Through an exploitability lens, nobody can reach either path today:\n1) The only caller in src/main is AnswerChecker.check, which is called only from inside the checking module (FormatTips calls Grader directly, and only with RawInput.Text). No web adapter or practice code calls the checker yet. Slices 5 and 7 have not been built, and the store spec says the API returns 400 for malformed request shapes before the checker runs. A real user or attacker cannot send a Text input to a CHOICE part, or a Selection to a text part.\n2) Per the cited spec, a negative or unreadable tolerance is rejected with a 400 when content is authored. A child cannot supply one, so falling back to exact is only a safety net for specs that should never exist.\n3) Even if either path were reached, the result is safe. The answer comes back UNPARSEABLE, which by FR-22 does not use up an attempt, and the answer key does not leak. An exact-match fallback is stricter, not more lenient, so it cannot be used to get a wrong answer marked correct.\nWhat is left is a gap in the spec text (an undocumented defensive default), not a problem that can happen to a user. At most it is a documentation nit for a later slice's adapter contract."
+        ]
+      },
+      {
+        "title": "Store-spec endpoint requirements (FR-22 refusal, who can trigger a check) are not covered and are deferred outside this change's tasks",
+        "file": "contract/openspec/specs/answer-checking/spec.md",
+        "line": 719,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "The store spec has 'Unreadable submissions are refused at the submission endpoint' (4 scenarios) and 'Who can trigger a check' (3 scenarios, e.g. 'Answer tester without an admin session … HTTP 401'). This repo is responsible for both, and neither is implemented here. The deferral is legitimate: the plan assigns FR-22 to slice 7, and design.md Non-goals and the current-state 'Scope NOT delivered' entry record it. But no tasks.md item or spec delta in slices 5, 7 or 9 points back to these answer-checking scenarios, so they could get lost.",
+        "suggestion": "Add a forward reference in the slice 5/7/9 change templates (or this change's tasks.md under 4.1) that names the 7 answer-checking endpoint scenarios, so the later slices pick them up.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The facts in the finding hold. At contract/openspec/specs/answer-checking/spec.md:719 the store spec has \"Unreadable submissions are refused at the submission endpoint\" with 4 scenarios, and at :762 \"Who can trigger a check\" with 3 scenarios: tester 401, re-evaluation 401, and child submission needs no credentials. This change implements neither. tasks.md 4.1 only says \"None in this slice (no endpoint; slices 5 and 7 add them)\", which names no scenarios and no requirements. The deferral itself is recorded in two places: docs/current-state.md:35 under \"Scope NOT delivered\", and in proposal.md/design.md. So the deferral is legitimate, as the finding says.\n\nI could not find any forward-tracking mechanism. A search of openspec/** finds no slice 5, 7 or 9 change that references these requirements, because those changes don't exist yet in this repo. Nothing in tasks.md lists the 7 scenarios either.\n\nThe best counter-argument is that slice 7 will pick up FR-22 from the capability plan anyway, and the plan points to the answer-checking spec. But \"Who can trigger a check\" is split across content-authoring and admin-access, so its 401 scenarios could easily fall between slices. This same pattern was already raised as a finding in slice 2's review-findings.json: \"Child write is limited to its own practice\" was deferred to slice 7 with nothing tracking it there. That makes the risk concrete and recurring.\n\nThis is a traceability/spec-compliance gap, not a code defect, and the finding correctly rates it minor. The suggested fix is cheap: name the 7 scenarios in tasks.md 4.1 or in current-state. Not refuted; severity stays minor.",
+          "Through an exploitability lens, nobody can trigger this. Slice 3 ships only the pure `checking` domain. No endpoint for submissions or the answer tester exists yet, so no user or attacker can send an unreadable submission or reach an unauthenticated check. Nothing is unguarded at runtime.\n\nWhat the finding actually claims is a process risk: the work \"could get lost\". The repo already tracks the deferral in several durable places:\n- `docs/current-state.md:35` lists, under \"Scope NOT delivered\", the FR-22 whole-submission refusal, the answer tester and re-evaluation, mapped to slices 5, 7 and 9.\n- `proposal.md:6` and the `design.md` Non-goals record the same deferral.\n- The capability plan assigns FR-22 to slice 7.\n- The store spec stays in `contract/`, and the handoff protocol requires each later slice to read the store spec it cites.\n\nSo the scenarios can't silently vanish. The suggested forward reference in other slices' templates is a nice-to-have bookkeeping tweak, not a defect that can be reproduced. The finding even concedes the deferral is legitimate. No concrete failure mechanism exists, so it is refuted."
+        ]
+      },
+      {
+        "title": "Coverage summary",
+        "file": "openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md",
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "94 scenarios (89 store + 5 delta): 86 implemented, 1 partial (golden-table 'every scenario input present' clause not asserted), 7 missing (endpoint refusal ×4 and who-can-trigger ×3, deferred to slices 5/7/9 per the plan), 0 contradicted. FR-14 to FR-21 and FR-23 each have a traced test. NFR-4 is enforced by fixtures/PROVENANCE.md:15 plus FixtureProvenanceTest. NFR-5 has no traced mechanism (see the first finding). No OpenAPI drift: the slice adds no endpoints, CheckingContractAlignmentTest pins the AnswerType and Verdict enums, and the AnswerSpec defaults match openapi.yaml:1609-1614.",
+        "suggestion": "Fix the NFR-5 trace gap and the tip-example fallback before the review gate closes.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "This is a summary of the review, not a claim about one defect. I checked every claim I could against the code:\n- **FR-14 to FR-21 and FR-23:** each has a `@trace` test. See `GoldenTableTest.kt:51-59`, `AnswerCheckerPropertyTest.kt` and `CheckingPurityTest.kt`.\n- **NFR-4:** enforced by `FixtureProvenanceTest`, with six `@trace NFR-4` tests.\n- **NFR-5 trace gap:** confirmed. `CheckerTimingTest.kt` names NFR-5 only in its KDoc, and its sole annotation is `// @trace FR-23` (line 12). `docs/qa/traceability-report.md:69` also shows NFR-5 with no test (`-`). Yet `mvp-capability-plan.md:46` assigns NFR-5 (the checker's share of the budget) to this slice.\n- **OpenAPI alignment:** `CheckingContractAlignmentTest` exists, and `contract/api/openapi.yaml:1610-1614` holds the AnswerSpec defaults the finding cites.\n\nThe deferral of the endpoint and trigger scenarios matches the plan's slice split. Nothing I found contradicts the summary. The real gap it points to (NFR-5 has no trace) is confirmed, and \"minor\" is the right severity.",
+          "I'm refuting this as a finding. It is a coverage roll-up, not a defect: no user or attacker can trigger anything from it.\n\n- **No failure mechanism of its own.** The two problems it mentions are already reported separately: the NFR-5 trace gap (\"see the first finding\") and the tip-example fallback. Counting the summary as a third issue would double-count them.\n- **The NFR-5 gap is real but is about bookkeeping.** `CheckerTimingTest.kt:8` already exercises the NFR-5 timing budget. It is only traced as `// @trace FR-23` (line 12), so what's missing is the trace label, not a check. That belongs to the separate finding anyway.\n- **The 7 \"missing\" scenarios are deliberately deferred.** The endpoint refusal and who-can-trigger scenarios are scheduled for slices 5, 7 and 9 in the capability plan. This slice adds no endpoints, so those paths can't be reached here.\n- **The \"partial\" golden-table clause is test thoroughness.** It is not a behaviour anyone can reproduce.\n\nNothing in the summary can occur for a real user or attacker."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "The catalog loads lazily inside the first UNPARSEABLE check, so a missing key surfaces at runtime as an initializer error and not at startup",
+        "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+        "line": 16,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`private val TIPS ... ResourceBundle.getBundle(\"messages\", ...).let { bundle -> AnswerType.entries.associateWith { bundle.getString(...) } }` runs in the static initializer of `FormatTips`, and the first `tipFor` call triggers it. If a key is missing, that first check throws ExceptionInInitializerError and every later check throws NoClassDefFoundError: a raw 500 on the child submission path, not the fail-fast at boot that design.md describes. It also means the first check of a running JVM does classpath file I/O, which works against the spec's 'no … file access while checking'.",
+        "suggestion": "Load the tips eagerly when the application starts, for example by touching `FormatTips` from a startup hook in the module that wires the checker in slice 7. Alternatively, expose an `AnswerChecker.selfCheck()` that a Spring context test and startup call, so a broken catalog fails the boot rather than the first child answer.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The JVM behaviour the finding describes is real, but the defect isn't reachable as claimed, and it misreads the design.\n\nWhat is accurate: `FormatTips` is a Kotlin `object`. `TIPS` is set in its static initializer, which runs on first use. A `getString` that throws `MissingResourceException` there would surface as `ExceptionInInitializerError`, and every later use would throw `NoClassDefFoundError`.\n\nWhy it doesn't hold up:\n1. **It misquotes the design.** design.md:67-69 does not promise a fail-fast at boot. It says `FormatTips` \"reads every key once when the class loads and fails fast, and the golden table exercises every tip key.\" The code does exactly that. The design puts the mitigation at build/test time, not at application startup.\n2. **A missing key can't reach a running JVM.** `messages.properties` ships in the same jar as the class (src/main/resources, lines 25-31). It has a key for all seven `AnswerType` entries. Because `associateWith` iterates over every `AnswerType.entries`, any test that touches `FormatTips` loads all keys at once. The golden table, property and timing tests hit UNPARSEABLE paths through `AnswerChecker.check`. So a missing or renamed key, or a new enum value, fails `mvn verify` before any artifact exists. Runtime classpath drift isn't plausible for a resource bundled in the same jar.\n3. **There's no child submission path yet.** Nothing in src/main calls `AnswerChecker`; the finding itself says the wiring comes in slice 7. The \"raw 500 on the child submission path\" has no caller in this code.\n4. **The \"file access while checking\" point is weak.** It's a one-time classpath read during class initialization, not per-check I/O. The same kind of lazy init applies to every Kotlin object and regex in the module.\n\nAt most this is a hardening suggestion for slice 7 (warm the checker at startup). It is not a correctness defect in this code.",
+          "The lazy loading is real: `FormatTips` is a Kotlin `object`, so `TIPS` loads on its first use, from `AnswerChecker.kt:16`. If a key were missing, the first check would throw ExceptionInInitializerError and later checks would throw NoClassDefFoundError. But no real user or attacker can trigger this.\n\n1. A missing key cannot reach a shipped build. The initializer reads the key for every `AnswerType.entries` value at once, not only the one being checked. The golden table has many UNPARSEABLE cases (VN-07, NN-04…, II-*, DI-*, FI-*), so loading the class with any one missing key fails `mvnw verify`. The design.md mitigation (\"reads every key once when the class loads and fails fast, and the golden table exercises every tip key\") says the same thing, and the build-time gate enforces it. For the bug to appear, someone would have to change the `messages.properties` inside the packaged jar after the build. That is a deploy-tampering scenario, not something a user can cause with input.\n2. No child endpoint calls the checker yet. Wiring it into the web layer is slice 7, so no 500 is reachable on any request path today.\n3. A child's input cannot change which keys exist. Every input, hostile or not, triggers the same one-time load of a catalog that the tests have already proved complete.\n4. The \"file access while checking\" point applies only once per JVM: one classpath resource read on first use. That is a minor style concern, not a correctness bug.\n\nThe startup self-check is a reasonable hardening idea for slice 7, but the claimed failure cannot be reproduced against this build."
+        ]
+      },
+      {
+        "title": "Ticked task 5.2 (openspec validate --strict) has no recorded evidence; 5.3 review gate still open while 5.1/5.4 are ticked",
+        "file": "openspec/changes/implement-answer-checking-api/tasks.md",
+        "line": 28,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "'- [x] 5.2 `npx openspec validate implement-answer-checking-api --strict`.' The slice evidence files (slice3-checker-run.md, slice3-red-run.md) do not record a validate run. Tasks 2.6, 5.1, 5.4 and 5.5 do have artifacts (docs/qa/evidence/slice3-red-run.md, automated-verification-latest.md, slice3-checker-run.md, current-state.md). Task 5.3 says to re-run 5.1 after the review findings are dispositioned, so 5.1 being ticked now is provisional.",
+        "suggestion": "Record the `openspec validate --strict` output (or confirm qa:verify includes it and cite that line in the evidence). Re-run and re-tick 5.1 after 5.3.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding says task 5.2 has no recorded evidence. That is wrong. In `docs/qa/automated-verification-latest.md` (the qa:verify output from task 5.1, run 2026-10-04 15:28Z), line 19 lists the check `openspec-all`, which runs `npx openspec validate --all --strict`, as PASS with exit code 0. Line 8124 of the same file shows `✓ change/implement-answer-checking-api` in that output, with totals of 3 passed and 0 failed. So the strict validation of this exact change was run, recorded and passed. It is evidenced inside the 5.1 artifact, not in the slice-3-specific evidence files the finding searched.\n\nThe second claim, that 5.1 is \"provisional\" because 5.3 is still open, is not a defect either. Task 5.3 is unticked, and the re-run of 5.1 is part of 5.3 itself, so the open checkbox already tracks it. A first qa:verify pass being green before the review gate is the normal order. Nothing is falsely claimed as done.\n\nThere is no mechanism of error here. At most, the 5.2 line could cite the evidence path, which is cosmetic.",
+          "The finding's main claim is wrong: evidence for 5.2 does exist. `docs/qa/automated-verification-latest.md:8113-8130` (the qa:verify output already cited for 5.1) records `npx openspec validate --all --strict` with exit code 0. Its output includes `✓ change/implement-answer-checking-api` under strict mode. That is the same check task 5.2 asks for, run across all items. The finding only looked in slice3-checker-run.md and slice3-red-run.md, so it missed this. The second point, that 5.1 is \"provisional\" while 5.3 is open, is not a defect either. Task 5.3 itself says to re-run 5.1 after the findings are dispositioned, so the workflow already plans for it, and 5.3 is correctly left unticked. Nothing here can affect a user or attacker, and the bookkeeping gap it describes is not real."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/implement-answer-checking-api/review-findings.json"
+  }
+}

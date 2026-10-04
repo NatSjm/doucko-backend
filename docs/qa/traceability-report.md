@@ -34,7 +34,7 @@ Result: PASS, 39 warning(s)
 | FR-20 | yes | yes | backend | 1 | - |
 | FR-21 | yes | yes | backend | 1 | - |
 | FR-22 | yes | yes | backend, frontend | - | - |
-| FR-23 | yes | yes | backend | 6 | - |
+| FR-23 | yes | yes | backend | 7 | - |
 | FR-24 | yes | yes | backend, frontend | - | - |
 | FR-25 | yes | yes | backend, frontend | - | - |
 | FR-26 | yes | yes | backend, frontend | - | - |
@@ -66,7 +66,7 @@ Result: PASS, 39 warning(s)
 | NFR-2 | backend | 11 |
 | NFR-3 | backend, frontend | 7 |
 | NFR-4 | backend, frontend | 6 |
-| NFR-5 | backend, frontend | - |
+| NFR-5 | backend, frontend | 1 |
 | NFR-6 | frontend | n/a |
 | NFR-7 | frontend | n/a |
 | NFR-8 | frontend | n/a |

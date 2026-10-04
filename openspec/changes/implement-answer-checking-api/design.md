@@ -33,11 +33,15 @@ checker trusts its spec; an accepted value it cannot read never matches.
    run right before it, the first letter or `°` after the number), which
    makes `12 500/3` and `24 2cm` decidable as the spec requires.
 5. **Format tips from the catalog, with a checked example.** The catalog
-   holds one tip per type with a `{0}` example slot. The example is the first
-   candidate from a fixed list that, checked against the same part, is
-   `WRONG`. So it is readable, uses the part's unit and never reveals an
-   accepted answer. Tips are Czech (the child reads them), unlike the English
-   API problem titles in the same catalog.
+   holds one tip per type with a `{0}` example slot. The example is one fixed,
+   unusual value per type (`4827`, `4827,27`, `48/29`, `4827,27 <unit>`). Only
+   when the part does not grade it `WRONG` is it replaced by a computed value
+   above every accepted magnitude plus the tolerance, graded `WRONG` before
+   use. There is no candidate list to skip through, so the tip is no oracle
+   over a set of values and never shows an ungraded example (review F01, F02,
+   F04). A tip over 120 characters (a long unit) uses `checking.tip.short`.
+   Tips are Czech (the child reads them), unlike the English API problem
+   titles in the same catalog.
 6. **Module marker.** `CheckingModule` carries `@ApplicationModule` like
    `AdminModule`. It is the only class in the package that references Spring
    Modulith, a compile-time annotation. `CheckingPurityTest` (ArchUnit)
@@ -61,6 +65,14 @@ None. The checker stores nothing.
 The checker never throws for any input or spec: unreadable input is
 `UNPARSEABLE` with a tip, and an unreadable accepted value never matches.
 The property test runs random strings against every type to prove it.
+
+Defined fallbacks for inputs the API layer normally refuses first: a raw input
+whose shape does not match the part type (a string for a CHOICE_* part, a
+selection for any other) is `UNPARSEABLE`; a tolerance that is missing,
+unreadable or negative means exact comparison; an `exactDecimals` outside
+0 to 6 never matches (`WRONG`) and never throws. Authoring validation
+(slice 5) refuses such specs with 400, so these are safety nets, not
+features.
 
 ## Risks and mitigations
 

@@ -1,0 +1,173 @@
+{
+  "generatedBy": "review-gate",
+  "scope": "slice 3 answer-checking backend (implement-answer-checking-api)",
+  "change": "implement-answer-checking-api",
+  "baseRef": "slice2-admin-access",
+  "headRef": "HEAD",
+  "dimensions": {
+    "correctness": {
+      "confirmed": 1,
+      "contested": 3,
+      "rejected": 1
+    },
+    "security": {
+      "confirmed": 1,
+      "contested": 1,
+      "rejected": 0
+    },
+    "spec-compliance": {
+      "confirmed": 5,
+      "contested": 3,
+      "rejected": 1
+    },
+    "visual": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Format-tip fallback can return an example that is CORRECT (it reveals an answer) or UNPARSEABLE",
+      "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "line": 55,
+      "status": "open"
+    },
+    {
+      "id": "F02",
+      "severity": "major",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "The format-tip example works as an answer-key oracle: skipped examples show the child which values are correct, and the fallback example can be a correct answer (FR-27)",
+      "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "line": 57,
+      "status": "open"
+    },
+    {
+      "id": "F03",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "NFR-5 travels with slice 3 but has no traced enforcement point (trace.json tests: [], acceptance status 'planned')",
+      "file": "src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt",
+      "line": 275,
+      "status": "open"
+    },
+    {
+      "id": "F04",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Format-tip example falls back to a CORRECT (answer-revealing) or non-WRONG candidate when no candidate grades WRONG",
+      "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "line": 264,
+      "status": "open"
+    },
+    {
+      "id": "F05",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Golden-table scenario clause 'every scenario input is present with its verdict' is not mechanically checked",
+      "file": "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
+      "line": 33,
+      "status": "open"
+    },
+    {
+      "id": "F06",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Format tips read a classpath file during the first check, and the purity test cannot detect file/process access",
+      "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "line": 225,
+      "status": "open"
+    },
+    {
+      "id": "F07",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "NUMBER_WITH_UNIT tip can exceed 120 characters for long unit spellings",
+      "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "line": 257,
+      "status": "open"
+    },
+    {
+      "id": "F08",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "A negative `exactDecimals` makes the checker throw, despite its documented 'never throws for any spec' guarantee",
+      "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "line": 63,
+      "status": "open"
+    },
+    {
+      "id": "F09",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "Unit value matching ignores which accepted entry the unit belongs to; correctness depends on an authoring invariant the checker never checks",
+      "file": "src/main/kotlin/cz/doucko/checking/domain/Grader.kt",
+      "line": 80,
+      "status": "open"
+    },
+    {
+      "id": "F10",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "The space-character set is defined twice, as a regex class and as a hand-coded predicate",
+      "file": "src/main/kotlin/cz/doucko/checking/domain/FractionNotation.kt",
+      "line": 107,
+      "status": "open"
+    },
+    {
+      "id": "F11",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "contested",
+      "title": "Checklist results for the rest of this slice: no endpoints, so authz, auth/session, upload, exposure and CORS are not applicable; no issues in injection, secrets, privacy or dependencies",
+      "file": "src/main/kotlin/cz/doucko/checking/AnswerChecker.kt",
+      "line": 11,
+      "status": "open"
+    },
+    {
+      "id": "F12",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "Undocumented behavior: an input shape that does not match the part type is UNPARSEABLE, and invalid tolerance silently means exact",
+      "file": "src/main/kotlin/cz/doucko/checking/domain/Grader.kt",
+      "line": 92,
+      "status": "open"
+    },
+    {
+      "id": "F13",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "Store-spec endpoint requirements (FR-22 refusal, who can trigger a check) are not covered and are deferred outside this change's tasks",
+      "file": "contract/openspec/specs/answer-checking/spec.md",
+      "line": 719,
+      "status": "open"
+    },
+    {
+      "id": "F14",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "Coverage summary",
+      "file": "openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md",
+      "line": null,
+      "status": "open"
+    }
+  ],
+  "clean": false,
+  "generatedAt": "2026-10-04T15:39:27Z"
+}
