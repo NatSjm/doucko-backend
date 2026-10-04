@@ -247,7 +247,7 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": "src/test/kotlin/cz/doucko/shared/RequestContentNotLoggedTest.kt",
+        "artifact": "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "status": "artifact-ok"
       }
     ],
@@ -271,7 +271,7 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": "src/test/kotlin/cz/doucko/shared/UndeclaredPathTest.kt",
+        "artifact": "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "status": "artifact-ok"
       }
     ],

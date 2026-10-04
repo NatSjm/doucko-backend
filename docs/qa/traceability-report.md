@@ -63,16 +63,16 @@ Result: PASS, 48 warning(s)
 | Req | Owner repo(s) | Test trace here |
 |---|---|---|
 | NFR-1 | backend | - |
-| NFR-2 | backend | 7 |
-| NFR-3 | backend, frontend | 3 |
+| NFR-2 | backend | 8 |
+| NFR-3 | backend, frontend | 5 |
 | NFR-4 | backend, frontend | 3 |
 | NFR-5 | backend, frontend | - |
 | NFR-6 | frontend | n/a |
 | NFR-7 | frontend | n/a |
 | NFR-8 | frontend | n/a |
-| NFR-9 | backend, frontend | 3 |
-| NFR-10 | backend | 4 |
-| NFR-11 | backend | 1 |
+| NFR-9 | backend, frontend | 4 |
+| NFR-10 | backend | 9 |
+| NFR-11 | backend | 2 |
 | NFR-12 | backend, frontend | 3 |
 | NFR-13 | frontend | n/a |
 | NFR-15 | backend | - |

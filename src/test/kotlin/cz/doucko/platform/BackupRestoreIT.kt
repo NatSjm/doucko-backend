@@ -101,6 +101,24 @@ class BackupRestoreIT {
 
     // @trace NFR-10
     @Test
+    fun `restoring an older dump leaves no object from the newer schema behind`() {
+        compose("up", "-d", "--wait", "db")
+        sql("CREATE TABLE it_probe (id int PRIMARY KEY, label text NOT NULL); INSERT INTO it_probe VALUES (1, 'old')")
+        val dumpDir = File(backupDir, "dumps").apply { mkdirs() }
+        run("node", "tools/backup.mjs", "--project", project, "--out", dumpDir.path)
+        val dump = dumpDir.listFiles()!!.single()
+        // A later migration added a table and a column that the dump does not know.
+        sql("CREATE TABLE it_newer (id int); ALTER TABLE it_probe ADD COLUMN extra text")
+
+        run("node", "tools/restore.mjs", "--project", project, "--yes", "--backup-dir", File(backupDir, "safety").path, dump.path)
+
+        sql("SELECT label FROM it_probe WHERE id = 1") shouldBe "old"
+        sql("SELECT count(*) FROM information_schema.tables WHERE table_name = 'it_newer'") shouldBe "0"
+        sql("SELECT count(*) FROM information_schema.columns WHERE table_name = 'it_probe' AND column_name = 'extra'") shouldBe "0"
+    }
+
+    // @trace NFR-10
+    @Test
     fun `restore without --yes refuses and changes nothing`() {
         val dump = File(backupDir, "any.dump").apply { writeText("not used") }
         val (exit, output) = exec("node", "tools/restore.mjs", "--project", project, dump.path)

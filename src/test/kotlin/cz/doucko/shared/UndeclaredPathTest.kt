@@ -12,7 +12,6 @@ import org.springframework.context.MessageSource
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
-import org.springframework.security.access.AccessDeniedException
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
@@ -94,7 +93,7 @@ class UndeclaredPathTest {
     fun `the admin area is closed until admin-access, as problem+json, and no handler runs`(method: String) {
         AdminProbe.calls.set(0)
         for (path in listOf("/api/admin/probe", "/api/admin/sources", "/api/admin/does-not-exist")) {
-            send(method, path).isProblem(403, title(AccessDeniedException::class.java))
+            send(method, path).isProblem(403, messages.getMessage("problem.title.403", null, Locale.ENGLISH))
         }
         AdminProbe.calls.get() shouldBe 0
     }

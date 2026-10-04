@@ -6,6 +6,7 @@ import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.system.CapturedOutput
@@ -22,11 +23,11 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * NFR-3: request content (answers, report notes, any text a child types) never reaches the logs.
- * [Echo] binds a JSON body like every real child endpoint will, so Spring MVC's DEBUG line
- * `Read "application/json" to [...]` is exercised; [AtDebug] proves the capture sees that leak.
- * Each case sets `logging.level.root` itself: log levels are JVM-global, and an explicit root keeps
- * the TRACE case from carrying over into the others.
+ * NFR-3: request content (answers, report notes, any text a child types) never reaches the logs, at
+ * any level. [Echo] binds a JSON body like every real child endpoint will, so Spring MVC's DEBUG
+ * line `Read "application/json" to [...]` and the TRACE argument dump are exercised. The capture
+ * itself is proven by [CaptureControl]. Each case sets `logging.level.root` itself: log levels are
+ * JVM-global, and an explicit root keeps one case from carrying over into another.
  */
 class RequestContentNotLoggedTest {
     private companion object {
@@ -71,12 +72,9 @@ class RequestContentNotLoggedTest {
 
         // @trace NFR-3
         @Test
-        fun `an unbound body and header values stay out of the logs even at TRACE`(output: CapturedOutput) {
-            mvc.post("/api/child/does-not-exist") {
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"answers":{"a":"$SENTINEL"},"note":"$SENTINEL"}"""
-                header("X-Probe", SENTINEL)
-            }
+        fun `a bound body, query and header values stay out of the logs even at TRACE`(output: CapturedOutput) {
+            mvc.postWithSentinel(ECHO).andExpect { status { isNoContent() } }
+            mvc.postWithSentinel("/api/child/does-not-exist")
             output.all shouldNotContain SENTINEL
         }
     }
@@ -98,20 +96,33 @@ class RequestContentNotLoggedTest {
         }
     }
 
-    /** Negative control: with Spring MVC at DEBUG the bound body IS logged, so the capture can see a leak. */
+    /**
+     * Negative control: at DEBUG the capture does see a sentinel logged by application code, and the
+     * same event from a Spring web or security logger is dropped — the guard, not the capture, keeps
+     * the TRACE case clean.
+     */
     @Nested
-    @WebMvcTest(properties = ["logging.level.root=INFO", "logging.level.org.springframework.web=DEBUG"])
+    @WebMvcTest(
+        properties = [
+            "logging.level.root=DEBUG",
+            "logging.level.org.springframework.web=DEBUG",
+            "logging.level.org.springframework.security=DEBUG",
+        ],
+    )
     @Import(SecurityConfiguration::class, Echo::class)
     @ExtendWith(OutputCaptureExtension::class)
-    inner class AtDebug {
-        @Autowired
-        lateinit var mvc: MockMvc
-
+    inner class CaptureControl {
         // @trace NFR-3
         @Test
-        fun `the capture sees a bound body when Spring MVC logs at DEBUG`(output: CapturedOutput) {
-            mvc.postWithSentinel(ECHO).andExpect { status { isNoContent() } }
-            output.all shouldContain SENTINEL
+        fun `the capture sees application DEBUG lines and the guard drops Spring web and security ones`(output: CapturedOutput) {
+            LoggerFactory.getLogger("cz.doucko.probe").debug("app $SENTINEL-app")
+            LoggerFactory.getLogger("org.springframework.web.servlet.probe").debug("web $SENTINEL-web")
+            LoggerFactory.getLogger("org.springframework.security.probe").debug("security $SENTINEL-security")
+            LoggerFactory.getLogger("org.springframework.web.servlet.probe").info("info line $SENTINEL-info")
+            output.all shouldContain "$SENTINEL-app"
+            output.all shouldContain "$SENTINEL-info"
+            output.all shouldNotContain "$SENTINEL-web"
+            output.all shouldNotContain "$SENTINEL-security"
         }
     }
 }

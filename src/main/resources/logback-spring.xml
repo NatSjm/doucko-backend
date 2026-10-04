@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Boot's default console/file logging plus the NFR-3 guard (cz.doucko.shared.logging.RequestContentLogGuard). -->
+<configuration>
+    <turboFilter class="cz.doucko.shared.logging.RequestContentLogGuard"/>
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+</configuration>

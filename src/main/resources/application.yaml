@@ -32,7 +32,8 @@ server:
 logging:
   level:
     # NFR-3: at DEBUG, Spring Security logs "Securing <METHOD> <path>?<query>" and Spring MVC logs a
-    # bound request body ("Read ... to ..."). Keep both at INFO; RequestContentNotLoggedTest guards it.
+    # bound request body ("Read ... to ..."). logback-spring.xml caps these loggers at INFO whatever is
+    # set here (RequestContentLogGuard); the levels below say the same. RequestContentNotLoggedTest guards it.
     org.springframework.web: INFO
     org.springframework.security: INFO
 

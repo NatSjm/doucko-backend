@@ -31,6 +31,12 @@ function refuseConfig() {
 
 if (opts["check-config"]) process.exit(refuseConfig() ? 1 : 0);
 
+// compose reads .env for up/down/ps; checking another file than the one it starts would be no check.
+if ("env-file" in opts) {
+  console.error("stack: --env-file only works with --check-config; up, down and ps always use .env.");
+  process.exit(2);
+}
+
 const docker = (...args) => spawnSync("docker", [...composeArgs(), ...args], { stdio: "inherit" }).status ?? 1;
 const command = positional[0];
 

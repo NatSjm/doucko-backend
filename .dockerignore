@@ -6,5 +6,7 @@ docs/
 trace/
 retro/
 openspec/
-.env
-.env.*
+**/.env
+**/.env.*
+**/*.dump
+fixtures/

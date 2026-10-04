@@ -767,6 +767,7 @@
         "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
         "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
         "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
+        "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
         "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt",
         "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt"
       ]
@@ -779,6 +780,8 @@
       ],
       "ownedHere": true,
       "tests": [
+        "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
+        "src/test/kotlin/cz/doucko/platform/DockerContextTest.kt",
         "src/test/kotlin/cz/doucko/shared/RequestContentNotLoggedTest.kt",
         "src/test/kotlin/cz/doucko/shared/RequestContentNotLoggedTest.kt",
         "src/test/kotlin/cz/doucko/shared/RequestContentNotLoggedTest.kt"
@@ -838,6 +841,7 @@
       ],
       "ownedHere": true,
       "tests": [
+        "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/shared/UndeclaredPathTest.kt",
         "src/test/kotlin/cz/doucko/shared/UndeclaredPathTest.kt",
         "src/test/kotlin/cz/doucko/shared/UndeclaredPathTest.kt"
@@ -853,7 +857,12 @@
         "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
         "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
         "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
-        "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt"
+        "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+        "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt",
+        "src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt",
+        "src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt",
+        "src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt",
+        "src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt"
       ]
     },
     {
@@ -863,7 +872,8 @@
       ],
       "ownedHere": true,
       "tests": [
-        "src/test/kotlin/cz/doucko/ModularityTest.kt"
+        "src/test/kotlin/cz/doucko/ModularityTest.kt",
+        "src/test/kotlin/cz/doucko/PackageLayoutTest.kt"
       ]
     },
     {

@@ -3,12 +3,14 @@
 //   npm run restore -- --yes <file>
 //   node tools/restore.mjs --yes [--project <compose project>] [--backup-dir <dir>] <file>
 //
-// Restoring replaces the current data (pg_restore --clean --if-exists), so it needs --yes. Before
-// anything is dropped it (1) checks that the file is a readable pg_dump archive and (2) takes a
-// safety backup of the current data (default ~/doucko-backups). The restore then runs in a single
-// transaction: a truncated or failing dump rolls back and leaves the live data as it was.
+// Restoring replaces the whole database schema, so it needs --yes. Before anything is dropped it
+// (1) checks that the file is a readable pg_dump archive and (2) takes a safety backup of the
+// current data (default ~/doucko-backups). Inside the db container the archive is then converted to
+// SQL (a truncated dump fails here, before anything changed), and `public` is dropped, recreated and
+// replayed in ONE psql transaction: objects from a newer schema do not survive an older dump, and
+// any error rolls everything back.
 import { spawnSync } from "node:child_process";
-import { closeSync, existsSync, openSync } from "node:fs";
+import { closeSync, openSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { composeArgs, parseArgs } from "./lib/compose.mjs";
@@ -16,7 +18,7 @@ import { composeArgs, parseArgs } from "./lib/compose.mjs";
 const { opts, positional } = parseArgs(process.argv.slice(2), ["project", "backup-dir"]);
 const file = positional[0];
 
-if (!file || !existsSync(file)) {
+if (!file || !statSync(file, { throwIfNoEntry: false })?.isFile()) {
   console.error("usage: node tools/restore.mjs --yes [--project <name>] [--backup-dir <dir>] <backup file>");
   process.exit(2);
 }
@@ -51,9 +53,16 @@ if (safety.status !== 0) {
   process.exit(1);
 }
 
-const result = inDb("pg_restore", "-U", "doucko", "-d", "doucko", "--clean", "--if-exists", "--no-owner", "--single-transaction", "--exit-on-error");
+const RESTORE = [
+  "set -e",
+  "sql=$(mktemp)",
+  `trap 'rm -f "$sql"' EXIT`,
+  `pg_restore --no-owner --file "$sql"`,
+  `{ echo "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"; cat "$sql"; } | psql -U doucko -d doucko -q -v ON_ERROR_STOP=1 --single-transaction`,
+].join("\n");
+const result = inDb("sh", "-c", RESTORE);
 if (result.status !== 0) {
-  console.error(`restore: pg_restore failed (exit ${result.status ?? result.error?.message}); the transaction was rolled back and the data is unchanged.`);
+  console.error(`restore: failed (exit ${result.status ?? result.error?.message}); nothing was committed and the data is unchanged.`);
   process.exit(1);
 }
 console.log(`restore complete: ${file}`);

@@ -62,4 +62,12 @@ class BindAddressTest {
     fun `the default compose binding passes the launcher check`() {
         stack("--check-config", "--env-file", envFile("DOUCKO_DB_PASSWORD=x\n")).first shouldBe 0
     }
+
+    // @trace NFR-2
+    @Test
+    fun `up refuses --env-file, so the configuration it checks is the one it starts`() {
+        val (exit, output) = stack("up", "--env-file", envFile("DOUCKO_DB_PASSWORD=x\n"))
+        exit shouldBe 2
+        output shouldContain "--env-file"
+    }
 }
