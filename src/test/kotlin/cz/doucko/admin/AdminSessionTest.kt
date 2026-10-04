@@ -136,7 +136,14 @@ class AdminSessionTest {
     @Test
     fun `sign-out with the CSRF header ends the session`() {
         val admin = mvc.signedIn()
-        mvc.signOut(admin).andExpect { status { isNoContent() } }
+        mvc.signOut(admin).andExpect {
+            status { isNoContent() }
+            cookie {
+                maxAge("SESSION", 0)
+                path("SESSION", "/api/admin")
+                maxAge("XSRF-TOKEN", 0)
+            }
+        }
         mvc.checkSession(admin.session).isProblem(401)
     }
 

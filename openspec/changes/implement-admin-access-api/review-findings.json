@@ -1,0 +1,133 @@
+{
+  "generatedBy": "review-gate",
+  "scope": "slice 2 admin-access backend (implement-admin-access-api)",
+  "change": "implement-admin-access-api",
+  "baseRef": "main",
+  "headRef": "HEAD",
+  "dimensions": {
+    "correctness": {
+      "confirmed": 1,
+      "contested": 3,
+      "rejected": 1
+    },
+    "security": {
+      "confirmed": 3,
+      "contested": 0,
+      "rejected": 0
+    },
+    "spec-compliance": {
+      "confirmed": 1,
+      "contested": 2,
+      "rejected": 4
+    },
+    "visual": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "major",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Concurrent invalidation makes the idle filter throw IllegalStateException, giving a raw 500",
+      "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt",
+      "line": 29,
+      "status": "open"
+    },
+    {
+      "id": "F02",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "Admin sign-in has no throttling, so a LAN client can guess passwords online without limit and use BCrypt to load the CPU",
+      "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+      "line": 73,
+      "status": "open"
+    },
+    {
+      "id": "F03",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "The admin password and the SESSION cookie travel in cleartext on the home LAN (no Secure flag, no TLS)",
+      "file": "src/main/resources/application.yaml",
+      "line": 36,
+      "status": "open"
+    },
+    {
+      "id": "F04",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "The build has no Maven dependency advisory scan, so checklist item 7 cannot be verified",
+      "file": "pom.xml",
+      "line": 182,
+      "status": "open"
+    },
+    {
+      "id": "F05",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "tasks.md 5.5 is unticked and current-state.md is stale relative to the commit",
+      "file": "docs/current-state.md",
+      "line": 11,
+      "status": "open"
+    },
+    {
+      "id": "F06",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "A failed sign-in that carries a valid session resets the idle clock, though the spec says a 401 must not reset anything",
+      "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt",
+      "line": 33,
+      "status": "open"
+    },
+    {
+      "id": "F07",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "The sign-in advice takes over HttpMessageNotReadable and HttpMediaTypeNotSupported handling for the whole app at HIGHEST_PRECEDENCE",
+      "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/SignInFailureAdvice.kt",
+      "line": 41,
+      "status": "open"
+    },
+    {
+      "id": "F08",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "Sign-out and expiry don't clear the SESSION cookie in the browser",
+      "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+      "line": 52,
+      "status": "open"
+    },
+    {
+      "id": "F09",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "'Child write is limited to its own practice' is deferred to slice 7 but nothing tracks it there",
+      "file": "contract/openspec/specs/admin-access/spec.md",
+      "line": null,
+      "status": "open"
+    },
+    {
+      "id": "F10",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "'No content-changing child operation exists' has no executable check in the backend",
+      "file": "contract/openspec/specs/admin-access/spec.md",
+      "line": null,
+      "status": "open"
+    }
+  ],
+  "clean": false,
+  "generatedAt": "2026-10-04T15:00:16Z"
+}

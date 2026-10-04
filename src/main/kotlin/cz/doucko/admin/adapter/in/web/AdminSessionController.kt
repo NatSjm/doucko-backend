@@ -3,6 +3,8 @@ package cz.doucko.admin.adapter.`in`.web
 import cz.doucko.admin.application.AdminCredentials
 import cz.doucko.api.AdminSessionApi
 import cz.doucko.api.model.SignInRequest
+import org.springframework.http.HttpHeaders
+import org.springframework.http.ResponseCookie
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -53,6 +55,18 @@ class AdminSessionController(
         request.getSession(false)?.invalidate()
         SecurityContextHolder.clearContext()
         csrfTokens.saveToken(null, request, response)
+        // Invalidating does not touch the browser: expire the cookie too (name and path as in application.yaml).
+        response.addHeader(
+            HttpHeaders.SET_COOKIE,
+            ResponseCookie
+                .from(SESSION_COOKIE, "")
+                .path("/api/admin")
+                .maxAge(0)
+                .httpOnly(true)
+                .sameSite("Strict")
+                .build()
+                .toString(),
+        )
         return ResponseEntity.noContent().build()
     }
 
@@ -64,6 +78,8 @@ class AdminSessionController(
     private companion object {
         /** The one admin has no user name (store spec): this is only the principal's label. */
         const val ADMIN = "admin"
+
+        const val SESSION_COOKIE = "SESSION"
     }
 }
 

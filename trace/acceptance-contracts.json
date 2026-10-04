@@ -303,7 +303,7 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt",
+        "artifact": "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutFilterTest.kt",
         "status": "artifact-ok"
       }
     ],

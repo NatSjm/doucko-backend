@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
+import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.post
 import java.time.Duration
 
 /** Store spec admin-access "Admin session idle timeout": 8 h on the backend's clock (NFR-15). */
@@ -68,6 +70,21 @@ class AdminIdleTimeoutTest {
         idle(8, 1)
         mvc.checkSession(admin.session).isProblem(401)
         idle(0, 1)
+        mvc.checkSession(admin.session).isProblem(401)
+    }
+
+    // @trace NFR-15
+    @Test
+    fun `a failed sign-in carrying the session is a 401 and does not reset the idle clock`() {
+        val admin = mvc.signedIn()
+        idle(7)
+        mvc
+            .post("/api/admin/session") {
+                session = admin.session
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"password":"wrong"}"""
+            }.isProblem(401, "Invalid credentials")
+        idle(1, 1)
         mvc.checkSession(admin.session).isProblem(401)
     }
 }

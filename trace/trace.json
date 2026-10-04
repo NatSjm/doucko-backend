@@ -768,7 +768,8 @@
         "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
         "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
         "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
-        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt"
+        "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
+        "src/test/kotlin/cz/doucko/admin/ChildOperationsContractTest.kt"
       ]
     },
     {
@@ -928,6 +929,8 @@
       ],
       "ownedHere": true,
       "tests": [
+        "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutFilterTest.kt",
+        "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt",
         "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt",
         "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt",
         "src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt",

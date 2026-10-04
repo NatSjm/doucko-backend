@@ -1,0 +1,1012 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-04T14:55:19.661Z",
+  "finishedAt": "2026-10-04T15:00:16.023Z",
+  "args": {
+    "scope": "slice 2 admin-access backend (implement-admin-access-api)",
+    "baseRef": "main",
+    "headRef": "HEAD",
+    "change": "implement-admin-access-api"
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": null,
+    "budgetPerAgentUsd": 2,
+    "maxTotalUsd": 20,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 5.823,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 438,
+      "durationMs": 136627,
+      "sessionId": "5355c4be-52db-41b4-aeae-59ddc4fb9c92",
+      "costUsd": 0.6210152,
+      "numTurns": 7,
+      "result": {
+        "findings": [
+          {
+            "title": "Concurrent invalidation makes the idle filter throw IllegalStateException, giving a raw 500",
+            "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt",
+            "line": 29,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "`request.getSession(false)?.let { session -> ... session.getAttribute(LAST_ACTIVITY) ... session.invalidate() ... session.setAttribute(...)` has no guard against a session that another request invalidates in the meantime. After 8 h idle the admin UI usually sends several requests at once on wake or reload. The first request calls `session.invalidate()`. A parallel request that already holds the same session object then calls `getAttribute`/`setAttribute` and Tomcat throws `IllegalStateException: Session already invalidated`. That error escapes the filter chain as a 500 rather than the 401 the spec requires. A sign-out in another tab racing any admin request hits the same path, and so does `signIn`'s `request.getSession(false)?.invalidate()` (AdminSessionController.kt:38).",
+            "suggestion": "Wrap the session reads and writes (and the invalidate calls in the filter and controller) in a try/catch for IllegalStateException and treat a caught one as 'no session', so the request carries on to the 401 entry point. Add a test that invalidates the session between `getSession(false)` and `getAttribute`."
+          },
+          {
+            "title": "A failed sign-in that carries a valid session resets the idle clock, though the spec says a 401 must not reset anything",
+            "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt",
+            "line": 33,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The filter calls `session.setAttribute(LAST_ACTIVITY, now)` for every request that carries an unexpired session, before the outcome is known. `POST /api/admin/session` is `permitAll` and goes through this filter. With a wrong password it returns 401 (`throw InvalidCredentialsException()` at AdminSessionController.kt:36), but the old session keeps its refreshed timestamp. Store spec admin-access, 'Admin session idle timeout': 'A request refused with HTTP 401 SHALL NOT reset anything'. Only CSRF 403s are meant to count as activity.",
+            "suggestion": "Skip the timestamp update for the sign-in request matcher (successful sign-in sets LAST_ACTIVITY itself), or restore the previous value when sign-in fails. Add a test: signed-in session, wrong-password sign-in 7 h later, then GET 1.5 h after that must return 401."
+          },
+          {
+            "title": "Admin module publishes an unqualified global Clock bean, which the controller injects by type",
+            "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+            "line": 43,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`@Bean fun adminClock(): Clock = Clock.systemUTC()` registers a plain `Clock` for the whole context. `AdminSessionController(private val clock: Clock, ...)` (AdminSessionController.kt:24) injects it by type. Later modules (e.g. progress, which needs Europe/Prague weeks) will want a Clock too. They will either silently get the admin module's bean, which crosses the module boundary implicitly (NFR-11), or add a second Clock bean and break the admin controller's injection with NoUniqueBeanDefinitionException.",
+            "suggestion": "Inject the bean by name or qualifier (`@Qualifier(\"adminClock\")`) in the controller. Alternatively, move a single application Clock into `shared` as its documented public bean and have admin consume it."
+          },
+          {
+            "title": "The sign-in advice takes over HttpMessageNotReadable and HttpMediaTypeNotSupported handling for the whole app at HIGHEST_PRECEDENCE",
+            "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/SignInFailureAdvice.kt",
+            "line": 41,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`@RestControllerAdvice @Order(Ordered.HIGHEST_PRECEDENCE)` handles these exceptions for every controller. Non-sign-in paths are delegated to a hand-built `object : ResponseEntityExceptionHandler() {}` rather than Boot's `ProblemDetailsExceptionHandler` (enabled by `spring.mvc.problemdetails.enabled: true`). An admin-module advice now silently decides the 400/415 bodies for the child API too. Any shared advice added later for these exceptions (for example human catalog messages per AGENTS.md) will be shadowed. The sign-in check also relies on an exact `request.requestURI == \"/api/admin/session\"` match, so a servlet context path would break it.",
+            "suggestion": "Restrict the advice to the admin controller (`@RestControllerAdvice(assignableTypes = [AdminSessionController::class])`). This catches the body/media-type errors that happen after handler selection. Media-type mismatches during mapping need the URI check kept, but compare against `AdminSessionApi.PATH_SIGN_IN` using `request.servletPath` instead of `requestURI`."
+          },
+          {
+            "title": "Sign-out and expiry don't clear the SESSION cookie in the browser",
+            "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+            "line": 52,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`signOut` calls `request.getSession(false)?.invalidate()` and `csrfTokens.saveToken(null, ...)`. That expires XSRF-TOKEN, but no Set-Cookie expires `SESSION` (path `/api/admin`). The idle filter's `session.invalidate()` doesn't clear it either. The browser keeps sending a dead session id. It's harmless server-side, but the stale cookie remains and every later request goes through a failed session lookup.",
+            "suggestion": "On sign-out (and optionally when the idle filter invalidates), write an expired `SESSION` cookie with the same path, HttpOnly and SameSite attributes. Spring Security's `CookieClearingLogoutHandler` can do this, or you can write the cookie directly."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 466,
+      "durationMs": 90421,
+      "sessionId": "7b95f822-9504-462d-bbd9-c72cf0a89934",
+      "costUsd": 0.5055698000000001,
+      "numTurns": 12,
+      "result": {
+        "findings": [
+          {
+            "title": "Admin sign-in has no throttling, so a LAN client can guess passwords online without limit and use BCrypt to load the CPU",
+            "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+            "line": 73,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "POST /api/admin/session is permitAll and has no delay, counter or concurrency cap. Each attempt costs one BCrypt check at the default strength of 10 (AdminCredentials.kt:18, about 100 ms), and Tomcat's worker pool can run many in parallel. A tech-savvy child, or any device on the home Wi-Fi, can script tens of guesses per second against a weak but policy-compliant passphrase (12+ characters, such as a Czech phrase plus digits). The same flood also keeps the laptop's CPU busy. The design lists lockout and rate limiting as non-goals, so this is a recorded, accepted risk. It is flagged only because the checklist asks for brute-force resistance and none exists.",
+            "suggestion": "Keep the 'no lockout' decision but add something cheap that cannot lock the admin out: a global semaphore of 1–2 concurrent sign-in checks plus a fixed delay of about 1 s after each failure. Alternatively raise the BCrypt strength to 12. If the risk stays accepted, record that in the store spec's risk section so it is not raised again."
+          },
+          {
+            "title": "The admin password and the SESSION cookie travel in cleartext on the home LAN (no Secure flag, no TLS)",
+            "file": "src/main/resources/application.yaml",
+            "line": 36,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "server.servlet.session.cookie sets http-only and same-site but not secure. XSRF-TOKEN is also issued without Secure, and the spec scenario explicitly checks the cookies 'over HTTP'. When the app is reached from another device by its LAN address (NFR-2's RFC 1918 mode), the sign-in body {password} and the SESSION cookie are sent unencrypted. Any device on the same Wi-Fi, such as a guest's phone, a compromised IoT device or a passive sniffer, can capture the admin password or replay the session for up to 8 h of idle time. Then it can mutate content once slices 5–9 add admin handlers. In the default 127.0.0.1 binding this does not apply.",
+            "suggestion": "Document LAN mode as 'trusted network only', or terminate TLS in the frontend nginx (for example a self-signed or mkcert certificate for the LAN IP). Then set server.servlet.session.cookie.secure=true and add .secure(true) in the CSRF cookie customizer. Both can be gated on a DOUCKO_TLS flag so localhost dev still works."
+          },
+          {
+            "title": "The build has no Maven dependency advisory scan, so checklist item 7 cannot be verified",
+            "file": "pom.xml",
+            "line": 182,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "The build plugins are spring-boot, openapi-generator, build-helper, kotlin, failsafe, jacoco and spotless. There is no OWASP dependency-check, OSV-Scanner or similar step, and qa:verify does not run one. This slice adds Spring Security session and CSRF code to the attack surface, but nothing in the repo reports critical or high CVEs in spring-security, tomcat-embed or jackson. This review could not produce an advisory list with exploitability notes from repo evidence.",
+            "suggestion": "Add a scan step to qa:verify, for example `osv-scanner --lockfile pom.xml` or the org.owasp dependency-check-maven plugin with failBuildOnCVSS=7. Commit its report next to docs/qa/automated-verification-latest.md so the dependency item has evidence."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 409,
+      "durationMs": 96551,
+      "sessionId": "9f07e52d-e1eb-4960-8fc3-33551e6f3f23",
+      "costUsd": 0.615867,
+      "numTurns": 12,
+      "result": {
+        "findings": [
+          {
+            "title": "Coverage summary: 39 backend-owned scenarios: 37 implemented, 2 partial, 0 missing, 0 contradicted",
+            "file": "openspec/changes/implement-admin-access-api/specs/admin-access/spec.md",
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "I checked the store spec admin-access (authentication, child endpoints, cookie+CSRF, idle timeout, no lockout, password policy) and the delta's 5 scenarios against AdminSessionTest, AdminIdleTimeoutTest, AdminSessionIT, AdminStartupTest, AdminPasswordPolicyTest and AdminCredentialsTest. These scenarios are implemented and tested: 401-before-403 (AdminSecurityConfiguration.kt:135-139), SESSION cookie path /api/admin (application.yaml:39), idle filter (AdminIdleTimeoutFilter.kt:27-35), 72-byte full compare (AdminCredentials.kt:294-298) and the startup policy (AdminPasswordPolicy.kt:320-326). The only gaps are the two child-endpoint scenarios listed below. The frontend-owned scenario 'Admin UI shows sign-in without a session' is excluded.",
+            "suggestion": "No action. This entry only carries the coverage line."
+          },
+          {
+            "title": "'Child write is limited to its own practice' is deferred to slice 7 but nothing tracks it there",
+            "file": "contract/openspec/specs/admin-access/spec.md",
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "Store scenario: 'WHEN the child submits POST /api/child/missions/{missionId}/tasks/{taskId}/attempts with ... \"accepted\":[\"99\"] ... THEN ... graded against 12, not 99 AND GET /api/admin/tasks/{taskId} afterwards returns prompt P...'. Code reality: there is no attempt endpoint and no test. The deferral appears only in design.md:11-13 ('It is proven in slice 7'). tasks.md does not mention it, and nothing ties this scenario to slice 7's implement-practice-flow-api.",
+            "suggestion": "Record the deferral where it will be enforced. Add a carried-over task or acceptance-contract entry (trace/acceptance-contracts.json) so implement-practice-flow-api must test this scenario, and note it as 'Scope NOT delivered' in current-state.md."
+          },
+          {
+            "title": "'No content-changing child operation exists' has no executable check in the backend",
+            "file": "contract/openspec/specs/admin-access/spec.md",
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "Scenario: 'WHEN the operations under /api/child/** in api/openapi.yaml are listed THEN none of them creates, updates or deletes a source, task, mission, answer spec, hint, translation or image'. No test in src/test lists the generated Child*Api operations. Child-side NFR-1 is enforced only structurally: the shared chain is permitAll, stateless and has no CSRF (SecurityConfiguration.kt diff).",
+            "suggestion": "Add a test that reflects over the generated cz.doucko.api child interfaces (or parses contract/api/openapi.yaml) and asserts that no /api/child operation targets content resources. Alternatively, state in the spec or plan that the docs store owns this scenario."
+          },
+          {
+            "title": "XSRF-TOKEN cookie gets SameSite=Strict, which no spec or contract mentions",
+            "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+            "line": 101,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "Delta spec: 'The XSRF-TOKEN cookie SHALL be readable by scripts (no HttpOnly) and scoped to /'. openapi.yaml:312 says only '`XSRF-TOKEN` (readable by JS, sent back as X-XSRF-TOKEN)'. Code: `setCookieCustomizer { it.sameSite(\"Strict\") }`. Sign-out also clears the token (AdminSessionController.kt signOut → saveToken(null)), which is also unspecified.",
+            "suggestion": "Add the SameSite=Strict attribute and the clear-on-sign-out behaviour to the delta's 'Session cookie scope' requirement (and to the openapi Set-Cookie description in a docs-store change), then cover both in AdminSessionIT."
+          },
+          {
+            "title": "tasks.md 5.5 is unticked and current-state.md is stale relative to the commit",
+            "file": "docs/current-state.md",
+            "line": 11,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "tasks.md: '- [ ] 5.5 Update `docs/current-state.md`.' The file was updated in this diff, but it says 'Active change: `implement-admin-access-api` (slice 2, branch `slice2-admin-access`, not committed)' and '(uncommitted)' (line 20). HEAD f94a58f already commits the slice. The ticked 5.1 cites docs/qa/automated-verification-latest.md ('Overall result: Pass'), which exists, so that tick is backed.",
+            "suggestion": "Correct current-state.md to show the committed state (f94a58f) and tick 5.5 when the milestone update is final, or leave it unticked and remove the stale 'not committed' wording."
+          },
+          {
+            "title": "New module `cz.doucko.admin` is not in the declared modular-monolith module list",
+            "file": "src/main/kotlin/cz/doucko/admin/AdminModule.kt",
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "AGENTS.md (NFR-11) lists modules as 'content, checking, practice, progress, tutor, storage, shared'. This slice adds a new top-level module `cz.doucko.admin` (design.md decision 1, 'Own module, own chain') and makes shared SecurityConfiguration defer /api/admin/** to it.",
+            "suggestion": "Amend the module list (docs-store ../docs/factory or an ADR under docs/adr/) to include `admin`, so the NFR-11 module boundary documentation matches the code. Do not edit installed files directly."
+          },
+          {
+            "title": "The startup-refusal scenario is verified at context level, not as a process exit status",
+            "file": "src/test/kotlin/cz/doucko/admin/AdminStartupTest.kt",
+            "line": 33,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "Store scenario 'Short password': 'THEN it exits with a non-zero status before serving any request'. The test asserts that the application context fails to start and that the message names ADMIN_PASSWORD/12 and omits the value. Nothing asserts the non-zero process exit, although Spring Boot normally exits non-zero on context failure. The compose smoke (docs/qa/evidence/slice2-compose-smoke.md) covers only a valid password.",
+            "suggestion": "Accept context failure as the mechanism and say so in design.md, or add one compose or process-level smoke step that starts the backend with an 11-character ADMIN_PASSWORD and records the non-zero exit."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 678,
+      "durationMs": 15859,
+      "sessionId": "3a58c3bc-036d-4a34-970c-3094c29f3f0f",
+      "costUsd": 0.10830220000000002,
+      "numTurns": 4,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1766,
+      "durationMs": 24491,
+      "sessionId": "3342bd43-cd65-48c1-9c11-fd44370b95a5",
+      "costUsd": 0.1413708,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The mechanism is real. The app uses plain Tomcat container sessions: there's no spring-session dependency, `server.servlet.session` is set in application.yaml, and the security context comes from HttpSessionSecurityContextRepository. Tomcat's StandardSession `getAttribute`, `setAttribute` and `invalidate` all throw `IllegalStateException` (\"... Session already invalidated\") once the session is invalid. AdminIdleTimeoutFilter.kt:27-34 has no guard. If request B gets the session from `getSession(false)` and request A then calls `invalidate()` (idle expiry in the filter, signOut at AdminSessionController.kt:53, or signIn at :38) before B reaches line 29, 31 or 33, B throws. The exception escapes the filter, so the request ends up as a 500 instead of a 401.\n\nThe impact is overstated, though. Tomcat's `Request.doGetSession` checks `isValid()`, so any request that calls `getSession(false)` after A has invalidated gets null and goes cleanly to the 401. Only a request that fetched the session object in the microseconds before A's `invalidate()` and touches it afterwards can hit this. \"Several requests on wake\" mostly doesn't trigger it.\n\nThe same race exists downstream in Spring Security's HttpSessionSecurityContextRepository, which also calls `getAttribute` without a guard. So this is a general servlet-session race, not something specific to this filter, and wrapping only this filter won't fully remove it.\n\nVerdict: the bug is genuine, but the window is very narrow and it's mostly framework-level, so I'm confirming it and downgrading it from major to minor."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1799,
+      "durationMs": 24698,
+      "sessionId": "6e05f884-90f1-4032-afe3-3ae6dffd9eac",
+      "costUsd": 0.1299808,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The mechanism is real. pom.xml has no Spring Session, Jetty or Undertow, so the app uses Tomcat's own StandardSession. In Tomcat, `getSession(false)` checks `isValid()` only once, when the call is made. After that, `StandardSession.getAttribute`, `setAttribute` and `invalidate` each throw `IllegalStateException` (\"Session already invalidated\") if the session has become invalid in the meantime. Nothing guards against this. AdminIdleTimeoutFilter.kt:27-34 has no try/catch, and neither does AdminSessionController.kt:38/53. No advice or error handler in src/main deals with ISE either. The filter is added before SecurityContextHolderFilter, so the exception escapes as a 500 from the error path.\n\nIt is reachable. Two requests carrying the same expired session can both read `last > idle`; one invalidates and the other's `invalidate()` throws. A sign-out racing another request does the same.\n\nWhy I downgrade:\n1. The race window is microseconds: between `getSession(false)` and the next session call in the same thread. The admin UI firing several requests at once on wake makes it possible but rare.\n2. Only the single authenticated admin can trigger it, and only against their own session. An attacker gets nothing from it: no bypass, no data leak, and the session still ends up invalidated. The worst result is that one parallel request returns 500 instead of 401, and a retry gives the right answer.\n3. Spring's own HttpSessionSecurityContextRepository and CSRF session handling have the same generic servlet race, so this is not unique to this code.\n\nIt does technically break the \"no raw 500\" rule and the 401 the spec requires, so it isn't refuted. But it is a low-probability robustness issue (minor), not a major correctness bug. The suggested fix is cheap and reasonable: catch ISE and treat it as 'no session'."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1502,
+      "durationMs": 27564,
+      "sessionId": "1d07c8fa-b172-4eff-bd9a-cf662165cde2",
+      "costUsd": 0.18343539999999997,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The code does what the finding says. In AdminIdleTimeoutFilter.kt:27-34, any request that has an unexpired session gets `LAST_ACTIVITY = now` before the chain runs. The filter is added to the admin chain (AdminSecurityConfiguration.kt:84), and that chain also handles the sign-in matcher (`authorize(signIn, permitAll)` at :73; CSRF is skipped for it at :80). So a wrong-password `POST /api/admin/session` sent with a still-valid session cookie updates the old session's timestamp. Then AdminSessionController.kt:36 throws InvalidCredentialsException and the response is a 401. Nothing restores the earlier value. The 'session invalidated, new timestamp set' code at :38-39 only runs on success.\n\nSpec check (contract/openspec/specs/admin-access/spec.md:192): 'A request refused with HTTP 401 SHALL NOT reset anything'. Read literally, this covers a wrong-password 401, so the finding stands.\n\nWhy I'm downgrading: the requirement contradicts itself for this exact case. Line 189-190 says 'Every request that carries a valid, unexpired session cookie SHALL reset the idle clock'. A failed sign-in that carries a valid session matches that sentence, and the code follows it. The 401 sentence seems aimed at requests with no session or an expired one ('SHALL NOT revive an expired session'), not at credential failures. The security impact is also nil. Whoever holds the session cookie can already reset the clock with any GET that succeeds, so a failed sign-in gives them no extra power to extend the session. The mechanism is real and the literal spec text is violated, but treat this as a spec ambiguity to settle in the docs store (say which rule wins for a sign-in 401) more than a real defect. If the 401 rule wins, the suggested fix (skip the timestamp update for the sign-in matcher) is correct."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1535,
+      "durationMs": 28393,
+      "sessionId": "ed21f7b7-36c0-4540-ba8e-4c96683da813",
+      "costUsd": 0.15506240000000002,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The mechanism is real. AdminIdleTimeoutFilter.kt:27-34 stamps LAST_ACTIVITY on every request that carries an unexpired session. The admin chain uses securityMatcher(\"/api/admin/**\") and adds the filter before SecurityContextHolderFilter (AdminSecurityConfiguration.kt:71,84), and sign-in is both permitAll and CSRF-exempt (lines 73,80). So a POST /api/admin/session with a valid cookie and a wrong password refreshes the timestamp, and AdminSessionController.kt:36 then throws a 401 without touching the session.\n\nWhether this is a defect depends on the spec, and the spec does not support the finding's reading. contract/openspec/specs/admin-access/spec.md:189-192 first says \"Every request that carries a valid, unexpired session cookie SHALL reset the idle clock — including a request refused with HTTP 403...\". It then says \"A request refused with HTTP 401 SHALL NOT reset anything and SHALL NOT revive an expired session.\" Read in context, and given the scenario at line 198-200 (\"8 h 1 min ago → 401 and nothing changes\"), the 401 clause covers requests refused because the session is missing or expired. A wrong-password sign-in carrying a valid session is exactly what the first, mandatory sentence covers. The code follows that sentence, and the filter's KDoc says so on purpose. At most the spec is ambiguous; the code does not clearly violate it.\n\nFrom an exploitability angle, nobody is harmed:\n- To extend the session, an attacker must already hold the admin session cookie, which grants full admin access anyway. Refreshing the idle clock gives them nothing new.\n- A CSRF-style cross-site POST can't do it either. SameSite cookie rules and the JSON body limit this, and even a successful cross-site POST only extends the legitimate admin's own session. It discloses nothing and changes no data.\n- The real admin UI only shows the sign-in form after the session check returns 401, which means the session is already gone. So this path doesn't come up in normal use.\n\nThe behavior can be reproduced by hand with curl, but it is not an exploitable or user-visible defect. It is a spec-wording ambiguity at most. If the spec author really meant that failed sign-ins don't count as activity, that should be clarified in the docs store first (a spec change). It should not be filed as a code bug here."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1397,
+      "durationMs": 18453,
+      "sessionId": "d7581d69-4a2e-4e3c-9ae4-242cb47f499e",
+      "costUsd": 0.11530779999999999,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "Nothing is wrong with the code as it stands; the finding describes a possible future problem. Today the context has exactly one `java.time.Clock` bean: `adminClock()` at AdminSecurityConfiguration.kt:43. A grep of src/main finds no other Clock bean, so `AdminSessionController(clock: Clock)` and the filter-chain parameter `adminClock: Clock` both resolve to it with no ambiguity.\n\nEach failure the finding names depends on code that doesn't exist yet:\n1. NoUniqueBeanDefinitionException only happens if some future module adds a second Clock bean that isn't @Primary. That module would be the one introducing the conflict, and it can't be written yet.\n2. The NFR-11 boundary claim doesn't hold. Spring Modulith's `verify()` checks type dependencies between application-module packages. `java.time.Clock` is a JDK type, not an admin-module type, so a progress bean that injected a Clock would not depend on `cz.doucko.admin` and verify() would not flag it.\n\nThe suggested fix would also hurt the current tests. `AdminWebTestBeans` (AdminWebTestSupport.kt:32-34) replaces the clock with a `@Primary` `MutableClock`, and the controller's injection by type is what lets that test clock reach it. Putting `@Qualifier(\"adminClock\")` on the controller would bypass the @Primary test clock. The controller would then run on the real system UTC clock while the idle-timeout filter used the test clock, which breaks the time-dependent session tests' setup.\n\nThis is at most a design or maintainability note: the bean could move to `shared` later. It is not a correctness defect in this code.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1430,
+      "durationMs": 16825,
+      "sessionId": "ec67ef8f-898c-4961-9004-802c5e1e6840",
+      "costUsd": 0.1103942,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding describes something that might go wrong later. In the current code it cannot happen. A grep of src/main finds exactly one Clock bean, `adminClock()` at AdminSecurityConfiguration.kt:43. Its only consumers are AdminSessionController (by type), the admin filter chain (parameter `adminClock`) and AdminIdleTimeoutFilter (built by hand with that bean). No other module defines or injects a Clock today, so the controller cannot get the wrong bean and there is no NoUniqueBeanDefinitionException.\n\nThe failure the finding predicts would not be silent either. If a later module added a second, non-@Primary Clock, the context would fail at startup. The by-type injection into the controller's `clock` parameter would hit NoUniqueBeanDefinitionException, and every *IT test would catch it at once. It would never reach a user. Spring's parameter-name fallback would still resolve `adminClock` in the filter-chain method.\n\nThe test suite already exercises having two Clock beans. AdminWebTestBeans registers a `@Primary` MutableClock next to adminClock, and the context starts and injects correctly. That shows the standard way to resolve it.\n\nThe point that \"a later module would silently get the admin module's bean\" is also speculative. It is a design and modularity concern (NFR-11 / Modulith would flag a cross-module dependency), not a correctness defect that a user or attacker can trigger. Nothing here is reachable, so it is at most a maintainability nit about bean scoping.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/SignInFailureAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1729,
+      "durationMs": 23605,
+      "sessionId": "015c461d-a5ec-40b8-b301-a896bafad406",
+      "costUsd": 0.0973508,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The facts in the finding check out, but nothing behaves incorrectly today.\n\nWhat the code does (SignInFailureAdvice.kt:25-49): it is a global `@RestControllerAdvice` with `@Order(HIGHEST_PRECEDENCE)` and no `assignableTypes` or `basePackages` restriction. It handles `HttpMessageNotReadableException` and `HttpMediaTypeNotSupportedException` for every controller. Requests that are not sign-in go to a hand-built `object : ResponseEntityExceptionHandler() {}`. The sign-in check is an exact match `request.requestURI == \"/api/admin/session\"`. So the claim that it takes over this handling for the whole app is accurate.\n\nWhy there is no bug now:\n1. Same output as Boot. Boot's `ProblemDetailsExceptionHandler` is itself an empty subclass of `ResponseEntityExceptionHandler`. This code sets the MessageSource on its copy, and Boot sets one on its bean the same way (the class implements MessageSourceAware). So child-API 400/415 responses are the same either way.\n2. Nothing is shadowed yet. A grep of src/ finds no other `@ControllerAdvice` or `ResponseEntityExceptionHandler`.\n3. No context path. application.yaml has no `server.servlet.context-path`, so the `requestURI` match works as deployed.\n\nWhat is left is a design and maintainability risk:\n- A shared advice added later for these two exceptions would be silently overridden because this one runs first.\n- The admin module owns a cross-cutting concern that belongs in `shared`.\n- A context path added later would break the sign-in match.\n\nThese risks are real and the suggested fix is reasonable: narrow the advice's scope, and match on `servletPath` against a constant. But the correctness claim depends on future changes, so I'm keeping the finding (not refuted) and downgrading it to a maintainability nit."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/SignInFailureAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1762,
+      "durationMs": 16633,
+      "sessionId": "3d19d49f-ad08-4a34-a5c7-7885f978b448",
+      "costUsd": 0.0876722,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The structural description is accurate. `SignInFailureAdvice.kt:25-49` is a global `@RestControllerAdvice` at HIGHEST_PRECEDENCE, and it handles HttpMessageNotReadable and HttpMediaTypeNotSupported for every controller. But a real user or attacker cannot hit any problem today:\n\n1. **Same behaviour off sign-in.** On every other path the advice calls `object : ResponseEntityExceptionHandler() {}.handleException(...)` with the app's MessageSource. Boot's `ProblemDetailsExceptionHandler` is an empty subclass of `ResponseEntityExceptionHandler`, and Spring also gives it the MessageSource through MessageSourceAware. So the 400 and 415 RFC 7807 bodies for child and other endpoints match what Boot would have returned. A client sees nothing different.\n2. **No context path.** `application.yaml` sets no `server.servlet.context-path`; a grep for context-path finds nothing. So `requestURI == \"/api/admin/session\"` matches the real sign-in path, and the context-path failure is hypothetical.\n3. **No advice is shadowed.** There is no other `@ControllerAdvice` or `ResponseEntityExceptionHandler` in `src/`. The \"future shared advice will be shadowed\" point is about future maintainability, not a defect that can be reproduced now.\n4. **Not a security issue.** The sign-in branch only turns 400/415 into the same 401 the contract requires, and it applies only to POST on the exact path. Nothing leaks, and an attacker can't use it to get a different response.\n\nWhat remains is a design and coupling concern (an admin-module advice owns app-wide handlers), not a correctness bug that can occur. With no observable mechanism, this is refuted. At most it is a nit or refactor suggestion.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1303,
+      "durationMs": 22762,
+      "sessionId": "0abfb73d-e625-4046-ade7-b09dea333660",
+      "costUsd": 0.1892712,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The mechanism is real. The session is a plain Tomcat container HttpSession configured in `application.yaml:27-39` (`server.servlet.session.cookie.name: SESSION`, path `/api/admin`). It is not Spring Session, so no cookie serializer exists that would write an expiring cookie on invalidate. Tomcat's `HttpSession.invalidate()` sends no Set-Cookie to expire `JSESSIONID`/`SESSION`. `AdminSecurityConfiguration.kt:83` has `logout { disable() }`, so Spring Security adds no `CookieClearingLogoutHandler` either. `signOut` (`AdminSessionController.kt:51-57`) only invalidates the session and clears the CSRF cookie through `csrfTokens.saveToken(null, ...)`. Nothing expires `SESSION`, and the idle filter's invalidate behaves the same way. So the browser does keep the dead session id.\n\nIt is still not a correctness defect against the contract. The store spec scenario \"Sign-out ends the session\" (`contract/openspec/specs/admin-access/spec.md:85-90`) only requires that a later GET with the old cookie returns 401, and it does. The stale id can't be revived, and the next sign-in replaces it with a new id. The cost the finding cites, a \"failed session lookup\", is a single in-memory map miss in Tomcat's session manager. That is negligible. The claim is accurate but cosmetic, closer to a nit than a minor issue."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1336,
+      "durationMs": 22001,
+      "sessionId": "a98459aa-d235-4606-8633-b4238737ec8e",
+      "costUsd": 0.1702836,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The mechanism is real, but it has no consequence a real user or attacker can reach. Code facts: there's no Spring Session, just plain Tomcat sessions (`server.servlet.session.cookie.name: SESSION`, path `/api/admin`, HttpOnly, SameSite=Strict, no max-age). `signOut` (AdminSessionController.kt:53) and AdminIdleTimeoutFilter.kt:31 call `HttpSession.invalidate()`. Tomcat doesn't send an expiring Set-Cookie on invalidate, so the browser does keep the dead `SESSION` id. That part of the finding is accurate.\n\nWhy it isn't a problem:\n1. Security: the id is invalidated on the server and Tomcat won't bring it back. AdminSessionIT.kt:88 shows a request with the old cookie after sign-out gets 401. AdminIdleTimeoutTest checks that requests after expiry don't revive the session. A stolen copy of the stale cookie is worthless.\n2. Functionality: the next sign-in calls `getSession(true)`, which creates a new id and sends a fresh Set-Cookie that overwrites the stale one (same name and path). A request without a session also gets the same 401 problem response, so the leftover cookie changes nothing the user sees.\n3. The \"every later request goes through a failed session lookup\" cost is a single map miss in Tomcat's in-memory manager. It only happens on `/api/admin` paths, because of the cookie path, and is negligible.\n4. It's a browser-session cookie with no max-age, so it disappears when the browser closes. It holds no PII. The finding itself says it's \"harmless server-side.\"\n\nThere's no exploit or reproducible user-facing failure, so this is cosmetic hygiene at most. If it's kept, it should be a nit, not a correctness defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1708,
+      "durationMs": 17126,
+      "sessionId": "c73f743e-c873-484b-8be1-3a3c5594169c",
+      "costUsd": 0.1129472,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the mechanism; the code shows it.\n- AdminSecurityConfiguration.kt:73 permits POST /api/admin/session to anyone (`authorize(signIn, permitAll)`), and that path is also exempt from the CSRF check.\n- AdminCredentials.matches runs `BCryptPasswordEncoder().matches` with the default strength of 10. The only checks before BCrypt are for an empty value and for length over 72 bytes, so every reasonable guess costs one BCrypt check.\n- A search of src/main for throttle, rate limit, semaphore, lockout, sleep or delay found nothing.\n- src/main/resources has no `server.address`, so the server most likely listens on all network interfaces, and other devices on the LAN can reach it. I did not read application.yaml, so I have not ruled out a binding set there.\nNothing in the framework or in other code limits sign-in attempts.\n\nHowever, openspec/changes/implement-admin-access-api/design.md:9 says \"Non-goals: lockout and rate limiting (excluded by the spec)\", and proposal.md:10 says \"no lockout\". So the missing throttle is a deliberate, recorded decision, not an implementation bug. The code does what the spec says. The finding admits this itself. It is a valid design-risk note, not a correctness defect. With a strong 12+ character passphrase, a single home server, and the BCrypt cost, the practical risk is low. I recommend downgrading it to an informational or risk-register item rather than counting it as a defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1741,
+      "durationMs": 27473,
+      "sessionId": "514820fb-b6d8-4ccf-be95-c93045b36476",
+      "costUsd": 0.18789,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The mechanism is real and an attacker on the LAN can trigger it. AdminSecurityConfiguration.kt:68-81 makes POST /api/admin/session permitAll and exempts it from CSRF. Nothing in src/main limits the rate: a search for throttle, rate limit, lockout, semaphore and delay finds nothing. AdminCredentials.kt:18 uses `BCryptPasswordEncoder()` at the default strength of 10. The only check before BCrypt is the empty/72-byte guard (lines 24-28), so every request of the right size costs a full BCrypt compare, and Tomcat runs these in parallel. The endpoint can be reached from the LAN: compose.yaml publishes the frontend proxy on DOUCKO_BIND_ADDRESS, and the spec supports setting that to the laptop's RFC 1918 address (\"Configured LAN address\" scenario). Any device on the home Wi-Fi can therefore script unlimited guesses and load the CPU. So the finding is not refuted on reproducibility.\n\nI am downgrading it because it is not a defect against the contract. The product spec rules this out on purpose:\n- contract/openspec/specs/admin-access/spec.md:227-237 requires that failed sign-ins \"SHALL NOT ... block the client\", with a scenario of 20 consecutive failures followed by an immediate success.\n- spec.md:326 explicitly excludes \"account lockout, rate limiting, CAPTCHA\" for the MVP.\n- NFR-15/OQ-23 in requirements.md and the change's design.md:9 (Non-goals) say the same.\n\nThe finding's fallback suggestion is to record the risk in the spec so it is not raised again, and spec.md:326 already does that. Its main suggestion, a fixed delay after each failure plus a concurrency cap, is a form of rate limiting, which the spec excludes. A code change here would contradict the contract and would have to start as a docs-store change. The finding itself admits it is a recorded, accepted risk.\n\nPractical impact is also limited:\n- The attacker must already be on the home LAN.\n- The stack binds to loopback by default.\n- The password must be at least 12 characters, so tens of guesses per second only threaten a guessable passphrase.\n\nTreat this as informational, or as a proposal to the docs store to revisit OQ-23 (for example, raising the BCrypt cost), not as a backend code defect."
+      }
+    },
+    {
+      "label": "verify:src/main/resources/application.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1611,
+      "durationMs": 22966,
+      "sessionId": "4269e675-660e-4a8b-a727-16c07292bb6d",
+      "costUsd": 0.21192460000000002,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "keep",
+        "reasoning": "I confirmed the mechanism in the code.\n\n- **Session cookie:** `application.yaml:34-39` sets only name, http-only, same-site and path for the `SESSION` cookie. It does not set `secure`.\n- **CSRF cookie:** `AdminSecurityConfiguration.kt:54-56` builds the `XSRF-TOKEN` cookie with `CookieCsrfTokenRepository.withHttpOnlyFalse()`. Its customizer adds only `sameSite(\"Strict\")`, not `.secure(true)`.\n- **No TLS anywhere:** the backend has no `server.ssl` settings. The spec scenario \"Cookie attributes over HTTP\" (`openspec/changes/implement-admin-access-api/specs/admin-access/spec.md:31-34`) checks the cookies over plain HTTP, so cleartext transport is assumed.\n- **LAN mode is supported:** `.env.example:9-10` and the platform-foundation spec allow `DOUCKO_BIND_ADDRESS` to be an RFC 1918 LAN address. The host guard in `SecurityConfiguration.kt:41-45` explicitly accepts \"the LAN address\".\n\nSo in LAN mode, the `{password}` sign-in body and the `SESSION` cookie travel unencrypted. Any device on the same network can capture them, and a stolen session stays valid for up to 8 h of idle time.\n\nI looked for something that would rule this out:\n- I found no TLS-terminating proxy in this repo. I could not inspect the frontend nginx because reading outside the backend directory was denied.\n- The repo has no \"trusted network only\" waiver, no ADR, and no spec text that accepts cleartext LAN traffic.\n- `SameSite=Strict` and `HttpOnly` stop cross-site and script access to the cookie. They do nothing against someone passively listening on the network.\n\nOne part of the suggestion needs a caveat: setting `Secure` without TLS would break sign-in, so the real fix is TLS, or documenting the risk. The finding already says this.\n\nThe default bind is `127.0.0.1`, LAN mode is opt-in, and there are no admin mutation handlers yet. So \"minor\" is the right severity."
+      }
+    },
+    {
+      "label": "verify:src/main/resources/application.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1644,
+      "durationMs": 16831,
+      "sessionId": "5b8ef12c-ee10-4121-8664-58c4061894b9",
+      "costUsd": 0.13861020000000002,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this finding. The mechanism is real and someone can reproduce it.\n\n**What the config does**\n- `application.yaml:34-39` sets the SESSION cookie to `http-only` with `same-site: strict` and `path: /api/admin`.\n- It never sets `secure`.\n- `include-stacktrace: never` and the other settings in that file do nothing to require TLS.\n\n**LAN mode is supported**\n- `.env.example:9-12` documents setting `DOUCKO_BIND_ADDRESS` to the laptop's RFC 1918 home-LAN address so other devices can reach the app.\n- `tools/lib/compose.mjs:30-41` accepts private LAN addresses.\n- So \"reach the app from another device by LAN IP\" is a feature the project offers, not a misconfiguration.\n\n**There is no TLS anywhere in this repo**\n- I searched yml, yaml, conf, kt, Dockerfile and md files for ssl, tls, 443, https and secure.\n- No TLS or Secure-cookie setup turned up, only noise from logs and links.\n- I did not check the frontend repo's nginx config, which is outside this workspace. Nothing here suggests it adds TLS.\n\n**What an attacker gets**\n- In LAN mode, the password POSTed to sign in and the SESSION cookie travel as plain HTTP.\n- Any device on the same Wi-Fi that can sniff traffic (for example after ARP spoofing) can capture the password or replay the cookie until the 8 h idle timeout.\n- SameSite and HttpOnly don't stop someone on the network from reading or replaying the cookie.\n\n**Why it stays minor**\n- The default binding is 127.0.0.1, where the problem doesn't apply.\n- The attacker has to be on the home LAN already.\n- Admin handlers that change content don't exist yet.\n- The \"Local network only\" threat model may have accepted this risk on purpose.\n\nThese points argue for keeping the severity at minor, not for refuting the finding.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:pom.xml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1324,
+      "durationMs": 16687,
+      "sessionId": "d84c0b81-35ce-424b-b388-c038039bb81d",
+      "costUsd": 0.1223186,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed. The pom.xml build plugins (lines 182–322) are spring-boot, openapi-generator, build-helper, kotlin, failsafe, jacoco and spotless. None of them is OWASP dependency-check, OSV or another advisory scanner. qa:verify runs scripts/qa-verify.mjs, and no script under scripts/ mentions audit, OSV, dependency-check or CVE. .github only contains workflows/ci.yml, and that workflow runs traceability, trajectory and qa-verify with no scan step. There is no Dependabot or Renovate config either. The security-reviewer agent's checklist item 7 (.claude/agents/security-reviewer.md:38) asks for Maven dependency advisories, but nothing in the repo produces that evidence. Earlier review-gate runs (trace/workflow-runs/20261003-233104 and 20261004-051324) flagged the same gap and it is still open. The repo's 'vacuous-pass-not-earned' and 'done-claims-need-evidence' rules mean this item cannot honestly be called clean. This is a missing check in the process, not a defect in the code, and no specific vulnerable dependency has been shown. Minor severity is correct.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:pom.xml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1357,
+      "durationMs": 19326,
+      "sessionId": "8f3530e4-21fc-481f-9c07-7bf115e5abbb",
+      "costUsd": 0.11054459999999999,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The factual claim holds. In pom.xml the build plugins (line 182 onward) are spring-boot-maven-plugin, openapi-generator, build-helper, kotlin, failsafe, jacoco and spotless. None of them is a dependency-check or OSV plugin. scripts/qa-verify.mjs has no scan step: its only hit for 'audit' is an unrelated comment at line 42. .github/workflows/ci.yml has no match for scan, CVE, dependency, OSV, Trivy or CodeQL. There is no backend dependabot or renovate config either. So the repo cannot produce evidence for the dependency-advisory item, and that gap is reproducible.\n\nThrough the exploitability lens, though, the finding names no concrete vulnerable dependency or exploitable path. The parent is spring-boot-starter-parent 4.1.1, a current line that manages spring-security, tomcat-embed and jackson versions. No user or attacker can exploit the absence of a scanner. It is a process and evidence gap (in line with AGENTS.md's 'declared-method-needs-mechanism' lesson), not a demonstrated vulnerability. Because the gap is real and verifiable it is not refuted, but it should be downgraded to informational/process hygiene, not treated as a security defect."
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-admin-access-api/specs/admin-access/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1473,
+      "durationMs": 23962,
+      "sessionId": "7d3df397-8a7d-4824-a087-363513b4e6ef",
+      "costUsd": 0.1363258,
+      "numTurns": 9,
+      "result": {
+        "refuted": true,
+        "reasoning": "This entry only reports coverage. It names no broken mechanism, so there is nothing to confirm as a correctness defect. Its own suggestion is \"No action\".\n\nChecked against the code:\n- **Accurate in substance:**\n  - The delta spec has exactly 5 scenarios.\n  - `application.yaml:39` sets the `SESSION` cookie path to `/api/admin`.\n  - `AdminIdleTimeoutFilter.kt:27-35` implements the 8 h idle invalidation. It refreshes the activity time when a session is present and touches nothing when there is none.\n  - `AdminCredentials.matches` (lines 24-28) rejects input over 72 UTF-8 bytes before BCrypt runs, so it does compare the full value.\n  - The startup policy throws `AdminPasswordRefusedException` when the context starts.\n  - All six test files the finding names exist.\n- **Line citations that don't exist:** three of the cited locations are past the end of their files:\n  - `AdminSecurityConfiguration.kt:135-139` (file has 100 lines)\n  - `AdminCredentials.kt:294-298` (37 lines)\n  - `AdminPasswordPolicy.kt:320-326` (28 lines)\n\n  These pointers look like offsets from a concatenated dump rather than real file:line references, so they don't resolve.\n\nThere is no defect here. The 37/2/0/0 count can't be checked from this entry alone. The two \"partial\" child-endpoint scenarios are argued in other findings, not this one. As a correctness finding it fails, and it carries no severity worth keeping beyond informational.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-admin-access-api/specs/admin-access/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1506,
+      "durationMs": 13263,
+      "sessionId": "79c537e3-7f5f-4797-8cee-31adc96e3a57",
+      "costUsd": 0.0800866,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "This entry is a coverage summary, not a defect. It describes no mechanism that a user or attacker could trigger, and its own suggestion is \"No action. This entry only carries the coverage line.\" Nothing here can be reproduced or exploited. The two real gaps it mentions (the child-endpoint scenarios) are reported as separate findings and should be judged there. The evidence also cites line numbers that don't exist. AdminCredentials.kt has only 37 lines, but the finding points to lines 294-298; the full-value 72-byte check is actually at lines 24-28. The AdminPasswordPolicy.kt:320-326 and AdminSecurityConfiguration.kt:135-139 references look similarly fabricated or concatenated. The underlying behaviour is real (the full compare in matches() and the startup refusal in the hash initialiser), but the entry itself is unreliable bookkeeping with no claim to verify. It should be refuted as an actionable finding.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:contract/openspec/specs/admin-access/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1361,
+      "durationMs": 25657,
+      "sessionId": "2fcebfd3-59ef-4d8f-ab44-662dae343e82",
+      "costUsd": 0.16958620000000002,
+      "numTurns": 10,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The main claim is correct: nothing makes slice 7 test this scenario.\n- The scenario is at contract/openspec/specs/admin-access/spec.md:124-128.\n- openspec/changes/implement-admin-access-api/tasks.md has no task for it.\n- Searching trace/ finds it only in old review-gate run logs. No acceptance contract covers it.\n- Slice 7 in contract/docs/mvp-capability-plan.md:199-212 is `practice-flow`. Its scope and definition of done never mention the admin-access \"Child write is limited to its own practice\" scenario.\n- No implement-practice-flow-api change exists yet.\nSo the deferral in design.md:11-13 is a statement with nothing to enforce it. That breaks the declared-method-needs-mechanism rule.\n\nOne part of the evidence is wrong. The finding says the deferral appears \"only in design.md\". docs/current-state.md:33 also records it under \"Scope NOT delivered\" (\"the 'Child write is limited to its own practice' scenario (needs slice 7 attempts)\"). That part of the suggestion is already done, and the deferral is not hidden.\n\nI'm recommending a downgrade from major because:\n- This is a traceability gap in the process, not a code defect. The attempt endpoint doesn't exist yet, so there is no wrong behaviour today.\n- The deferral is honestly disclosed in current-state.md.\n- Slice 7's definition of done still says \"backend tests per scenario\", but that likely means practice-flow scenarios only, so it does not reliably cover this one.\n\nThe fix is still worth making: add an acceptance-contract entry or a slice-7 plan item that names this scenario."
+      }
+    },
+    {
+      "label": "verify:contract/openspec/specs/admin-access/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1394,
+      "durationMs": 22358,
+      "sessionId": "400a23ac-d288-41a6-ac68-415bc561b241",
+      "costUsd": 0.135013,
+      "numTurns": 8,
+      "result": {
+        "refuted": true,
+        "severityAdjustment": "downgrade",
+        "reasoning": "Through an exploitability lens, nothing here can happen to a real user or attacker. No child attempt endpoint exists yet, so there is no way to send `\"accepted\":[\"99\"]` or to change a task through a child write. That code arrives in slice 7.\n\nThe finding's factual claim, that \"nothing tracks it\", is also partly wrong:\n1. `docs/current-state.md:33` already lists it under **Scope NOT delivered**: 'the \"Child write is limited to its own practice\" scenario (needs slice 7 attempts)'. The suggestion asks for exactly this, and it is already done.\n2. The capability plan (`contract/docs/mvp-capability-plan.md:50`) gives slice 7 / `implement-practice-flow-api` ownership of FR-27 (\"child endpoints never mutate content / never leak answer keys\"). That is the requirement this scenario tests. Slice 7 must provide traced FR-27 tests, so the deferral is tied to slice 7 through requirement ownership.\n3. `design.md:11-13` records the deferral explicitly.\n\nWhat remains is a small bookkeeping gap. No `trace/acceptance-contracts.json` entry or carried-over task points by name to this specific `admin-access` scenario for slice 7. That is a process nit, not a major spec-compliance defect, and it has no reachable mechanism today."
+      }
+    },
+    {
+      "label": "verify:contract/openspec/specs/admin-access/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1289,
+      "durationMs": 31621,
+      "sessionId": "1e42974c-890e-411a-83c7-4254445ab19b",
+      "costUsd": 0.2197734,
+      "numTurns": 12,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed. The scenario \"No content-changing child operation exists\" (contract/openspec/specs/admin-access/spec.md:119-122) has no executable check in the backend:\n- No test in src/test lists the generated Child*Api interfaces (ChildHqApi, ChildPracticeApi, ChildProfileApi) or parses the /api/child operations in contract/api/openapi.yaml. ContractGenerationTest only checks that the interfaces are generated (NFR-12). Every /api/child test (UndeclaredPathTest, RequestContentNotLoggedTest, DouckoBackendApplicationIT, the AdminSessionTest case \"child paths need no CSRF\") hits undeclared paths for 404, CSRF or logging. None of them lists which operations exist.\n- The slice's design.md:11-13 sets aside a different scenario, \"Child write is limited to its own practice\" (proven in slice 7). It never mentions this one, and neither do tasks.md or proposal.md. So it was not deferred or handed to the docs store; it was simply left out.\n- In the pinned contract/ submodule, the only other files that mention /api/child are review trace JSONs. No script there checks this either.\n- The protection really is only structural. The shared chain is permitAll, stateless and has no CSRF; only /api/admin/** has a guard. A hand-written controller under /api/child that changed content would pass every current test.\n\nThrough the correctness lens, the running code has no defect today: no child content-changing endpoint exists. But the finding's claim, that the spec scenario has no executable mechanism, is accurate. AGENTS.md's \"declared-method-needs-mechanism\" rule makes that a legitimate gap. Minor severity and medium confidence fit.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:contract/openspec/specs/admin-access/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1322,
+      "durationMs": 14063,
+      "sessionId": "913bd2fa-4317-433d-a409-396e806fa27f",
+      "costUsd": 0.0878614,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "I couldn't find any way a real user or attacker could trigger this. The finding is about missing test coverage, not about a mechanism that can be exploited.\n\n1. **No child endpoints exist in the backend.** The only `/api/child` references under `src/` are tests that hit made-up paths (e.g. `/api/child/does-not-exist`) and a comment in `SecurityConfiguration.kt`. Nothing implements a generated Child*Api operation, so no child code path could create, update or delete content.\n\n2. **The contract has no content-changing child operations either.** The child paths in `contract/api/openapi.yaml` are:\n   - `hq`, `missions/{id}`, `current-task`, `replay`, `summary`, `tasks/{taskId}`\n   - `attempts`, `hints`, `reports`\n   - `images/{imageId}`, `profile/settings`, `hq/rank-up-ack`\n\n   None of these touches sources, tasks, missions, answer specs, hints, translations or images as content. The writes (attempts, reports, settings, rank-up ack) go to the child's own progress data. So the scenario's THEN clause holds against the current contract.\n\n3. **The docs store owns this scenario.** Its WHEN clause lists the operations in `api/openapi.yaml`, which is a property of the contract. AGENTS.md says an API change is a docs-store change first. A content-changing child operation would therefore have to be added to the docs-store contract before this repo could ever implement it, so that is the natural place for the check.\n\nThere is a reasonable case for adding a reflection test later, as a guard for regressions. Even so, no user or attacker can reproduce the claimed problem today, so I'm marking the finding refuted.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1240,
+      "durationMs": 19229,
+      "sessionId": "b441f233-1307-488b-983c-937c32e2c59e",
+      "costUsd": 0.161458,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding describes: `AdminSecurityConfiguration.kt:56` (not line 101) calls `setCookieCustomizer { it.sameSite(\"Strict\") }`. But the finding's main claim, that no spec or contract mentions this, is wrong, and nothing here is incorrect.\n\n1. **The change's own design records both behaviours.** `openspec/changes/implement-admin-access-api/design.md:36-40`, decision 5, says: \"`CookieCsrfTokenRepository.withHttpOnlyFalse()` with cookie path `/` and SameSite=Strict … Sign-in is excluded and issues a fresh token. Sign-out deletes it.\" So SameSite=Strict and clearing the token on sign-out were deliberate, documented choices, not unplanned drift.\n\n2. **A test already covers it.** `AdminSessionIT.kt:71` asserts `xsrf shouldContain \"SameSite=Strict\"` against a real HTTP response. The compose smoke evidence (`docs/qa/evidence/slice2-compose-smoke.md:13`) also shows `XSRF-TOKEN (Path=/; SameSite=Strict)`. The suggestion to \"cover both in AdminSessionIT\" is at least half done already.\n\n3. **Nothing contradicts the spec.** The delta spec (`spec.md:28-29`) requires the cookie to be readable by scripts (no HttpOnly) and scoped to `/`. The code meets both, and nothing in the spec forbids a SameSite attribute. The openapi text, \"readable by JS, sent back as X-XSRF-TOKEN\", still holds: the admin UI is same-site, so a Strict cookie is still sent and readable. NFR-15 and OQ-23 call for SameSite=Strict on the admin session, and the CSRF cookie follows the same policy. That is consistent hardening.\n\n4. **Deleting the token on sign-out is consistent too.** The session is invalidated at that point, and the next sign-in issues a fresh token, so it breaks no specified flow.\n\nAt most, the delta spec's normative \"Session cookie scope\" requirement could mention SameSite on XSRF-TOKEN alongside the design. That is a nit about documentation completeness, not a correctness defect, and the evidence the finding rests on (\"no spec … mentions\") is false.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1273,
+      "durationMs": 15686,
+      "sessionId": "ad73fcd7-b551-4072-8a4b-c9820fb173f1",
+      "costUsd": 0.09460099999999999,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "Seen through exploitability, this is not a real defect. No user or attacker can reach a harmful outcome. (1) The cited line is wrong: the customizer is at AdminSecurityConfiguration.kt:56, not 101. (2) SameSite=Strict on XSRF-TOKEN is stricter than the spec requires. The spec's SHALL clauses still hold: the cookie is readable by scripts (no HttpOnly) and has Path=/. The extra attribute doesn't break the SPA flow, since the frontend reaches the API same-origin through the 8081 proxy. The compose smoke in tasks 5.4 shows sign-in → GET → DELETE with the header → 204 working end to end. Strict also gives an attacker nothing new: it only stops the token cookie from being sent on cross-site requests. (3) The finding says the behaviour is \"unspecified\", but the change's own design.md:36-40 documents both points: \"cookie path `/` and SameSite=Strict\" and \"Sign-out deletes it.\" (4) The suggestion to cover it in AdminSessionIT is already met: AdminSessionIT.kt:71 asserts `xsrf shouldContain \"SameSite=Strict\"`. At most, the openapi Set-Cookie description is less detailed than design.md. That's a docs nit, not a reproducible problem.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:docs/current-state.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1189,
+      "durationMs": 12375,
+      "sessionId": "5ac9241f-24c0-4331-853d-1c325d149feb",
+      "costUsd": 0.082231,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the finding. `docs/current-state.md` line 11 says \"branch `slice2-admin-access`, not committed\", and line 20 says \"Slice 2 (uncommitted)\". Git status shows only `trace/ledger.jsonl` as modified, so this wording is what HEAD f94a58f committed (\"feat(admin): admin sign-in, session, CSRF and idle expiry (slice 2)\"). The committed handoff file therefore contradicts its own commit and misstates repository state.\n\nThe unticked 5.5 is the weak half of the finding. In `tasks.md`, 5.5 comes after 5.3 (the review gate, still unticked) and before 5.6 (archive and commit). Leaving 5.5 open until the final milestone update is consistent with the plan, so that part alone is not a defect. The \"not committed\" / \"uncommitted\" wording is still factually stale. The impact is minor and limited to documentation (no runtime behaviour is affected), so the minor severity fits.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:docs/current-state.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1222,
+      "durationMs": 13213,
+      "sessionId": "57df8160-505d-4a99-8489-7c9faa866fc3",
+      "costUsd": 0.0835248,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the stale wording, but half of the finding is weak. docs/current-state.md:11 says \"Active change: `implement-admin-access-api` (slice 2, branch `slice2-admin-access`, not committed)\", and line 20 says \"Slice 2 (uncommitted)\". HEAD f94a58f, \"feat(admin): admin sign-in, session, CSRF and idle expiry (slice 2)\", already commits the slice, so this handoff file is now wrong. Its stated purpose is to brief future agent windows. An agent that reads it could redo work or skip the commit check. The task plan also says commit happens together with archive (5.6), but the commit came first, so the file has drifted from what actually happened.\n\nThe unticked 5.5 is less convincing. 5.3 (review gate) and 5.6 (archive) are still open, so leaving the milestone update unticked is reasonable, and that part of the finding is not a defect.\n\nNo user or attacker can exploit this; it is a docs and handoff accuracy problem only. Since the stale \"not committed\" claim is real and checkable, the finding stands at minor severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/AdminModule.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1100,
+      "durationMs": 17369,
+      "sessionId": "4a85c201-f6cb-433f-82af-0b1d79852adf",
+      "costUsd": 0.1148272,
+      "numTurns": 8,
+      "result": {
+        "refuted": true,
+        "reasoning": "Nothing is actually wrong here. NFR-11 itself (contract/docs/requirements.md:172) asks only for a modular monolith whose module boundaries are verified by tests. It does not list module names. The authoritative capability plan (contract/docs/mvp-capability-plan.md:84) says NFR-11 is satisfied by `ModularityTest` \"plus one named module per slice\", with the note \"2–9 (each adds its module)\". So slice 2 adding a named Modulith module is the planned approach, not a deviation from the spec. `cz.doucko.admin` is a properly declared `@ApplicationModule` (AdminModule.kt:11-13), so Spring Modulith `verify()` covers it, which meets NFR-11. The list in AGENTS.md is a conventions note, not a closed set: the existing `cz.doucko.api` module (ApiModule.kt, sanctioned by ADR-0003) isn't in it either. At most there's a cosmetic doc mismatch in a non-normative note, with no effect on correctness or spec compliance.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/AdminModule.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1133,
+      "durationMs": 13541,
+      "sessionId": "735b5c61-fd6f-4803-8fb0-5bbaa4020ac5",
+      "costUsd": 0.0738964,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "Seen through exploitability and reproducibility, there is nothing here a user or attacker could trigger. `AdminModule.kt` declares `cz.doucko.admin` with `@PackageInfo` and `@ApplicationModule(displayName = \"Admin access\")`. That makes it a proper Spring Modulith application module, so the NFR-11 boundary check (`verify()`) applies to it exactly as it does to the listed modules. The KDoc also states that later slices never call into it. The only gap is that the module list in AGENTS.md doesn't name `admin`. That is a documentation and spec-hygiene point, not a defect that changes runtime behaviour, weakens a security boundary or can be reproduced by any request. The code itself sets the module boundary and Modulith enforces it, so the claimed boundary problem cannot happen. At most this is a documentation note.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/admin/AdminStartupTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1279,
+      "durationMs": 19958,
+      "sessionId": "9e7d3d97-953f-4490-891f-b09504bfabc2",
+      "costUsd": 0.1591546,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The behaviour is correct; the finding only points to a small gap in test evidence. `DouckoBackendApplication.kt:9-11` is a plain `fun main` that calls `runApplication<DouckoBackendApplication>(*args)`, with no try/catch, no custom `SpringApplication` setup and no exit-code override. If the `AdminCredentials` bean rejects `ADMIN_PASSWORD` at startup, Spring Boot's `SpringApplication.run` reports the failure, closes the context and rethrows. The exception leaves `main` uncaught, so the JVM exits non-zero, and no request is served because the web server starts only after the context refreshes. `AdminStartupTest.kt:33-45` uses `ApplicationContextRunner` with the real `AdminCredentials` configuration. It shows that a bad password fails startup, names `ADMIN_PASSWORD` and the limit, and never prints the value. That failure is the only step between the policy and the non-zero exit, and nothing in this code base intercepts it. The finding itself says Spring Boot \"normally exits non-zero on context failure\", and `tasks.md` 2.2 records the context-level check as the intended mechanism. So no wrong behaviour exists in this code; at most there is an optional extra process-level smoke check, which is a documentation preference rather than a correctness defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/admin/AdminStartupTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1312,
+      "durationMs": 16888,
+      "sessionId": "bdf50f29-3cdd-4f64-b64b-48ed13fd2b5b",
+      "costUsd": 0.1095906,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "Refuted: the scenario can't actually happen. No user or attacker can get the backend to serve requests with a short ADMIN_PASSWORD, and nothing can make it exit with status 0.\n\nHow startup works:\n- `AdminCredentials` (src/main/kotlin/cz/doucko/admin/application/AdminCredentials.kt) is an eager singleton `@Component`. Its `hash` initializer throws `AdminPasswordRefusedException` (an `IllegalStateException`) while the bean is being constructed, whenever the password policy reports a violation.\n- I searched src/main for `@Lazy` and `lazy-initialization` and found no matches, so the bean is created during context refresh, before the web server accepts requests.\n- `main` is a plain `runApplication<DouckoBackendApplication>(*args)` (DouckoBackendApplication.kt:10). There is no custom `SpringApplication` setup, no `exitProcess`, and no try/catch around it.\n- Standard Spring Boot behaviour: `SpringApplication.run` reports the failure, closes the context and re-throws. The exception escapes `main`, and the JVM exits non-zero.\n\nSo \"context fails to start\" leads directly to \"process exits non-zero before serving any request\" through framework behaviour, not through any project code. AdminStartupTest.kt:33 tests the refusal itself: startup fails, the message names ADMIN_PASSWORD and the limit, and the password value is never shown.\n\nWhat's left of the finding is a note about how the evidence is documented (no process-level smoke test records the exit code). It isn't a defect anyone could reproduce. The reviewer also gave it low confidence and admits Spring Boot normally exits non-zero. At most it's a one-line note for design.md, not a real spec-compliance gap.",
+        "severityAdjustment": "downgrade"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "15 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 5, contested: 5, rejected: 5"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/implement-admin-access-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "slice 2 admin-access backend (implement-admin-access-api)",
+    "summary": "Review gate for slice 2 admin-access backend (implement-admin-access-api): 5 confirmed, 5 contested (treat as confirmed unless trivially wrong), 5 rejected.",
+    "confirmed": [
+      {
+        "title": "Concurrent invalidation makes the idle filter throw IllegalStateException, giving a raw 500",
+        "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt",
+        "line": 29,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "`request.getSession(false)?.let { session -> ... session.getAttribute(LAST_ACTIVITY) ... session.invalidate() ... session.setAttribute(...)` has no guard against a session that another request invalidates in the meantime. After 8 h idle the admin UI usually sends several requests at once on wake or reload. The first request calls `session.invalidate()`. A parallel request that already holds the same session object then calls `getAttribute`/`setAttribute` and Tomcat throws `IllegalStateException: Session already invalidated`. That error escapes the filter chain as a 500 rather than the 401 the spec requires. A sign-out in another tab racing any admin request hits the same path, and so does `signIn`'s `request.getSession(false)?.invalidate()` (AdminSessionController.kt:38).",
+        "suggestion": "Wrap the session reads and writes (and the invalidate calls in the filter and controller) in a try/catch for IllegalStateException and treat a caught one as 'no session', so the request carries on to the 401 entry point. Add a test that invalidates the session between `getSession(false)` and `getAttribute`.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is real. The app uses plain Tomcat container sessions: there's no spring-session dependency, `server.servlet.session` is set in application.yaml, and the security context comes from HttpSessionSecurityContextRepository. Tomcat's StandardSession `getAttribute`, `setAttribute` and `invalidate` all throw `IllegalStateException` (\"... Session already invalidated\") once the session is invalid. AdminIdleTimeoutFilter.kt:27-34 has no guard. If request B gets the session from `getSession(false)` and request A then calls `invalidate()` (idle expiry in the filter, signOut at AdminSessionController.kt:53, or signIn at :38) before B reaches line 29, 31 or 33, B throws. The exception escapes the filter, so the request ends up as a 500 instead of a 401.\n\nThe impact is overstated, though. Tomcat's `Request.doGetSession` checks `isValid()`, so any request that calls `getSession(false)` after A has invalidated gets null and goes cleanly to the 401. Only a request that fetched the session object in the microseconds before A's `invalidate()` and touches it afterwards can hit this. \"Several requests on wake\" mostly doesn't trigger it.\n\nThe same race exists downstream in Spring Security's HttpSessionSecurityContextRepository, which also calls `getAttribute` without a guard. So this is a general servlet-session race, not something specific to this filter, and wrapping only this filter won't fully remove it.\n\nVerdict: the bug is genuine, but the window is very narrow and it's mostly framework-level, so I'm confirming it and downgrading it from major to minor.",
+          "The mechanism is real. pom.xml has no Spring Session, Jetty or Undertow, so the app uses Tomcat's own StandardSession. In Tomcat, `getSession(false)` checks `isValid()` only once, when the call is made. After that, `StandardSession.getAttribute`, `setAttribute` and `invalidate` each throw `IllegalStateException` (\"Session already invalidated\") if the session has become invalid in the meantime. Nothing guards against this. AdminIdleTimeoutFilter.kt:27-34 has no try/catch, and neither does AdminSessionController.kt:38/53. No advice or error handler in src/main deals with ISE either. The filter is added before SecurityContextHolderFilter, so the exception escapes as a 500 from the error path.\n\nIt is reachable. Two requests carrying the same expired session can both read `last > idle`; one invalidates and the other's `invalidate()` throws. A sign-out racing another request does the same.\n\nWhy I downgrade:\n1. The race window is microseconds: between `getSession(false)` and the next session call in the same thread. The admin UI firing several requests at once on wake makes it possible but rare.\n2. Only the single authenticated admin can trigger it, and only against their own session. An attacker gets nothing from it: no bypass, no data leak, and the session still ends up invalidated. The worst result is that one parallel request returns 500 instead of 401, and a retry gives the right answer.\n3. Spring's own HttpSessionSecurityContextRepository and CSRF session handling have the same generic servlet race, so this is not unique to this code.\n\nIt does technically break the \"no raw 500\" rule and the 401 the spec requires, so it isn't refuted. But it is a low-probability robustness issue (minor), not a major correctness bug. The suggested fix is cheap and reasonable: catch ISE and treat it as 'no session'."
+        ]
+      },
+      {
+        "title": "Admin sign-in has no throttling, so a LAN client can guess passwords online without limit and use BCrypt to load the CPU",
+        "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+        "line": 73,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "POST /api/admin/session is permitAll and has no delay, counter or concurrency cap. Each attempt costs one BCrypt check at the default strength of 10 (AdminCredentials.kt:18, about 100 ms), and Tomcat's worker pool can run many in parallel. A tech-savvy child, or any device on the home Wi-Fi, can script tens of guesses per second against a weak but policy-compliant passphrase (12+ characters, such as a Czech phrase plus digits). The same flood also keeps the laptop's CPU busy. The design lists lockout and rate limiting as non-goals, so this is a recorded, accepted risk. It is flagged only because the checklist asks for brute-force resistance and none exists.",
+        "suggestion": "Keep the 'no lockout' decision but add something cheap that cannot lock the admin out: a global semaphore of 1–2 concurrent sign-in checks plus a fixed delay of about 1 s after each failure. Alternatively raise the BCrypt strength to 12. If the risk stays accepted, record that in the store spec's risk section so it is not raised again.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute the mechanism; the code shows it.\n- AdminSecurityConfiguration.kt:73 permits POST /api/admin/session to anyone (`authorize(signIn, permitAll)`), and that path is also exempt from the CSRF check.\n- AdminCredentials.matches runs `BCryptPasswordEncoder().matches` with the default strength of 10. The only checks before BCrypt are for an empty value and for length over 72 bytes, so every reasonable guess costs one BCrypt check.\n- A search of src/main for throttle, rate limit, semaphore, lockout, sleep or delay found nothing.\n- src/main/resources has no `server.address`, so the server most likely listens on all network interfaces, and other devices on the LAN can reach it. I did not read application.yaml, so I have not ruled out a binding set there.\nNothing in the framework or in other code limits sign-in attempts.\n\nHowever, openspec/changes/implement-admin-access-api/design.md:9 says \"Non-goals: lockout and rate limiting (excluded by the spec)\", and proposal.md:10 says \"no lockout\". So the missing throttle is a deliberate, recorded decision, not an implementation bug. The code does what the spec says. The finding admits this itself. It is a valid design-risk note, not a correctness defect. With a strong 12+ character passphrase, a single home server, and the BCrypt cost, the practical risk is low. I recommend downgrading it to an informational or risk-register item rather than counting it as a defect.",
+          "The mechanism is real and an attacker on the LAN can trigger it. AdminSecurityConfiguration.kt:68-81 makes POST /api/admin/session permitAll and exempts it from CSRF. Nothing in src/main limits the rate: a search for throttle, rate limit, lockout, semaphore and delay finds nothing. AdminCredentials.kt:18 uses `BCryptPasswordEncoder()` at the default strength of 10. The only check before BCrypt is the empty/72-byte guard (lines 24-28), so every request of the right size costs a full BCrypt compare, and Tomcat runs these in parallel. The endpoint can be reached from the LAN: compose.yaml publishes the frontend proxy on DOUCKO_BIND_ADDRESS, and the spec supports setting that to the laptop's RFC 1918 address (\"Configured LAN address\" scenario). Any device on the home Wi-Fi can therefore script unlimited guesses and load the CPU. So the finding is not refuted on reproducibility.\n\nI am downgrading it because it is not a defect against the contract. The product spec rules this out on purpose:\n- contract/openspec/specs/admin-access/spec.md:227-237 requires that failed sign-ins \"SHALL NOT ... block the client\", with a scenario of 20 consecutive failures followed by an immediate success.\n- spec.md:326 explicitly excludes \"account lockout, rate limiting, CAPTCHA\" for the MVP.\n- NFR-15/OQ-23 in requirements.md and the change's design.md:9 (Non-goals) say the same.\n\nThe finding's fallback suggestion is to record the risk in the spec so it is not raised again, and spec.md:326 already does that. Its main suggestion, a fixed delay after each failure plus a concurrency cap, is a form of rate limiting, which the spec excludes. A code change here would contradict the contract and would have to start as a docs-store change. The finding itself admits it is a recorded, accepted risk.\n\nPractical impact is also limited:\n- The attacker must already be on the home LAN.\n- The stack binds to loopback by default.\n- The password must be at least 12 characters, so tens of guesses per second only threaten a guessable passphrase.\n\nTreat this as informational, or as a proposal to the docs store to revisit OQ-23 (for example, raising the BCrypt cost), not as a backend code defect."
+        ]
+      },
+      {
+        "title": "The admin password and the SESSION cookie travel in cleartext on the home LAN (no Secure flag, no TLS)",
+        "file": "src/main/resources/application.yaml",
+        "line": 36,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "server.servlet.session.cookie sets http-only and same-site but not secure. XSRF-TOKEN is also issued without Secure, and the spec scenario explicitly checks the cookies 'over HTTP'. When the app is reached from another device by its LAN address (NFR-2's RFC 1918 mode), the sign-in body {password} and the SESSION cookie are sent unencrypted. Any device on the same Wi-Fi, such as a guest's phone, a compromised IoT device or a passive sniffer, can capture the admin password or replay the session for up to 8 h of idle time. Then it can mutate content once slices 5–9 add admin handlers. In the default 127.0.0.1 binding this does not apply.",
+        "suggestion": "Document LAN mode as 'trusted network only', or terminate TLS in the frontend nginx (for example a self-signed or mkcert certificate for the LAN IP). Then set server.servlet.session.cookie.secure=true and add .secure(true) in the CSRF cookie customizer. Both can be gated on a DOUCKO_TLS flag so localhost dev still works.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the mechanism in the code.\n\n- **Session cookie:** `application.yaml:34-39` sets only name, http-only, same-site and path for the `SESSION` cookie. It does not set `secure`.\n- **CSRF cookie:** `AdminSecurityConfiguration.kt:54-56` builds the `XSRF-TOKEN` cookie with `CookieCsrfTokenRepository.withHttpOnlyFalse()`. Its customizer adds only `sameSite(\"Strict\")`, not `.secure(true)`.\n- **No TLS anywhere:** the backend has no `server.ssl` settings. The spec scenario \"Cookie attributes over HTTP\" (`openspec/changes/implement-admin-access-api/specs/admin-access/spec.md:31-34`) checks the cookies over plain HTTP, so cleartext transport is assumed.\n- **LAN mode is supported:** `.env.example:9-10` and the platform-foundation spec allow `DOUCKO_BIND_ADDRESS` to be an RFC 1918 LAN address. The host guard in `SecurityConfiguration.kt:41-45` explicitly accepts \"the LAN address\".\n\nSo in LAN mode, the `{password}` sign-in body and the `SESSION` cookie travel unencrypted. Any device on the same network can capture them, and a stolen session stays valid for up to 8 h of idle time.\n\nI looked for something that would rule this out:\n- I found no TLS-terminating proxy in this repo. I could not inspect the frontend nginx because reading outside the backend directory was denied.\n- The repo has no \"trusted network only\" waiver, no ADR, and no spec text that accepts cleartext LAN traffic.\n- `SameSite=Strict` and `HttpOnly` stop cross-site and script access to the cookie. They do nothing against someone passively listening on the network.\n\nOne part of the suggestion needs a caveat: setting `Secure` without TLS would break sign-in, so the real fix is TLS, or documenting the risk. The finding already says this.\n\nThe default bind is `127.0.0.1`, LAN mode is opt-in, and there are no admin mutation handlers yet. So \"minor\" is the right severity.",
+          "I could not refute this finding. The mechanism is real and someone can reproduce it.\n\n**What the config does**\n- `application.yaml:34-39` sets the SESSION cookie to `http-only` with `same-site: strict` and `path: /api/admin`.\n- It never sets `secure`.\n- `include-stacktrace: never` and the other settings in that file do nothing to require TLS.\n\n**LAN mode is supported**\n- `.env.example:9-12` documents setting `DOUCKO_BIND_ADDRESS` to the laptop's RFC 1918 home-LAN address so other devices can reach the app.\n- `tools/lib/compose.mjs:30-41` accepts private LAN addresses.\n- So \"reach the app from another device by LAN IP\" is a feature the project offers, not a misconfiguration.\n\n**There is no TLS anywhere in this repo**\n- I searched yml, yaml, conf, kt, Dockerfile and md files for ssl, tls, 443, https and secure.\n- No TLS or Secure-cookie setup turned up, only noise from logs and links.\n- I did not check the frontend repo's nginx config, which is outside this workspace. Nothing here suggests it adds TLS.\n\n**What an attacker gets**\n- In LAN mode, the password POSTed to sign in and the SESSION cookie travel as plain HTTP.\n- Any device on the same Wi-Fi that can sniff traffic (for example after ARP spoofing) can capture the password or replay the cookie until the 8 h idle timeout.\n- SameSite and HttpOnly don't stop someone on the network from reading or replaying the cookie.\n\n**Why it stays minor**\n- The default binding is 127.0.0.1, where the problem doesn't apply.\n- The attacker has to be on the home LAN already.\n- Admin handlers that change content don't exist yet.\n- The \"Local network only\" threat model may have accepted this risk on purpose.\n\nThese points argue for keeping the severity at minor, not for refuting the finding."
+        ]
+      },
+      {
+        "title": "The build has no Maven dependency advisory scan, so checklist item 7 cannot be verified",
+        "file": "pom.xml",
+        "line": 182,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "The build plugins are spring-boot, openapi-generator, build-helper, kotlin, failsafe, jacoco and spotless. There is no OWASP dependency-check, OSV-Scanner or similar step, and qa:verify does not run one. This slice adds Spring Security session and CSRF code to the attack surface, but nothing in the repo reports critical or high CVEs in spring-security, tomcat-embed or jackson. This review could not produce an advisory list with exploitability notes from repo evidence.",
+        "suggestion": "Add a scan step to qa:verify, for example `osv-scanner --lockfile pom.xml` or the org.owasp dependency-check-maven plugin with failBuildOnCVSS=7. Commit its report next to docs/qa/automated-verification-latest.md so the dependency item has evidence.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Confirmed. The pom.xml build plugins (lines 182–322) are spring-boot, openapi-generator, build-helper, kotlin, failsafe, jacoco and spotless. None of them is OWASP dependency-check, OSV or another advisory scanner. qa:verify runs scripts/qa-verify.mjs, and no script under scripts/ mentions audit, OSV, dependency-check or CVE. .github only contains workflows/ci.yml, and that workflow runs traceability, trajectory and qa-verify with no scan step. There is no Dependabot or Renovate config either. The security-reviewer agent's checklist item 7 (.claude/agents/security-reviewer.md:38) asks for Maven dependency advisories, but nothing in the repo produces that evidence. Earlier review-gate runs (trace/workflow-runs/20261003-233104 and 20261004-051324) flagged the same gap and it is still open. The repo's 'vacuous-pass-not-earned' and 'done-claims-need-evidence' rules mean this item cannot honestly be called clean. This is a missing check in the process, not a defect in the code, and no specific vulnerable dependency has been shown. Minor severity is correct.",
+          "The factual claim holds. In pom.xml the build plugins (line 182 onward) are spring-boot-maven-plugin, openapi-generator, build-helper, kotlin, failsafe, jacoco and spotless. None of them is a dependency-check or OSV plugin. scripts/qa-verify.mjs has no scan step: its only hit for 'audit' is an unrelated comment at line 42. .github/workflows/ci.yml has no match for scan, CVE, dependency, OSV, Trivy or CodeQL. There is no backend dependabot or renovate config either. So the repo cannot produce evidence for the dependency-advisory item, and that gap is reproducible.\n\nThrough the exploitability lens, though, the finding names no concrete vulnerable dependency or exploitable path. The parent is spring-boot-starter-parent 4.1.1, a current line that manages spring-security, tomcat-embed and jackson versions. No user or attacker can exploit the absence of a scanner. It is a process and evidence gap (in line with AGENTS.md's 'declared-method-needs-mechanism' lesson), not a demonstrated vulnerability. Because the gap is real and verifiable it is not refuted, but it should be downgraded to informational/process hygiene, not treated as a security defect."
+        ]
+      },
+      {
+        "title": "tasks.md 5.5 is unticked and current-state.md is stale relative to the commit",
+        "file": "docs/current-state.md",
+        "line": 11,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "tasks.md: '- [ ] 5.5 Update `docs/current-state.md`.' The file was updated in this diff, but it says 'Active change: `implement-admin-access-api` (slice 2, branch `slice2-admin-access`, not committed)' and '(uncommitted)' (line 20). HEAD f94a58f already commits the slice. The ticked 5.1 cites docs/qa/automated-verification-latest.md ('Overall result: Pass'), which exists, so that tick is backed.",
+        "suggestion": "Correct current-state.md to show the committed state (f94a58f) and tick 5.5 when the milestone update is final, or leave it unticked and remove the stale 'not committed' wording.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the finding. `docs/current-state.md` line 11 says \"branch `slice2-admin-access`, not committed\", and line 20 says \"Slice 2 (uncommitted)\". Git status shows only `trace/ledger.jsonl` as modified, so this wording is what HEAD f94a58f committed (\"feat(admin): admin sign-in, session, CSRF and idle expiry (slice 2)\"). The committed handoff file therefore contradicts its own commit and misstates repository state.\n\nThe unticked 5.5 is the weak half of the finding. In `tasks.md`, 5.5 comes after 5.3 (the review gate, still unticked) and before 5.6 (archive and commit). Leaving 5.5 open until the final milestone update is consistent with the plan, so that part alone is not a defect. The \"not committed\" / \"uncommitted\" wording is still factually stale. The impact is minor and limited to documentation (no runtime behaviour is affected), so the minor severity fits.",
+          "I confirmed the stale wording, but half of the finding is weak. docs/current-state.md:11 says \"Active change: `implement-admin-access-api` (slice 2, branch `slice2-admin-access`, not committed)\", and line 20 says \"Slice 2 (uncommitted)\". HEAD f94a58f, \"feat(admin): admin sign-in, session, CSRF and idle expiry (slice 2)\", already commits the slice, so this handoff file is now wrong. Its stated purpose is to brief future agent windows. An agent that reads it could redo work or skip the commit check. The task plan also says commit happens together with archive (5.6), but the commit came first, so the file has drifted from what actually happened.\n\nThe unticked 5.5 is less convincing. 5.3 (review gate) and 5.6 (archive) are still open, so leaving the milestone update unticked is reasonable, and that part of the finding is not a defect.\n\nNo user or attacker can exploit this; it is a docs and handoff accuracy problem only. Since the stale \"not committed\" claim is real and checkable, the finding stands at minor severity."
+        ]
+      }
+    ],
+    "contested": [
+      {
+        "title": "A failed sign-in that carries a valid session resets the idle clock, though the spec says a 401 must not reset anything",
+        "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt",
+        "line": 33,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The filter calls `session.setAttribute(LAST_ACTIVITY, now)` for every request that carries an unexpired session, before the outcome is known. `POST /api/admin/session` is `permitAll` and goes through this filter. With a wrong password it returns 401 (`throw InvalidCredentialsException()` at AdminSessionController.kt:36), but the old session keeps its refreshed timestamp. Store spec admin-access, 'Admin session idle timeout': 'A request refused with HTTP 401 SHALL NOT reset anything'. Only CSRF 403s are meant to count as activity.",
+        "suggestion": "Skip the timestamp update for the sign-in request matcher (successful sign-in sets LAST_ACTIVITY itself), or restore the previous value when sign-in fails. Add a test: signed-in session, wrong-password sign-in 7 h later, then GET 1.5 h after that must return 401.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The code does what the finding says. In AdminIdleTimeoutFilter.kt:27-34, any request that has an unexpired session gets `LAST_ACTIVITY = now` before the chain runs. The filter is added to the admin chain (AdminSecurityConfiguration.kt:84), and that chain also handles the sign-in matcher (`authorize(signIn, permitAll)` at :73; CSRF is skipped for it at :80). So a wrong-password `POST /api/admin/session` sent with a still-valid session cookie updates the old session's timestamp. Then AdminSessionController.kt:36 throws InvalidCredentialsException and the response is a 401. Nothing restores the earlier value. The 'session invalidated, new timestamp set' code at :38-39 only runs on success.\n\nSpec check (contract/openspec/specs/admin-access/spec.md:192): 'A request refused with HTTP 401 SHALL NOT reset anything'. Read literally, this covers a wrong-password 401, so the finding stands.\n\nWhy I'm downgrading: the requirement contradicts itself for this exact case. Line 189-190 says 'Every request that carries a valid, unexpired session cookie SHALL reset the idle clock'. A failed sign-in that carries a valid session matches that sentence, and the code follows it. The 401 sentence seems aimed at requests with no session or an expired one ('SHALL NOT revive an expired session'), not at credential failures. The security impact is also nil. Whoever holds the session cookie can already reset the clock with any GET that succeeds, so a failed sign-in gives them no extra power to extend the session. The mechanism is real and the literal spec text is violated, but treat this as a spec ambiguity to settle in the docs store (say which rule wins for a sign-in 401) more than a real defect. If the 401 rule wins, the suggested fix (skip the timestamp update for the sign-in matcher) is correct.",
+          "The mechanism is real. AdminIdleTimeoutFilter.kt:27-34 stamps LAST_ACTIVITY on every request that carries an unexpired session. The admin chain uses securityMatcher(\"/api/admin/**\") and adds the filter before SecurityContextHolderFilter (AdminSecurityConfiguration.kt:71,84), and sign-in is both permitAll and CSRF-exempt (lines 73,80). So a POST /api/admin/session with a valid cookie and a wrong password refreshes the timestamp, and AdminSessionController.kt:36 then throws a 401 without touching the session.\n\nWhether this is a defect depends on the spec, and the spec does not support the finding's reading. contract/openspec/specs/admin-access/spec.md:189-192 first says \"Every request that carries a valid, unexpired session cookie SHALL reset the idle clock — including a request refused with HTTP 403...\". It then says \"A request refused with HTTP 401 SHALL NOT reset anything and SHALL NOT revive an expired session.\" Read in context, and given the scenario at line 198-200 (\"8 h 1 min ago → 401 and nothing changes\"), the 401 clause covers requests refused because the session is missing or expired. A wrong-password sign-in carrying a valid session is exactly what the first, mandatory sentence covers. The code follows that sentence, and the filter's KDoc says so on purpose. At most the spec is ambiguous; the code does not clearly violate it.\n\nFrom an exploitability angle, nobody is harmed:\n- To extend the session, an attacker must already hold the admin session cookie, which grants full admin access anyway. Refreshing the idle clock gives them nothing new.\n- A CSRF-style cross-site POST can't do it either. SameSite cookie rules and the JSON body limit this, and even a successful cross-site POST only extends the legitimate admin's own session. It discloses nothing and changes no data.\n- The real admin UI only shows the sign-in form after the session check returns 401, which means the session is already gone. So this path doesn't come up in normal use.\n\nThe behavior can be reproduced by hand with curl, but it is not an exploitable or user-visible defect. It is a spec-wording ambiguity at most. If the spec author really meant that failed sign-ins don't count as activity, that should be clarified in the docs store first (a spec change). It should not be filed as a code bug here."
+        ]
+      },
+      {
+        "title": "The sign-in advice takes over HttpMessageNotReadable and HttpMediaTypeNotSupported handling for the whole app at HIGHEST_PRECEDENCE",
+        "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/SignInFailureAdvice.kt",
+        "line": 41,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`@RestControllerAdvice @Order(Ordered.HIGHEST_PRECEDENCE)` handles these exceptions for every controller. Non-sign-in paths are delegated to a hand-built `object : ResponseEntityExceptionHandler() {}` rather than Boot's `ProblemDetailsExceptionHandler` (enabled by `spring.mvc.problemdetails.enabled: true`). An admin-module advice now silently decides the 400/415 bodies for the child API too. Any shared advice added later for these exceptions (for example human catalog messages per AGENTS.md) will be shadowed. The sign-in check also relies on an exact `request.requestURI == \"/api/admin/session\"` match, so a servlet context path would break it.",
+        "suggestion": "Restrict the advice to the admin controller (`@RestControllerAdvice(assignableTypes = [AdminSessionController::class])`). This catches the body/media-type errors that happen after handler selection. Media-type mismatches during mapping need the URI check kept, but compare against `AdminSessionApi.PATH_SIGN_IN` using `request.servletPath` instead of `requestURI`.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The facts in the finding check out, but nothing behaves incorrectly today.\n\nWhat the code does (SignInFailureAdvice.kt:25-49): it is a global `@RestControllerAdvice` with `@Order(HIGHEST_PRECEDENCE)` and no `assignableTypes` or `basePackages` restriction. It handles `HttpMessageNotReadableException` and `HttpMediaTypeNotSupportedException` for every controller. Requests that are not sign-in go to a hand-built `object : ResponseEntityExceptionHandler() {}`. The sign-in check is an exact match `request.requestURI == \"/api/admin/session\"`. So the claim that it takes over this handling for the whole app is accurate.\n\nWhy there is no bug now:\n1. Same output as Boot. Boot's `ProblemDetailsExceptionHandler` is itself an empty subclass of `ResponseEntityExceptionHandler`. This code sets the MessageSource on its copy, and Boot sets one on its bean the same way (the class implements MessageSourceAware). So child-API 400/415 responses are the same either way.\n2. Nothing is shadowed yet. A grep of src/ finds no other `@ControllerAdvice` or `ResponseEntityExceptionHandler`.\n3. No context path. application.yaml has no `server.servlet.context-path`, so the `requestURI` match works as deployed.\n\nWhat is left is a design and maintainability risk:\n- A shared advice added later for these two exceptions would be silently overridden because this one runs first.\n- The admin module owns a cross-cutting concern that belongs in `shared`.\n- A context path added later would break the sign-in match.\n\nThese risks are real and the suggested fix is reasonable: narrow the advice's scope, and match on `servletPath` against a constant. But the correctness claim depends on future changes, so I'm keeping the finding (not refuted) and downgrading it to a maintainability nit.",
+          "The structural description is accurate. `SignInFailureAdvice.kt:25-49` is a global `@RestControllerAdvice` at HIGHEST_PRECEDENCE, and it handles HttpMessageNotReadable and HttpMediaTypeNotSupported for every controller. But a real user or attacker cannot hit any problem today:\n\n1. **Same behaviour off sign-in.** On every other path the advice calls `object : ResponseEntityExceptionHandler() {}.handleException(...)` with the app's MessageSource. Boot's `ProblemDetailsExceptionHandler` is an empty subclass of `ResponseEntityExceptionHandler`, and Spring also gives it the MessageSource through MessageSourceAware. So the 400 and 415 RFC 7807 bodies for child and other endpoints match what Boot would have returned. A client sees nothing different.\n2. **No context path.** `application.yaml` sets no `server.servlet.context-path`; a grep for context-path finds nothing. So `requestURI == \"/api/admin/session\"` matches the real sign-in path, and the context-path failure is hypothetical.\n3. **No advice is shadowed.** There is no other `@ControllerAdvice` or `ResponseEntityExceptionHandler` in `src/`. The \"future shared advice will be shadowed\" point is about future maintainability, not a defect that can be reproduced now.\n4. **Not a security issue.** The sign-in branch only turns 400/415 into the same 401 the contract requires, and it applies only to POST on the exact path. Nothing leaks, and an attacker can't use it to get a different response.\n\nWhat remains is a design and coupling concern (an admin-module advice owns app-wide handlers), not a correctness bug that can occur. With no observable mechanism, this is refuted. At most it is a nit or refactor suggestion."
+        ]
+      },
+      {
+        "title": "Sign-out and expiry don't clear the SESSION cookie in the browser",
+        "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+        "line": 52,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`signOut` calls `request.getSession(false)?.invalidate()` and `csrfTokens.saveToken(null, ...)`. That expires XSRF-TOKEN, but no Set-Cookie expires `SESSION` (path `/api/admin`). The idle filter's `session.invalidate()` doesn't clear it either. The browser keeps sending a dead session id. It's harmless server-side, but the stale cookie remains and every later request goes through a failed session lookup.",
+        "suggestion": "On sign-out (and optionally when the idle filter invalidates), write an expired `SESSION` cookie with the same path, HttpOnly and SameSite attributes. Spring Security's `CookieClearingLogoutHandler` can do this, or you can write the cookie directly.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The mechanism is real. The session is a plain Tomcat container HttpSession configured in `application.yaml:27-39` (`server.servlet.session.cookie.name: SESSION`, path `/api/admin`). It is not Spring Session, so no cookie serializer exists that would write an expiring cookie on invalidate. Tomcat's `HttpSession.invalidate()` sends no Set-Cookie to expire `JSESSIONID`/`SESSION`. `AdminSecurityConfiguration.kt:83` has `logout { disable() }`, so Spring Security adds no `CookieClearingLogoutHandler` either. `signOut` (`AdminSessionController.kt:51-57`) only invalidates the session and clears the CSRF cookie through `csrfTokens.saveToken(null, ...)`. Nothing expires `SESSION`, and the idle filter's invalidate behaves the same way. So the browser does keep the dead session id.\n\nIt is still not a correctness defect against the contract. The store spec scenario \"Sign-out ends the session\" (`contract/openspec/specs/admin-access/spec.md:85-90`) only requires that a later GET with the old cookie returns 401, and it does. The stale id can't be revived, and the next sign-in replaces it with a new id. The cost the finding cites, a \"failed session lookup\", is a single in-memory map miss in Tomcat's session manager. That is negligible. The claim is accurate but cosmetic, closer to a nit than a minor issue.",
+          "The mechanism is real, but it has no consequence a real user or attacker can reach. Code facts: there's no Spring Session, just plain Tomcat sessions (`server.servlet.session.cookie.name: SESSION`, path `/api/admin`, HttpOnly, SameSite=Strict, no max-age). `signOut` (AdminSessionController.kt:53) and AdminIdleTimeoutFilter.kt:31 call `HttpSession.invalidate()`. Tomcat doesn't send an expiring Set-Cookie on invalidate, so the browser does keep the dead `SESSION` id. That part of the finding is accurate.\n\nWhy it isn't a problem:\n1. Security: the id is invalidated on the server and Tomcat won't bring it back. AdminSessionIT.kt:88 shows a request with the old cookie after sign-out gets 401. AdminIdleTimeoutTest checks that requests after expiry don't revive the session. A stolen copy of the stale cookie is worthless.\n2. Functionality: the next sign-in calls `getSession(true)`, which creates a new id and sends a fresh Set-Cookie that overwrites the stale one (same name and path). A request without a session also gets the same 401 problem response, so the leftover cookie changes nothing the user sees.\n3. The \"every later request goes through a failed session lookup\" cost is a single map miss in Tomcat's in-memory manager. It only happens on `/api/admin` paths, because of the cookie path, and is negligible.\n4. It's a browser-session cookie with no max-age, so it disappears when the browser closes. It holds no PII. The finding itself says it's \"harmless server-side.\"\n\nThere's no exploit or reproducible user-facing failure, so this is cosmetic hygiene at most. If it's kept, it should be a nit, not a correctness defect."
+        ]
+      },
+      {
+        "title": "'Child write is limited to its own practice' is deferred to slice 7 but nothing tracks it there",
+        "file": "contract/openspec/specs/admin-access/spec.md",
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "Store scenario: 'WHEN the child submits POST /api/child/missions/{missionId}/tasks/{taskId}/attempts with ... \"accepted\":[\"99\"] ... THEN ... graded against 12, not 99 AND GET /api/admin/tasks/{taskId} afterwards returns prompt P...'. Code reality: there is no attempt endpoint and no test. The deferral appears only in design.md:11-13 ('It is proven in slice 7'). tasks.md does not mention it, and nothing ties this scenario to slice 7's implement-practice-flow-api.",
+        "suggestion": "Record the deferral where it will be enforced. Add a carried-over task or acceptance-contract entry (trace/acceptance-contracts.json) so implement-practice-flow-api must test this scenario, and note it as 'Scope NOT delivered' in current-state.md.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The main claim is correct: nothing makes slice 7 test this scenario.\n- The scenario is at contract/openspec/specs/admin-access/spec.md:124-128.\n- openspec/changes/implement-admin-access-api/tasks.md has no task for it.\n- Searching trace/ finds it only in old review-gate run logs. No acceptance contract covers it.\n- Slice 7 in contract/docs/mvp-capability-plan.md:199-212 is `practice-flow`. Its scope and definition of done never mention the admin-access \"Child write is limited to its own practice\" scenario.\n- No implement-practice-flow-api change exists yet.\nSo the deferral in design.md:11-13 is a statement with nothing to enforce it. That breaks the declared-method-needs-mechanism rule.\n\nOne part of the evidence is wrong. The finding says the deferral appears \"only in design.md\". docs/current-state.md:33 also records it under \"Scope NOT delivered\" (\"the 'Child write is limited to its own practice' scenario (needs slice 7 attempts)\"). That part of the suggestion is already done, and the deferral is not hidden.\n\nI'm recommending a downgrade from major because:\n- This is a traceability gap in the process, not a code defect. The attempt endpoint doesn't exist yet, so there is no wrong behaviour today.\n- The deferral is honestly disclosed in current-state.md.\n- Slice 7's definition of done still says \"backend tests per scenario\", but that likely means practice-flow scenarios only, so it does not reliably cover this one.\n\nThe fix is still worth making: add an acceptance-contract entry or a slice-7 plan item that names this scenario.",
+          "Through an exploitability lens, nothing here can happen to a real user or attacker. No child attempt endpoint exists yet, so there is no way to send `\"accepted\":[\"99\"]` or to change a task through a child write. That code arrives in slice 7.\n\nThe finding's factual claim, that \"nothing tracks it\", is also partly wrong:\n1. `docs/current-state.md:33` already lists it under **Scope NOT delivered**: 'the \"Child write is limited to its own practice\" scenario (needs slice 7 attempts)'. The suggestion asks for exactly this, and it is already done.\n2. The capability plan (`contract/docs/mvp-capability-plan.md:50`) gives slice 7 / `implement-practice-flow-api` ownership of FR-27 (\"child endpoints never mutate content / never leak answer keys\"). That is the requirement this scenario tests. Slice 7 must provide traced FR-27 tests, so the deferral is tied to slice 7 through requirement ownership.\n3. `design.md:11-13` records the deferral explicitly.\n\nWhat remains is a small bookkeeping gap. No `trace/acceptance-contracts.json` entry or carried-over task points by name to this specific `admin-access` scenario for slice 7. That is a process nit, not a major spec-compliance defect, and it has no reachable mechanism today."
+        ]
+      },
+      {
+        "title": "'No content-changing child operation exists' has no executable check in the backend",
+        "file": "contract/openspec/specs/admin-access/spec.md",
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "Scenario: 'WHEN the operations under /api/child/** in api/openapi.yaml are listed THEN none of them creates, updates or deletes a source, task, mission, answer spec, hint, translation or image'. No test in src/test lists the generated Child*Api operations. Child-side NFR-1 is enforced only structurally: the shared chain is permitAll, stateless and has no CSRF (SecurityConfiguration.kt diff).",
+        "suggestion": "Add a test that reflects over the generated cz.doucko.api child interfaces (or parses contract/api/openapi.yaml) and asserts that no /api/child operation targets content resources. Alternatively, state in the spec or plan that the docs store owns this scenario.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "Confirmed. The scenario \"No content-changing child operation exists\" (contract/openspec/specs/admin-access/spec.md:119-122) has no executable check in the backend:\n- No test in src/test lists the generated Child*Api interfaces (ChildHqApi, ChildPracticeApi, ChildProfileApi) or parses the /api/child operations in contract/api/openapi.yaml. ContractGenerationTest only checks that the interfaces are generated (NFR-12). Every /api/child test (UndeclaredPathTest, RequestContentNotLoggedTest, DouckoBackendApplicationIT, the AdminSessionTest case \"child paths need no CSRF\") hits undeclared paths for 404, CSRF or logging. None of them lists which operations exist.\n- The slice's design.md:11-13 sets aside a different scenario, \"Child write is limited to its own practice\" (proven in slice 7). It never mentions this one, and neither do tasks.md or proposal.md. So it was not deferred or handed to the docs store; it was simply left out.\n- In the pinned contract/ submodule, the only other files that mention /api/child are review trace JSONs. No script there checks this either.\n- The protection really is only structural. The shared chain is permitAll, stateless and has no CSRF; only /api/admin/** has a guard. A hand-written controller under /api/child that changed content would pass every current test.\n\nThrough the correctness lens, the running code has no defect today: no child content-changing endpoint exists. But the finding's claim, that the spec scenario has no executable mechanism, is accurate. AGENTS.md's \"declared-method-needs-mechanism\" rule makes that a legitimate gap. Minor severity and medium confidence fit.",
+          "I couldn't find any way a real user or attacker could trigger this. The finding is about missing test coverage, not about a mechanism that can be exploited.\n\n1. **No child endpoints exist in the backend.** The only `/api/child` references under `src/` are tests that hit made-up paths (e.g. `/api/child/does-not-exist`) and a comment in `SecurityConfiguration.kt`. Nothing implements a generated Child*Api operation, so no child code path could create, update or delete content.\n\n2. **The contract has no content-changing child operations either.** The child paths in `contract/api/openapi.yaml` are:\n   - `hq`, `missions/{id}`, `current-task`, `replay`, `summary`, `tasks/{taskId}`\n   - `attempts`, `hints`, `reports`\n   - `images/{imageId}`, `profile/settings`, `hq/rank-up-ack`\n\n   None of these touches sources, tasks, missions, answer specs, hints, translations or images as content. The writes (attempts, reports, settings, rank-up ack) go to the child's own progress data. So the scenario's THEN clause holds against the current contract.\n\n3. **The docs store owns this scenario.** Its WHEN clause lists the operations in `api/openapi.yaml`, which is a property of the contract. AGENTS.md says an API change is a docs-store change first. A content-changing child operation would therefore have to be added to the docs-store contract before this repo could ever implement it, so that is the natural place for the check.\n\nThere is a reasonable case for adding a reflection test later, as a guard for regressions. Even so, no user or attacker can reproduce the claimed problem today, so I'm marking the finding refuted."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "Admin module publishes an unqualified global Clock bean, which the controller injects by type",
+        "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+        "line": 43,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`@Bean fun adminClock(): Clock = Clock.systemUTC()` registers a plain `Clock` for the whole context. `AdminSessionController(private val clock: Clock, ...)` (AdminSessionController.kt:24) injects it by type. Later modules (e.g. progress, which needs Europe/Prague weeks) will want a Clock too. They will either silently get the admin module's bean, which crosses the module boundary implicitly (NFR-11), or add a second Clock bean and break the admin controller's injection with NoUniqueBeanDefinitionException.",
+        "suggestion": "Inject the bean by name or qualifier (`@Qualifier(\"adminClock\")`) in the controller. Alternatively, move a single application Clock into `shared` as its documented public bean and have admin consume it.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "Nothing is wrong with the code as it stands; the finding describes a possible future problem. Today the context has exactly one `java.time.Clock` bean: `adminClock()` at AdminSecurityConfiguration.kt:43. A grep of src/main finds no other Clock bean, so `AdminSessionController(clock: Clock)` and the filter-chain parameter `adminClock: Clock` both resolve to it with no ambiguity.\n\nEach failure the finding names depends on code that doesn't exist yet:\n1. NoUniqueBeanDefinitionException only happens if some future module adds a second Clock bean that isn't @Primary. That module would be the one introducing the conflict, and it can't be written yet.\n2. The NFR-11 boundary claim doesn't hold. Spring Modulith's `verify()` checks type dependencies between application-module packages. `java.time.Clock` is a JDK type, not an admin-module type, so a progress bean that injected a Clock would not depend on `cz.doucko.admin` and verify() would not flag it.\n\nThe suggested fix would also hurt the current tests. `AdminWebTestBeans` (AdminWebTestSupport.kt:32-34) replaces the clock with a `@Primary` `MutableClock`, and the controller's injection by type is what lets that test clock reach it. Putting `@Qualifier(\"adminClock\")` on the controller would bypass the @Primary test clock. The controller would then run on the real system UTC clock while the idle-timeout filter used the test clock, which breaks the time-dependent session tests' setup.\n\nThis is at most a design or maintainability note: the bean could move to `shared` later. It is not a correctness defect in this code.",
+          "The finding describes something that might go wrong later. In the current code it cannot happen. A grep of src/main finds exactly one Clock bean, `adminClock()` at AdminSecurityConfiguration.kt:43. Its only consumers are AdminSessionController (by type), the admin filter chain (parameter `adminClock`) and AdminIdleTimeoutFilter (built by hand with that bean). No other module defines or injects a Clock today, so the controller cannot get the wrong bean and there is no NoUniqueBeanDefinitionException.\n\nThe failure the finding predicts would not be silent either. If a later module added a second, non-@Primary Clock, the context would fail at startup. The by-type injection into the controller's `clock` parameter would hit NoUniqueBeanDefinitionException, and every *IT test would catch it at once. It would never reach a user. Spring's parameter-name fallback would still resolve `adminClock` in the filter-chain method.\n\nThe test suite already exercises having two Clock beans. AdminWebTestBeans registers a `@Primary` MutableClock next to adminClock, and the context starts and injects correctly. That shows the standard way to resolve it.\n\nThe point that \"a later module would silently get the admin module's bean\" is also speculative. It is a design and modularity concern (NFR-11 / Modulith would flag a cross-module dependency), not a correctness defect that a user or attacker can trigger. Nothing here is reachable, so it is at most a maintainability nit about bean scoping."
+        ]
+      },
+      {
+        "title": "Coverage summary: 39 backend-owned scenarios: 37 implemented, 2 partial, 0 missing, 0 contradicted",
+        "file": "openspec/changes/implement-admin-access-api/specs/admin-access/spec.md",
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "I checked the store spec admin-access (authentication, child endpoints, cookie+CSRF, idle timeout, no lockout, password policy) and the delta's 5 scenarios against AdminSessionTest, AdminIdleTimeoutTest, AdminSessionIT, AdminStartupTest, AdminPasswordPolicyTest and AdminCredentialsTest. These scenarios are implemented and tested: 401-before-403 (AdminSecurityConfiguration.kt:135-139), SESSION cookie path /api/admin (application.yaml:39), idle filter (AdminIdleTimeoutFilter.kt:27-35), 72-byte full compare (AdminCredentials.kt:294-298) and the startup policy (AdminPasswordPolicy.kt:320-326). The only gaps are the two child-endpoint scenarios listed below. The frontend-owned scenario 'Admin UI shows sign-in without a session' is excluded.",
+        "suggestion": "No action. This entry only carries the coverage line.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "This entry only reports coverage. It names no broken mechanism, so there is nothing to confirm as a correctness defect. Its own suggestion is \"No action\".\n\nChecked against the code:\n- **Accurate in substance:**\n  - The delta spec has exactly 5 scenarios.\n  - `application.yaml:39` sets the `SESSION` cookie path to `/api/admin`.\n  - `AdminIdleTimeoutFilter.kt:27-35` implements the 8 h idle invalidation. It refreshes the activity time when a session is present and touches nothing when there is none.\n  - `AdminCredentials.matches` (lines 24-28) rejects input over 72 UTF-8 bytes before BCrypt runs, so it does compare the full value.\n  - The startup policy throws `AdminPasswordRefusedException` when the context starts.\n  - All six test files the finding names exist.\n- **Line citations that don't exist:** three of the cited locations are past the end of their files:\n  - `AdminSecurityConfiguration.kt:135-139` (file has 100 lines)\n  - `AdminCredentials.kt:294-298` (37 lines)\n  - `AdminPasswordPolicy.kt:320-326` (28 lines)\n\n  These pointers look like offsets from a concatenated dump rather than real file:line references, so they don't resolve.\n\nThere is no defect here. The 37/2/0/0 count can't be checked from this entry alone. The two \"partial\" child-endpoint scenarios are argued in other findings, not this one. As a correctness finding it fails, and it carries no severity worth keeping beyond informational.",
+          "This entry is a coverage summary, not a defect. It describes no mechanism that a user or attacker could trigger, and its own suggestion is \"No action. This entry only carries the coverage line.\" Nothing here can be reproduced or exploited. The two real gaps it mentions (the child-endpoint scenarios) are reported as separate findings and should be judged there. The evidence also cites line numbers that don't exist. AdminCredentials.kt has only 37 lines, but the finding points to lines 294-298; the full-value 72-byte check is actually at lines 24-28. The AdminPasswordPolicy.kt:320-326 and AdminSecurityConfiguration.kt:135-139 references look similarly fabricated or concatenated. The underlying behaviour is real (the full compare in matches() and the startup refusal in the hash initialiser), but the entry itself is unreliable bookkeeping with no claim to verify. It should be refuted as an actionable finding."
+        ]
+      },
+      {
+        "title": "XSRF-TOKEN cookie gets SameSite=Strict, which no spec or contract mentions",
+        "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSecurityConfiguration.kt",
+        "line": 101,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "Delta spec: 'The XSRF-TOKEN cookie SHALL be readable by scripts (no HttpOnly) and scoped to /'. openapi.yaml:312 says only '`XSRF-TOKEN` (readable by JS, sent back as X-XSRF-TOKEN)'. Code: `setCookieCustomizer { it.sameSite(\"Strict\") }`. Sign-out also clears the token (AdminSessionController.kt signOut → saveToken(null)), which is also unspecified.",
+        "suggestion": "Add the SameSite=Strict attribute and the clear-on-sign-out behaviour to the delta's 'Session cookie scope' requirement (and to the openapi Set-Cookie description in a docs-store change), then cover both in AdminSessionIT.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The code does what the finding describes: `AdminSecurityConfiguration.kt:56` (not line 101) calls `setCookieCustomizer { it.sameSite(\"Strict\") }`. But the finding's main claim, that no spec or contract mentions this, is wrong, and nothing here is incorrect.\n\n1. **The change's own design records both behaviours.** `openspec/changes/implement-admin-access-api/design.md:36-40`, decision 5, says: \"`CookieCsrfTokenRepository.withHttpOnlyFalse()` with cookie path `/` and SameSite=Strict … Sign-in is excluded and issues a fresh token. Sign-out deletes it.\" So SameSite=Strict and clearing the token on sign-out were deliberate, documented choices, not unplanned drift.\n\n2. **A test already covers it.** `AdminSessionIT.kt:71` asserts `xsrf shouldContain \"SameSite=Strict\"` against a real HTTP response. The compose smoke evidence (`docs/qa/evidence/slice2-compose-smoke.md:13`) also shows `XSRF-TOKEN (Path=/; SameSite=Strict)`. The suggestion to \"cover both in AdminSessionIT\" is at least half done already.\n\n3. **Nothing contradicts the spec.** The delta spec (`spec.md:28-29`) requires the cookie to be readable by scripts (no HttpOnly) and scoped to `/`. The code meets both, and nothing in the spec forbids a SameSite attribute. The openapi text, \"readable by JS, sent back as X-XSRF-TOKEN\", still holds: the admin UI is same-site, so a Strict cookie is still sent and readable. NFR-15 and OQ-23 call for SameSite=Strict on the admin session, and the CSRF cookie follows the same policy. That is consistent hardening.\n\n4. **Deleting the token on sign-out is consistent too.** The session is invalidated at that point, and the next sign-in issues a fresh token, so it breaks no specified flow.\n\nAt most, the delta spec's normative \"Session cookie scope\" requirement could mention SameSite on XSRF-TOKEN alongside the design. That is a nit about documentation completeness, not a correctness defect, and the evidence the finding rests on (\"no spec … mentions\") is false.",
+          "Seen through exploitability, this is not a real defect. No user or attacker can reach a harmful outcome. (1) The cited line is wrong: the customizer is at AdminSecurityConfiguration.kt:56, not 101. (2) SameSite=Strict on XSRF-TOKEN is stricter than the spec requires. The spec's SHALL clauses still hold: the cookie is readable by scripts (no HttpOnly) and has Path=/. The extra attribute doesn't break the SPA flow, since the frontend reaches the API same-origin through the 8081 proxy. The compose smoke in tasks 5.4 shows sign-in → GET → DELETE with the header → 204 working end to end. Strict also gives an attacker nothing new: it only stops the token cookie from being sent on cross-site requests. (3) The finding says the behaviour is \"unspecified\", but the change's own design.md:36-40 documents both points: \"cookie path `/` and SameSite=Strict\" and \"Sign-out deletes it.\" (4) The suggestion to cover it in AdminSessionIT is already met: AdminSessionIT.kt:71 asserts `xsrf shouldContain \"SameSite=Strict\"`. At most, the openapi Set-Cookie description is less detailed than design.md. That's a docs nit, not a reproducible problem."
+        ]
+      },
+      {
+        "title": "New module `cz.doucko.admin` is not in the declared modular-monolith module list",
+        "file": "src/main/kotlin/cz/doucko/admin/AdminModule.kt",
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "AGENTS.md (NFR-11) lists modules as 'content, checking, practice, progress, tutor, storage, shared'. This slice adds a new top-level module `cz.doucko.admin` (design.md decision 1, 'Own module, own chain') and makes shared SecurityConfiguration defer /api/admin/** to it.",
+        "suggestion": "Amend the module list (docs-store ../docs/factory or an ADR under docs/adr/) to include `admin`, so the NFR-11 module boundary documentation matches the code. Do not edit installed files directly.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "Nothing is actually wrong here. NFR-11 itself (contract/docs/requirements.md:172) asks only for a modular monolith whose module boundaries are verified by tests. It does not list module names. The authoritative capability plan (contract/docs/mvp-capability-plan.md:84) says NFR-11 is satisfied by `ModularityTest` \"plus one named module per slice\", with the note \"2–9 (each adds its module)\". So slice 2 adding a named Modulith module is the planned approach, not a deviation from the spec. `cz.doucko.admin` is a properly declared `@ApplicationModule` (AdminModule.kt:11-13), so Spring Modulith `verify()` covers it, which meets NFR-11. The list in AGENTS.md is a conventions note, not a closed set: the existing `cz.doucko.api` module (ApiModule.kt, sanctioned by ADR-0003) isn't in it either. At most there's a cosmetic doc mismatch in a non-normative note, with no effect on correctness or spec compliance.",
+          "Seen through exploitability and reproducibility, there is nothing here a user or attacker could trigger. `AdminModule.kt` declares `cz.doucko.admin` with `@PackageInfo` and `@ApplicationModule(displayName = \"Admin access\")`. That makes it a proper Spring Modulith application module, so the NFR-11 boundary check (`verify()`) applies to it exactly as it does to the listed modules. The KDoc also states that later slices never call into it. The only gap is that the module list in AGENTS.md doesn't name `admin`. That is a documentation and spec-hygiene point, not a defect that changes runtime behaviour, weakens a security boundary or can be reproduced by any request. The code itself sets the module boundary and Modulith enforces it, so the claimed boundary problem cannot happen. At most this is a documentation note."
+        ]
+      },
+      {
+        "title": "The startup-refusal scenario is verified at context level, not as a process exit status",
+        "file": "src/test/kotlin/cz/doucko/admin/AdminStartupTest.kt",
+        "line": 33,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "Store scenario 'Short password': 'THEN it exits with a non-zero status before serving any request'. The test asserts that the application context fails to start and that the message names ADMIN_PASSWORD/12 and omits the value. Nothing asserts the non-zero process exit, although Spring Boot normally exits non-zero on context failure. The compose smoke (docs/qa/evidence/slice2-compose-smoke.md) covers only a valid password.",
+        "suggestion": "Accept context failure as the mechanism and say so in design.md, or add one compose or process-level smoke step that starts the backend with an 11-character ADMIN_PASSWORD and records the non-zero exit.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The behaviour is correct; the finding only points to a small gap in test evidence. `DouckoBackendApplication.kt:9-11` is a plain `fun main` that calls `runApplication<DouckoBackendApplication>(*args)`, with no try/catch, no custom `SpringApplication` setup and no exit-code override. If the `AdminCredentials` bean rejects `ADMIN_PASSWORD` at startup, Spring Boot's `SpringApplication.run` reports the failure, closes the context and rethrows. The exception leaves `main` uncaught, so the JVM exits non-zero, and no request is served because the web server starts only after the context refreshes. `AdminStartupTest.kt:33-45` uses `ApplicationContextRunner` with the real `AdminCredentials` configuration. It shows that a bad password fails startup, names `ADMIN_PASSWORD` and the limit, and never prints the value. That failure is the only step between the policy and the non-zero exit, and nothing in this code base intercepts it. The finding itself says Spring Boot \"normally exits non-zero on context failure\", and `tasks.md` 2.2 records the context-level check as the intended mechanism. So no wrong behaviour exists in this code; at most there is an optional extra process-level smoke check, which is a documentation preference rather than a correctness defect.",
+          "Refuted: the scenario can't actually happen. No user or attacker can get the backend to serve requests with a short ADMIN_PASSWORD, and nothing can make it exit with status 0.\n\nHow startup works:\n- `AdminCredentials` (src/main/kotlin/cz/doucko/admin/application/AdminCredentials.kt) is an eager singleton `@Component`. Its `hash` initializer throws `AdminPasswordRefusedException` (an `IllegalStateException`) while the bean is being constructed, whenever the password policy reports a violation.\n- I searched src/main for `@Lazy` and `lazy-initialization` and found no matches, so the bean is created during context refresh, before the web server accepts requests.\n- `main` is a plain `runApplication<DouckoBackendApplication>(*args)` (DouckoBackendApplication.kt:10). There is no custom `SpringApplication` setup, no `exitProcess`, and no try/catch around it.\n- Standard Spring Boot behaviour: `SpringApplication.run` reports the failure, closes the context and re-throws. The exception escapes `main`, and the JVM exits non-zero.\n\nSo \"context fails to start\" leads directly to \"process exits non-zero before serving any request\" through framework behaviour, not through any project code. AdminStartupTest.kt:33 tests the refusal itself: startup fails, the message names ADMIN_PASSWORD and the limit, and the password value is never shown.\n\nWhat's left of the finding is a note about how the evidence is documented (no process-level smoke test records the exit code). It isn't a defect anyone could reproduce. The reviewer also gave it low confidence and admits Spring Boot normally exits non-zero. At most it's a one-line note for design.md, not a real spec-compliance gap."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/implement-admin-access-api/review-findings.json"
+  }
+}
