@@ -35,6 +35,9 @@ services:
       DOUCKO_DB_PASSWORD: ${DOUCKO_DB_PASSWORD:?set DOUCKO_DB_PASSWORD in .env (see .env.example)}
       # admin-access: the backend refuses to start unless it is 12 characters to 72 bytes (NFR-16).
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env (see .env.example)}
+      # child-profile: read only on the first start against an empty database (later starts ignore it),
+      # so it is optional here; a first start without a valid value refuses to start (NFR-3: never committed).
+      DOUCKO_CHILD_DISPLAY_NAME: ${DOUCKO_CHILD_DISPLAY_NAME:-}
     depends_on:
       db:
         condition: service_healthy

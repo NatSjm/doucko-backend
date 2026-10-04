@@ -9,7 +9,7 @@ import org.slf4j.Marker
 /**
  * NFR-3 at every log level: the loggers that print request or bind content when set below INFO —
  * Spring MVC's "Read … to …" and handler-argument dumps, Spring Security's request line with its
- * query string, Tomcat's raw request buffer, Hibernate/JDBC bound parameter values — are capped at
+ * query string, Tomcat's raw request buffer, Hibernate/JDBC bound parameter values, Hibernate Validator's trace of a validated request DTO — are capped at
  * INFO whatever `logging.level.*` says, and the Tomcat parser loggers that print a malformed request
  * line at INFO are capped at WARN. Installed by `logback-spring.xml`.
  */
@@ -54,6 +54,8 @@ class RequestContentLogGuard : TurboFilter() {
                 "org.apache.tomcat",
                 "org.hibernate.orm.jdbc.bind",
                 "org.hibernate.type",
+                // Hibernate Validator traces each validated object (a bound request DTO) with its values.
+                "org.hibernate.validator",
                 "org.postgresql",
             )
     }

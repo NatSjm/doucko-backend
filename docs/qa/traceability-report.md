@@ -55,16 +55,16 @@ Result: PASS, 47 warning(s)
 | FR-40 | yes | yes | backend, frontend | - | - |
 | FR-41 | yes | yes | backend, frontend | - | - |
 | FR-42 | yes | yes | backend | - | - |
-| FR-43 | yes | yes | backend | - | - |
+| FR-43 | yes | yes | backend | 50 | - |
 | FR-44 | yes | yes | backend | - | - |
 
 ## Other MVP requirements (NFR / TC / BC)
 
 | Req | Owner repo(s) | Test trace here |
 |---|---|---|
-| NFR-1 | backend | 16 |
+| NFR-1 | backend | 18 |
 | NFR-2 | backend | 11 |
-| NFR-3 | backend, frontend | 7 |
+| NFR-3 | backend, frontend | 16 |
 | NFR-4 | backend, frontend | 6 |
 | NFR-5 | backend, frontend | - |
 | NFR-6 | frontend | n/a |
@@ -142,5 +142,5 @@ None.
 - **test-trace**: FR-40 (owned by backend) has no test annotated "@trace FR-40"
 - **test-trace**: FR-41 (owned by backend) has no test annotated "@trace FR-41"
 - **test-trace**: FR-42 (owned by backend) has no test annotated "@trace FR-42"
-- **test-trace**: FR-43 (owned by backend) has no test annotated "@trace FR-43"
 - **test-trace**: FR-44 (owned by backend) has no test annotated "@trace FR-44"
+- **active-changes**: active change "implement-child-profile-api" is not archived
