@@ -23,7 +23,7 @@
   `updateProfileSettings` login-free with presence-aware PATCH, configured task locales (`uk`).
 - **Next task:** finish slice 4 (review gate, archive), then the next slice per the capability plan.
 - **Claims:**
-  - Slice 4 QA battery passes (188 unit, 33 integration tests incl. `ProfileSettingsIT`, `ChildProfileStartupIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
+  - Slice 4 QA battery passes (194 unit, 33 integration tests incl. `ProfileSettingsIT`, `ChildProfileStartupIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
   - Slice 4 RED run — evidence: `docs/qa/evidence/slice4-red-run.md`; compose smoke skipped (main checkout stack running) — reason: `openspec/changes/implement-child-profile-api/tasks.md` task 5.4
   - Slice 2 QA battery passes (108 unit, 25 integration tests incl. `AdminSessionIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
   - Slice 2 RED run — evidence: `docs/qa/evidence/slice2-red-run.md`; real-stack smoke — evidence: `docs/qa/evidence/slice2-compose-smoke.md`

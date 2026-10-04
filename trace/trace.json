@@ -860,6 +860,7 @@
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/platform/DockerContextTest.kt",
+        "src/test/kotlin/cz/doucko/profile/ChildProfileEntityTest.kt",
         "src/test/kotlin/cz/doucko/profile/ChildProfileStartupIT.kt",
         "src/test/kotlin/cz/doucko/profile/ChildProfileStartupIT.kt",
         "src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt",

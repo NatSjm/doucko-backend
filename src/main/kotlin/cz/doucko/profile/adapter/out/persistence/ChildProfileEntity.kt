@@ -14,16 +14,16 @@ import java.time.Instant
 @Table(name = "child_profile")
 class ChildProfileEntity(
     @Id
-    val id: Int = SINGLE_ID,
+    private val id: Int = SINGLE_ID,
     @Column(name = "display_name", nullable = false, updatable = false)
-    val displayName: String,
+    private val displayName: String,
     @Column(name = "secondary_task_locale")
     var secondaryTaskLocale: String? = null,
     @Enumerated(EnumType.STRING)
     @Column(name = "answer_mode", nullable = false)
     var answerMode: AnswerMode = AnswerMode.DIRECT,
     @Column(name = "created_at", nullable = false, updatable = false)
-    val createdAt: Instant = Instant.now(),
+    private val createdAt: Instant = Instant.now(),
 ) {
     override fun toString() = "ChildProfileEntity(id=$id)"
 

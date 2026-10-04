@@ -7,6 +7,9 @@ import cz.doucko.profile.domain.SettingsInput
 import cz.doucko.profile.domain.SettingsValidator
 import cz.doucko.profile.domain.Validation
 
+/** The contract's TaskLocale shape. */
+private val LOCALE_SHAPE = Regex("[a-z]{2}")
+
 /**
  * `GET` and `PATCH` of the profile settings (store spec child-profile, FR-43). A patch is validated as a
  * whole (400 naming every invalid field), then checked for `GUIDED` (422), and only then written, so a
@@ -35,9 +38,5 @@ class ProfileSettingsService(
             }
         if (patch.answerMode == Change.To(AnswerMode.GUIDED)) throw GuidedModeNotAvailableException()
         return store.updateSettings(patch::applyTo)
-    }
-
-    private companion object {
-        val LOCALE_SHAPE = Regex("[a-z]{2}")
     }
 }

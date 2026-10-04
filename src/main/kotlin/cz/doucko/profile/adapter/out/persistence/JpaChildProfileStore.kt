@@ -19,11 +19,11 @@ class JpaChildProfileStore(
     }
 
     @Transactional(readOnly = true)
-    override fun settings(): ProfileSettings = repository.findById(ChildProfileEntity.SINGLE_ID).orElseThrow(::missing).settings()
+    override fun settings(): ProfileSettings = repository.findById(ChildProfileEntity.SINGLE_ID).orElseThrow().settings()
 
     @Transactional
     override fun updateSettings(change: (ProfileSettings) -> ProfileSettings): ProfileSettings {
-        val entity = repository.findForUpdate(ChildProfileEntity.SINGLE_ID) ?: throw missing()
+        val entity = checkNotNull(repository.findForUpdate(ChildProfileEntity.SINGLE_ID))
         val updated = change(entity.settings())
         entity.secondaryTaskLocale = updated.secondaryTaskLocale
         entity.answerMode = updated.answerMode
@@ -31,7 +31,4 @@ class JpaChildProfileStore(
     }
 
     private fun ChildProfileEntity.settings() = ProfileSettings(secondaryTaskLocale, answerMode)
-
-    /** Cannot happen after a successful start: the initializer creates the row or the start fails. */
-    private fun missing() = IllegalStateException("The child profile does not exist.")
 }
