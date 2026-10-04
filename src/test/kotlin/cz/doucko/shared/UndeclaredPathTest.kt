@@ -1,6 +1,7 @@
 package cz.doucko.shared
 
 import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
+import cz.doucko.content.ContentWebTestBeans
 import cz.doucko.profile.ProfileWebTestBeans
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import io.kotest.matchers.shouldBe
@@ -30,7 +31,13 @@ import java.util.concurrent.atomic.AtomicInteger
  * Without an admin session, every `/api/admin/` request is refused as problem+json and no handler runs.
  */
 @WebMvcTest
-@Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, UndeclaredPathTest.AdminProbe::class, ProfileWebTestBeans::class)
+@Import(
+    SecurityConfiguration::class,
+    AdminSecurityConfiguration::class,
+    UndeclaredPathTest.AdminProbe::class,
+    ProfileWebTestBeans::class,
+    ContentWebTestBeans::class,
+)
 class UndeclaredPathTest {
     @Autowired
     lateinit var mvc: MockMvc

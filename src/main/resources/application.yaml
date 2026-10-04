@@ -19,12 +19,21 @@ spring:
       enabled: true
     # NFR-3: never log request parameters or header values (DispatcherServlet masks them while false).
     log-request-details: false
+  servlet:
+    multipart:
+      # NFR-17: a source PDF is at most 50 MB (an image 5 MB, checked by the use case). A larger file is refused
+      # while the request is parsed: 413 problem+json (UploadLimitAdvice).
+      max-file-size: 50MB
+      max-request-size: 51MB
   messages:
     # NFR-9: backend copy (problem titles, details) comes from messages*.properties.
     basename: messages
     fallback-to-system-locale: false
 
 server:
+  tomcat:
+    # NFR-17: read (and drop) the rest of an oversized upload, so the client receives the 413 instead of a reset.
+    max-swallow-size: -1
   servlet:
     session:
       # admin-access (NFR-15): the admin session. AdminIdleTimeoutFilter enforces the 8 h idle expiry on
@@ -65,3 +74,12 @@ doucko:
     # child-profile: the task locales a profile may pick as secondaryTaskLocale (FR-43). Configuration,
     # not code: an empty list refuses every locale. MVP: Ukrainian only.
     task-locales: uk
+  content:
+    # content-authoring (CA-D16): allowed grades and subjects. MVP: grade 6, math.
+    grades: 6
+    subjects: math
+    # FR-8: the same configured task locales as the profile (one setting).
+    task-locales: ${doucko.profile.task-locales}
+    # NFR-17: uploaded PDFs and images, outside every repository working tree (refused otherwise).
+    # Compose mounts the doucko-storage volume here.
+    storage-dir: ${DOUCKO_STORAGE_DIR:${user.home}/.doucko/storage}

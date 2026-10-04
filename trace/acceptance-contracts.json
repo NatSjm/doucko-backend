@@ -7,40 +7,40 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-5": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-6": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-7": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-8": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-12": [
@@ -319,8 +319,8 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "status": "artifact-ok"
       }
     ]
   }

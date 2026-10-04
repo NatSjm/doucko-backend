@@ -9,7 +9,9 @@ COPY src/main src/main
 RUN mvn -B -q -DskipTests -Dspotless.check.skip=true -Djacoco.skip=true package
 
 FROM eclipse-temurin:21-jre-alpine
-RUN addgroup -S doucko && adduser -S doucko -G doucko
+RUN addgroup -S doucko && adduser -S doucko -G doucko \
+    && mkdir -p /var/lib/doucko/storage && chown doucko:doucko /var/lib/doucko/storage
+# NFR-17: a new named volume mounted here copies this ownership, so the backend can write uploads.
 USER doucko
 WORKDIR /app
 COPY --from=build /build/target/backend-*-SNAPSHOT.jar app.jar

@@ -52,4 +52,13 @@ class ComposeConfigurationTest {
         (db["volumes"] as List<*>).map { it.toString() } shouldContain "doucko-pgdata:/var/lib/postgresql/data"
         (compose["volumes"] as Map<*, *>).keys shouldContain "doucko-pgdata"
     }
+
+    // @trace NFR-17
+    @Test
+    fun `uploaded files live on the named volume doucko-storage, outside every repository`() {
+        val backend = services["backend"].shouldNotBeNull()
+        (backend["volumes"] as List<*>).map { it.toString() } shouldContain "doucko-storage:/var/lib/doucko/storage"
+        (backend["environment"] as Map<*, *>)["DOUCKO_STORAGE_DIR"] shouldBe "/var/lib/doucko/storage"
+        (compose["volumes"] as Map<*, *>).keys shouldContain "doucko-storage"
+    }
 }

@@ -3,6 +3,7 @@ package cz.doucko.profile
 import cz.doucko.admin.AdminWebTestBeans
 import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
 import cz.doucko.admin.signedIn
+import cz.doucko.content.ContentWebTestBeans
 import cz.doucko.profile.domain.AnswerMode
 import cz.doucko.profile.domain.ProfileSettings
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
@@ -58,7 +59,13 @@ private fun ResultActionsDsl.isProblem(
 
 /** child-profile "Profile settings" and "Invalid settings are refused without side effects" over the web layer. */
 @WebMvcTest
-@Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, AdminWebTestBeans::class, ProfileWebTestBeans::class)
+@Import(
+    SecurityConfiguration::class,
+    AdminSecurityConfiguration::class,
+    AdminWebTestBeans::class,
+    ProfileWebTestBeans::class,
+    ContentWebTestBeans::class,
+)
 class ProfileSettingsTest {
     @Autowired
     lateinit var mvc: MockMvc
@@ -304,7 +311,13 @@ class ProfileSettingsTest {
     /** child-profile "Removing the configured locale makes it refused": no code change, only configuration. */
     @Nested
     @WebMvcTest(properties = ["doucko.profile.task-locales="])
-    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, AdminWebTestBeans::class, ProfileWebTestBeans::class)
+    @Import(
+        SecurityConfiguration::class,
+        AdminSecurityConfiguration::class,
+        AdminWebTestBeans::class,
+        ProfileWebTestBeans::class,
+        ContentWebTestBeans::class,
+    )
     inner class WithoutConfiguredLocales {
         @Autowired
         lateinit var mvc: MockMvc

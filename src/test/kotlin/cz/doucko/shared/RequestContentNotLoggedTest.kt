@@ -1,6 +1,16 @@
 package cz.doucko.shared
 
+import com.jayway.jsonpath.JsonPath
 import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
+import cz.doucko.admin.signedIn
+import cz.doucko.content.ContentWebTestBeans
+import cz.doucko.content.Files
+import cz.doucko.content.SOURCE_FIELDS
+import cz.doucko.content.adminGet
+import cz.doucko.content.adminJson
+import cz.doucko.content.quote
+import cz.doucko.content.taskJson
+import cz.doucko.content.uploadSource
 import cz.doucko.profile.ProfileWebTestBeans
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import io.kotest.matchers.string.shouldContain
@@ -88,6 +98,26 @@ class RequestContentNotLoggedTest {
         get(SETTINGS) { header("X-Probe", SENTINEL) }.andExpect { status { isOk() } }
     }
 
+    /**
+     * content-authoring (NFR-3, slice 5): the authoring endpoints take free text (prompts, titles, test
+     * answers, search queries). Valid and refused requests carry the sentinel in each.
+     */
+    private fun MockMvc.contentWithSentinel() {
+        val admin = signedIn()
+        val upload = uploadSource(admin, Files.pdf(60), "title" to SENTINEL, "grade" to "6", "subject" to "math")
+        val sourceId = JsonPath.read<String>(upload.andReturn().response.contentAsString, "$.sourceId")
+        uploadSource(admin, Files.pdf(2), "title" to SENTINEL, "grade" to SENTINEL, "subject" to SENTINEL)
+        uploadSource(admin, SENTINEL.toByteArray(), *SOURCE_FIELDS, name = SENTINEL)
+        val created = adminJson("POST", admin, "/api/admin/tasks", taskJson(sourceId, "prompt" to quote(SENTINEL)))
+        val taskId = JsonPath.read<String>(created.andReturn().response.contentAsString, "$.taskId")
+        adminJson("POST", admin, "/api/admin/tasks", taskJson(sourceId, "prompt" to quote(SENTINEL), "difficulty" to quote(SENTINEL)))
+        adminJson("POST", admin, "/api/admin/tasks", """{"prompt": "$SENTINEL""")
+        adminJson("POST", admin, "/api/admin/tasks/$taskId/check", """{"answers":{"a":"$SENTINEL","$SENTINEL":"1"}}""")
+        adminJson("PUT", admin, "/api/admin/sources/$sourceId", """{"title":"x","grade":6,"subject":"math","$SENTINEL":1}""")
+        adminGet(admin, "/api/admin/tasks", "q" to SENTINEL).andExpect { status { isOk() } }
+        adminGet(admin, "/api/admin/tasks/$SENTINEL")
+    }
+
     @Nested
     @WebMvcTest(
         properties = [
@@ -97,7 +127,13 @@ class RequestContentNotLoggedTest {
             "logging.level.cz.doucko=TRACE",
         ],
     )
-    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, Echo::class, ProfileWebTestBeans::class)
+    @Import(
+        SecurityConfiguration::class,
+        AdminSecurityConfiguration::class,
+        Echo::class,
+        ProfileWebTestBeans::class,
+        ContentWebTestBeans::class,
+    )
     @ExtendWith(OutputCaptureExtension::class)
     inner class AtTrace {
         @Autowired
@@ -110,13 +146,20 @@ class RequestContentNotLoggedTest {
             mvc.postWithSentinel("/api/child/does-not-exist")
             mvc.signInWithSentinel()
             mvc.settingsWithSentinel()
+            mvc.contentWithSentinel()
             output.all shouldNotContain SENTINEL
         }
     }
 
     @Nested
     @WebMvcTest(properties = ["logging.level.root=INFO"])
-    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, Echo::class, ProfileWebTestBeans::class)
+    @Import(
+        SecurityConfiguration::class,
+        AdminSecurityConfiguration::class,
+        Echo::class,
+        ProfileWebTestBeans::class,
+        ContentWebTestBeans::class,
+    )
     @ExtendWith(OutputCaptureExtension::class)
     inner class AtConfiguredLevels {
         @Autowired
@@ -129,6 +172,7 @@ class RequestContentNotLoggedTest {
             mvc.postWithSentinel("/api/child/does-not-exist")
             mvc.signInWithSentinel()
             mvc.settingsWithSentinel()
+            mvc.contentWithSentinel()
             output.all shouldNotContain SENTINEL
         }
     }
@@ -146,7 +190,13 @@ class RequestContentNotLoggedTest {
             "logging.level.org.springframework.security=DEBUG",
         ],
     )
-    @Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, Echo::class, ProfileWebTestBeans::class)
+    @Import(
+        SecurityConfiguration::class,
+        AdminSecurityConfiguration::class,
+        Echo::class,
+        ProfileWebTestBeans::class,
+        ContentWebTestBeans::class,
+    )
     @ExtendWith(OutputCaptureExtension::class)
     inner class CaptureControl {
         // @trace NFR-3

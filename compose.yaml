@@ -8,6 +8,8 @@
 # - The database is never published to the host (admin-access "Database not published").
 # - Data lives on the named volume doucko-pgdata (NFR-10); `npm run backup` dumps it to
 #   ~/doucko-backups, outside every repository.
+# - Uploaded PDFs and task images live on the named volume doucko-storage (NFR-17), outside every
+#   repository. `npm run backup` dumps only the database, not this volume.
 # - The frontend service builds from the sibling checkout ../frontend (decision D-P1).
 name: doucko
 
@@ -21,7 +23,10 @@ services:
     volumes:
       - doucko-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U doucko -d doucko"]
+      # Over TCP: the temporary server of the first-start initialisation listens only on the Unix socket,
+      # so a socket check could report healthy just before that server shuts down (BackupRestoreIT flake,
+      # "the database system is shutting down").
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U doucko -d doucko"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -38,6 +43,10 @@ services:
       # child-profile: read only on the first start against an empty database (later starts ignore it),
       # so it is optional here; a first start without a valid value refuses to start (NFR-3: never committed).
       DOUCKO_CHILD_DISPLAY_NAME: ${DOUCKO_CHILD_DISPLAY_NAME:-}
+      # content-authoring (NFR-17): uploaded files, on the doucko-storage volume.
+      DOUCKO_STORAGE_DIR: /var/lib/doucko/storage
+    volumes:
+      - doucko-storage:/var/lib/doucko/storage
     depends_on:
       db:
         condition: service_healthy
@@ -61,3 +70,4 @@ services:
 
 volumes:
   doucko-pgdata:
+  doucko-storage:

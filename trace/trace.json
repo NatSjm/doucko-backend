@@ -100,10 +100,29 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/StorageAndPdfTest.kt",
+        "src/test/kotlin/cz/doucko/content/UploadLimitsIT.kt"
+      ],
       "recordings": []
     },
     {
@@ -117,7 +136,9 @@
         "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -128,10 +149,34 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -142,10 +187,16 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/UploadLimitsIT.kt"
+      ],
       "recordings": []
     },
     {
@@ -155,10 +206,15 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -172,7 +228,41 @@
         "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/SpecRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -186,7 +276,11 @@
         "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -197,10 +291,19 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -225,10 +328,17 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -239,10 +349,18 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/SourceRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -269,7 +387,11 @@
         "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -899,6 +1021,7 @@
       "ownedHere": true,
       "tests": [
         "src/test/kotlin/cz/doucko/admin/AdminSessionIT.kt",
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/platform/DockerContextTest.kt",
@@ -1084,7 +1207,23 @@
         "frontend"
       ],
       "ownedHere": true,
-      "tests": []
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/SourceRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/StorageAndPdfTest.kt",
+        "src/test/kotlin/cz/doucko/content/StorageAndPdfTest.kt",
+        "src/test/kotlin/cz/doucko/content/StorageAndPdfTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/UploadLimitsIT.kt",
+        "src/test/kotlin/cz/doucko/content/UploadLimitsIT.kt",
+        "src/test/kotlin/cz/doucko/content/UploadLimitsIT.kt",
+        "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt"
+      ]
     },
     {
       "id": "TC-1",
@@ -1163,55 +1302,11 @@
   "warnings": [
     {
       "check": "test-trace",
-      "msg": "FR-1 (owned by backend) has no test annotated \"@trace FR-1\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-2 (owned by backend) has no test annotated \"@trace FR-2\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-3 (owned by backend) has no test annotated \"@trace FR-3\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-4 (owned by backend) has no test annotated \"@trace FR-4\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-5 (owned by backend) has no test annotated \"@trace FR-5\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-6 (owned by backend) has no test annotated \"@trace FR-6\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-7 (owned by backend) has no test annotated \"@trace FR-7\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-8 (owned by backend) has no test annotated \"@trace FR-8\""
-    },
-    {
-      "check": "test-trace",
       "msg": "FR-9 (owned by backend) has no test annotated \"@trace FR-9\""
     },
     {
       "check": "test-trace",
-      "msg": "FR-10 (owned by backend) has no test annotated \"@trace FR-10\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-11 (owned by backend) has no test annotated \"@trace FR-11\""
-    },
-    {
-      "check": "test-trace",
       "msg": "FR-12 (owned by backend) has no test annotated \"@trace FR-12\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-13 (owned by backend) has no test annotated \"@trace FR-13\""
     },
     {
       "check": "test-trace",
@@ -1308,6 +1403,10 @@
     {
       "check": "test-trace",
       "msg": "FR-44 (owned by backend) has no test annotated \"@trace FR-44\""
+    },
+    {
+      "check": "active-changes",
+      "msg": "active change \"implement-authoring-tasks-api\" is not archived"
     }
   ]
 }

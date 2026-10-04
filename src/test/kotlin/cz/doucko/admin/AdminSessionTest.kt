@@ -1,6 +1,7 @@
 package cz.doucko.admin
 
 import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
+import cz.doucko.content.ContentWebTestBeans
 import cz.doucko.profile.ProfileWebTestBeans
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import io.kotest.matchers.nulls.shouldBeNull
@@ -25,7 +26,13 @@ import java.net.URI
 
 /** Store spec admin-access: authentication, CSRF and lockout scenarios against the admin chain. */
 @WebMvcTest
-@Import(SecurityConfiguration::class, AdminSecurityConfiguration::class, AdminWebTestBeans::class, ProfileWebTestBeans::class)
+@Import(
+    SecurityConfiguration::class,
+    AdminSecurityConfiguration::class,
+    AdminWebTestBeans::class,
+    ProfileWebTestBeans::class,
+    ContentWebTestBeans::class,
+)
 class AdminSessionTest {
     @Autowired
     lateinit var mvc: MockMvc
