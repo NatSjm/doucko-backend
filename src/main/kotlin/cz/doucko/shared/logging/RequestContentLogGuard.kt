@@ -10,7 +10,8 @@ import org.slf4j.Marker
  * NFR-3 at every log level: the loggers that print request or bind content when set below INFO —
  * Spring MVC's "Read … to …" and handler-argument dumps, Spring Security's request line with its
  * query string, Tomcat's raw request buffer, Hibernate/JDBC bound parameter values — are capped at
- * INFO whatever `logging.level.*` says. Installed by `logback-spring.xml`.
+ * INFO whatever `logging.level.*` says, and the Tomcat parser loggers that print a malformed request
+ * line at INFO are capped at WARN. Installed by `logback-spring.xml`.
  */
 class RequestContentLogGuard : TurboFilter() {
     override fun decide(
@@ -23,11 +24,21 @@ class RequestContentLogGuard : TurboFilter() {
     ): FilterReply =
         if (level != null && !level.isGreaterOrEqual(Level.INFO) && guarded(logger.name.removePrefix("_"))) {
             FilterReply.DENY
+        } else if (level != null && !level.isGreaterOrEqual(Level.WARN) && RAW_REQUEST_AT_INFO.any { logger.name.startsWith(it) }) {
+            FilterReply.DENY
         } else {
             FilterReply.NEUTRAL
         }
 
     private companion object {
+        /**
+         * Tomcat's HTTP/1.1 parser logs a malformed request line, target and query included, at INFO
+         * ("Error parsing HTTP request header … Invalid character found in the request target [ … ]").
+         * Those loggers are capped at WARN.
+         */
+        val RAW_REQUEST_AT_INFO =
+            listOf("org.apache.coyote.http11", "org.apache.coyote.AbstractProtocol", "org.apache.tomcat.util.http.parser")
+
         /** Spring names some internal loggers "_org.springframework…" (hidden logs); the prefix is ignored. */
         fun guarded(name: String) = GUARDED.any { name == it || name.startsWith("$it.") }
 

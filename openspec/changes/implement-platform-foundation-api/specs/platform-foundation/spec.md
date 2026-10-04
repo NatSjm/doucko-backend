@@ -2,21 +2,22 @@
 
 ### Requirement: Loopback or LAN binding only
 
-The Compose stack SHALL publish every host port on a single configurable
-bind address that defaults to `127.0.0.1`, and SHALL NOT publish the
-database port (NFR-2; store spec admin-access, "Local network only"). The
+The Compose stack SHALL publish only the frontend port, on a single
+configurable bind address that defaults to `127.0.0.1`, and SHALL NOT publish
+the backend or database port (NFR-2; store spec admin-access, "Local network only"). The
 stack launcher SHALL refuse a bind address that is not loopback or a
 canonical RFC 1918 IPv4 address, and SHALL check the bindings compose
 actually renders (`docker compose config`), not its own reading of `.env`;
 it starts exactly the configuration it checked (`.env`, no `--env-file`).
 The guard runs in `npm run stack:up`; a plain `docker compose up` does not
-run it. Only the actuator health endpoint SHALL be exposed.
+run it. Only the actuator health endpoint SHALL be exposed; the actuator root
+(`/actuator`) SHALL NOT list endpoints.
 
 #### Scenario: Default binding is loopback
 
 - **GIVEN** `compose.yaml` with no overrides
 - **WHEN** its published ports are read
-- **THEN** every published port binds `${DOUCKO_BIND_ADDRESS:-127.0.0.1}` and the database service publishes none
+- **THEN** every published port binds `${DOUCKO_BIND_ADDRESS:-127.0.0.1}`, the frontend publishes one, and the backend and database services publish none
 
 #### Scenario: Public bind address refused
 
@@ -32,8 +33,26 @@ run it. Only the actuator health endpoint SHALL be exposed.
 
 #### Scenario: Only health is exposed
 
-- **WHEN** `/actuator/modulith`, `/actuator/info` or `/actuator/env` is requested
-- **THEN** the answer is 404, and `/actuator/health` answers 200
+- **WHEN** `/actuator`, `/actuator/modulith`, `/actuator/info` or `/actuator/env` is requested
+- **THEN** the answer is 404 (problem+json for `/actuator`), and `/actuator/health` answers 200
+
+### Requirement: DNS rebinding refused
+
+The backend SHALL answer only requests whose Host is `localhost`, a bare
+IPv4 address or the Compose service name `backend`; any other Host SHALL get
+400 problem+json titled from the catalog (NFR-2). A web page on a domain that
+an attacker points at the laptop then cannot script the unauthenticated child
+API. The frontend's nginx applies the same rule (421) in front of it.
+
+#### Scenario: Allowed hosts
+
+- **WHEN** an undeclared path is requested with Host `localhost`, `127.0.0.1`, `192.168.1.20:8081` or `backend:8080`
+- **THEN** the answer is the ordinary 404 problem+json
+
+#### Scenario: Rebound name refused
+
+- **WHEN** a request carries Host `evil.example`, `127.0.0.1.evil.example`, `localhost.evil.example` or `backend.evil.example`
+- **THEN** the answer is 400 problem+json titled "Bad request"
 
 ### Requirement: Data volume and backup
 
@@ -103,7 +122,9 @@ No request body, query-string or header value SHALL appear in the backend's
 logs at any log level (NFR-3), including a body an endpoint binds, and startup
 SHALL log no credential. The loggers that print request or bind content below
 INFO (Spring web and security, Tomcat, Hibernate/JDBC bind values) are capped
-at INFO by the logging configuration whatever `logging.level.*` says.
+at INFO by the logging configuration whatever `logging.level.*` says, and
+Tomcat's HTTP/1.1 parser loggers, which print a malformed request line at
+INFO, are capped at WARN.
 
 #### Scenario: Nothing leaks even at TRACE
 
@@ -123,6 +144,11 @@ at INFO by the logging configuration whatever `logging.level.*` says.
 - **WHEN** application code, a Spring web logger and a Spring security logger each log a sentinel at DEBUG
 - **THEN** the capture contains the application's line and neither Spring line (negative control)
 
+#### Scenario: Malformed request line
+
+- **WHEN** a request line whose target holds an invalid character carries a sentinel in its query
+- **THEN** the answer is 400 and the captured log output does not contain the sentinel
+
 #### Scenario: No generated password
 
 - **WHEN** the application starts
@@ -136,8 +162,12 @@ test SHALL fail on any unlisted file, any other origin, any listed file that
 does not exist or is not a fixture path, and any malformed manifest row
 (NFR-4, CA-D21). In scope: every file under `src/` except Kotlin sources,
 everything under `fixtures/`, and every image, document, audio or video
-file anywhere in git. Exempt: `application.yaml`, `logback-spring.xml`, the
-message catalog, and Flyway migrations without data statements (pure DDL).
+file anywhere in git, `docs/qa/` included except the recordings
+(`results[].video` .webm, `results[].screenshot` .png) that a
+`docs/qa/**/manifest.json` lists. File names are read exactly (no quoting of
+non-ASCII names). Exempt: `application.yaml`, `logback-spring.xml`, the
+message catalog, and Flyway migrations with no data statement (`INSERT
+INTO`, `COPY`, `UPDATE … SET`, `MERGE INTO`) anywhere outside comments.
 
 #### Scenario: Unlisted fixture fails the check
 

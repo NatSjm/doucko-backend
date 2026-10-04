@@ -43,3 +43,7 @@ management:
       exposure:
         # NFR-2: only the compose healthcheck needs actuator; nothing else is reachable from the LAN.
         include: health
+      # The /actuator root would list the exposed endpoints as HAL JSON; off, it is an undeclared
+      # path like any other (404 problem+json).
+      discovery:
+        enabled: false

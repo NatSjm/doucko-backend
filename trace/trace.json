@@ -784,6 +784,7 @@
       "ownedHere": true,
       "tests": [
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
+        "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/platform/DockerContextTest.kt",
         "src/test/kotlin/cz/doucko/shared/RequestContentNotLoggedTest.kt",
         "src/test/kotlin/cz/doucko/shared/RequestContentNotLoggedTest.kt",
@@ -798,6 +799,9 @@
       ],
       "ownedHere": true,
       "tests": [
+        "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+        "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+        "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
         "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
         "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
         "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt"

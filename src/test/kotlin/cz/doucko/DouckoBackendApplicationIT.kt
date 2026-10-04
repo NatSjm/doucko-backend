@@ -91,9 +91,42 @@ class DouckoBackendApplicationIT {
     @Test
     fun `only the health endpoint of actuator is reachable`() {
         mvc.get("/actuator/health").andExpect { status { isOk() } }
-        for (path in listOf("/actuator/modulith", "/actuator/info", "/actuator/env", "/actuator/httpexchanges")) {
+        for (path in listOf(
+            "/actuator",
+            "/actuator/",
+            "/actuator/modulith",
+            "/actuator/info",
+            "/actuator/env",
+            "/actuator/httpexchanges",
+        )) {
             mvc.get(path).andExpect { status { isNotFound() } }
         }
+        // The discovery root lists no endpoints and is an ordinary undeclared path: 404 problem+json.
+        val root = get("/actuator")
+        root.statusCode() shouldBe 404
+        root.headers().firstValue("Content-Type").orElse("") shouldStartWith "application/problem+json"
+    }
+
+    // @trace NFR-3
+    @Test
+    fun `a malformed request line is refused without logging its target or query`(output: CapturedOutput) {
+        val secret = "SEKRET-${System.nanoTime()}"
+        val status =
+            java.net.Socket("localhost", port).use { socket ->
+                // '{' is not allowed in a request target, so Tomcat rejects the line before Spring sees it.
+                socket.getOutputStream().write(
+                    "GET /api/child/x?token=$secret{ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".toByteArray(),
+                )
+                socket
+                    .getInputStream()
+                    .readAllBytes()
+                    .toString(Charsets.UTF_8)
+                    .substringAfter(' ')
+                    .substringBefore(' ')
+                    .toInt()
+            }
+        status shouldBe 400
+        output.all shouldNotContain secret
     }
 
     // @trace NFR-9

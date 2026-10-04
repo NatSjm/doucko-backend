@@ -1,0 +1,1021 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-04T12:08:52.515Z",
+  "finishedAt": "2026-10-04T12:15:32.095Z",
+  "args": {
+    "scope": "slice 1 platform-foundation (backend): openspec/changes/implement-platform-foundation-api",
+    "baseRef": "6e13f53",
+    "headRef": "HEAD",
+    "focus": "Check against the change's spec delta (openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md) and the store specs admin-access ('Database not published') and content-authoring (CA-D21). Pay attention to: tools/stack.mjs --check-bind accepting anything outside loopback/RFC 1918 (IPv6 forms, IPv4-mapped, leading zeros, hostnames, 0.0.0.0 spellings); compose.yaml ports that bypass DOUCKO_BIND_ADDRESS; backup/restore writing inside a repository, leaking the DB password on the command line or in logs, or restore destroying data without a guard; any path where request body, query or headers reach logs (filters, actuator httpexchanges, Spring debug settings); the security config leaving /api/admin/** or actuator endpoints open; undeclared paths returning anything other than problem+json without driver internals; FixtureProvenanceTest missing fixture roots; the Dockerfile and .dockerignore copying .env or secrets; the .editorconfig ktlint package-name rule disabled. Also review the DNS-rebinding fix (commit 5bf3df9): the StrictHttpFirewall host allowlist (localhost, bare IPv4, backend) and its 400 problem+json, and compose.yaml no longer publishing the backend port. Report only defects in shipped behaviour or tests that can pass while the spec is violated by ordinary use.",
+    "change": "implement-platform-foundation-api"
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": null,
+    "budgetPerAgentUsd": 2,
+    "maxTotalUsd": 15,
+    "untypedTools": "Read,Grep,Glob,Write,Bash",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 6.6844,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 1788,
+      "durationMs": 200347,
+      "sessionId": "410cd0bd-095e-4760-aad5-faefa76b9bdb",
+      "costUsd": 0.8372265999999999,
+      "numTurns": 13,
+      "result": {
+        "findings": [
+          {
+            "title": "Actuator discovery root /actuator stays exposed and answers 200 HAL JSON, not 404 problem+json",
+            "file": "src/main/resources/application.yaml",
+            "line": 45,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "`management.endpoints.web.exposure.include: health` limits which endpoints are exposed, but it leaves `management.endpoints.web.discovery.enabled` at its default (true). So `GET /actuator` returns 200 with an `application/vnd.spring-boot.actuator.v3+json` `_links` document. The spec says only the health endpoint is exposed and that any undeclared path is 404 problem+json. The IT test `only the health endpoint of actuator is reachable` checks only /actuator/modulith, /info, /env and /httpexchanges, so it passes while this violation ships. Similar gap: /actuator/health/<component> is refused by actuator itself with an empty-body 404, not problem+json.",
+            "suggestion": "Set `management.endpoints.web.discovery.enabled: false`. Add `/actuator` (and e.g. `/actuator/health/db`) to the IT test, and check the problem+json content type and catalog title as well as the status."
+          },
+          {
+            "title": "FixtureProvenanceTest exempts docs/qa/ wholesale, so screenshots or PDFs there skip the 'any media file anywhere in git' rule",
+            "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+            "line": 22,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "`val OUT_OF_SCOPE = listOf(\"contract/\", \"target/\", \"node_modules/\", \"docs/qa/\")` is checked first in `inScope`, so `docs/qa/evidence/page.png` returns false before the MEDIA rule runs. The spec delta puts in scope \"every image, document, audio or video file anywhere in git\" and lists no docs/qa exemption. QA evidence screenshots are exactly where workbook pages or the child's data (NFR-3/NFR-4) would end up, and the test stays green.",
+            "suggestion": "Remove `docs/qa/` from OUT_OF_SCOPE, or apply only the MEDIA rule to it. Add a case such as `docs/qa/evidence/shot.png` to the negative test."
+          },
+          {
+            "title": "git ls-files output is C-quoted for non-ASCII names, so Czech-named fixtures are silently dropped from the provenance check",
+            "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+            "line": 77,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "`git ls-files --cached --others --exclude-standard` prints names with non-ASCII bytes as `\"fixtures/\\303\\272loha.png\"` under the default `core.quotePath=true`. `gitFiles()` then applies `out.filter { File(it).isFile }`, which drops those quoted strings because no such file exists. A file named with Czech diacritics (e.g. `úloha.pdf`) is never checked, and the test passes with workbook content committed.",
+            "suggestion": "Run `git -c core.quotePath=false ls-files -z ...` and split on NUL. Fail, rather than filter, when a listed path does not exist on disk."
+          },
+          {
+            "title": "Migration 'pure DDL' exemption only spots INSERT/COPY/UPDATE at line start",
+            "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+            "line": 25,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`Regex(\"\"\"(?im)^\\s*(insert|copy|update)\\b\"\"\")` misses data written as `CREATE TABLE t(x text); INSERT INTO t ...` on one line, `WITH s AS (...) INSERT ...`, `MERGE`, and `CREATE TABLE ... AS SELECT/VALUES`. A seed migration written in any of these forms counts as exempt DDL, so answer keys can enter a migration without a provenance row.",
+            "suggestion": "Match the data keywords at any statement boundary (`(^|;)\\s*(with|insert|copy|update|merge)\\b`) and also look for `VALUES`/`AS SELECT`. Simpler: treat every migration as in scope unless it is explicitly allowlisted."
+          },
+          {
+            "title": "Tomcat logs the raw request target (query string included) at INFO when a request line has an invalid character, and the INFO cap does not stop it",
+            "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+            "line": 41,
+            "severity": "major",
+            "confidence": "low",
+            "evidence": "The guard denies only levels below INFO for `org.apache.coyote`. When a query contains characters outside Tomcat's relaxedQueryChars, Tomcat's Http11Processor logs `Error parsing HTTP request header` at INFO for the first occurrence. Browsers leave `{`, `|` and `}` unencoded in queries. The nested IllegalArgumentException message `Invalid character found in the request target [...]` contains the target and its query. That puts request content in the log at the configured level (NFR-3). The same request also gets Tomcat's own 400 rather than problem+json. The tests use MockMvc and a well-formed HttpClient, so they never exercise this path.",
+            "suggestion": "Cap `org.apache.coyote.http11` (or all of `org.apache.coyote`) at WARN in the guard, or set `org.apache.juli.logging.UserDataHelper.CONFIG=NONE`. Add a raw-socket IT case that sends a sentinel in an invalid query and checks it does not appear in CapturedOutput."
+          },
+          {
+            "title": "JDBC bind-value logger of Spring JDBC not covered by the guard",
+            "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+            "line": 46,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "GUARDED covers Hibernate's `org.hibernate.orm.jdbc.bind` and `org.postgresql`. It does not cover `org.springframework.jdbc`, whose `StatementCreatorUtils` logs every bound parameter value at TRACE (`Setting SQL statement parameter value: ... parameter value [...]`). The spec says the 'Hibernate/JDBC bind values' loggers are capped. Any JdbcTemplate/JdbcClient use (including in later slices) would log answers at TRACE, and the TRACE test, which never touches the database, cannot catch it.",
+            "suggestion": "Add `org.springframework.jdbc` (and `org.springframework.orm`) to GUARDED."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 1816,
+      "durationMs": 191868,
+      "sessionId": "cee3fade-eb4b-4101-b854-d23999392b9a",
+      "costUsd": 0.849893,
+      "numTurns": 12,
+      "result": {
+        "findings": [
+          {
+            "title": "FixtureProvenanceTest skips every file under docs/qa/, so screenshots and recordings can be committed there without failing the check",
+            "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+            "line": 22,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "The spec delta covers 'every image, document, audio or video file anywhere in git', but `OUT_OF_SCOPE` contains \"docs/qa/\". `inScope()` returns false for those paths before it ever reaches the `MEDIA` check. docs/qa/evidence/ is where this harness writes slice evidence (slice1-compose-smoke.md, review-fixes). Suppose an agent or developer saves a UI screenshot there, e.g. docs/qa/evidence/slice2-practice.png showing a workbook page or the child's name. The provenance test stays green and the CA-D21 / NFR-3 / NFR-4 guard is bypassed in exactly the folder where screenshots are most likely to be saved.",
+            "suggestion": "Exempt only the generated text reports under docs/qa (for example *.md, *.json and *.jsonl there). Keep the MEDIA rule for every path except contract/, target/ and node_modules/. Add a case with `docs/qa/evidence/shot.png` to the 'unlisted fixture … fails' test."
+          },
+          {
+            "title": "Tomcat logs a rejected request target, query string included, at INFO, which the log guard lets through",
+            "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+            "line": 24,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The guard only drops events below INFO (`!level.isGreaterOrEqual(Level.INFO)`). Tomcat's Http11Processor logs the first request-line parse failure in each suppression window at INFO, as 'Error parsing HTTP request header … Invalid character found in the request target [<path>?<query>]'. The WHATWG URL rules do not percent-encode `{ } | ^ \\ `` ` in a query, so a browser fetch such as `?answer=a|b` from the child UI, or a request from any LAN client, puts the raw query value in the backend log. RequestContentNotLoggedTest only sends a sentinel made of legal characters, so it passes while this NFR-3 path stays open. The response is also Tomcat's own 400 rather than problem+json.",
+            "suggestion": "Cap org.apache.coyote.http11.Http11Processor (or all org.apache.coyote) at WARN in the guard, or set `server.tomcat.relaxed-query-chars` and handle the input in the app. Add a raw-socket test case that sends a sentinel containing `|` in the query and asserts the captured output does not contain it."
+          },
+          {
+            "title": "The provenance test's scope classifiers miss common document types and data-bearing migrations",
+            "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+            "line": 25,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`DATA_STATEMENT` only matches `insert|copy|update` at the start of a line. A seed migration written as `WITH s AS (...) INSERT INTO task ...`, `MERGE INTO …`, `DO $$ BEGIN INSERT …`, or `CREATE TABLE …; INSERT …` on one line is treated as pure DDL and exempted, so workbook task text or answer keys in a Flyway migration pass the CA-D21 check. Outside src/ and fixtures/, `MEDIA` (line 21) also misses document and archive formats such as rtf, pptx/odp, epub, djvu, zip and the backup format `.dump`. A `git add -f` of a backup or a workbook archive therefore goes unflagged.",
+            "suggestion": "Match data statements anywhere in a statement, e.g. `(?i)\\b(insert\\s+into|copy\\s+\\w+\\s+from|merge\\s+into|update\\s+\\w+\\s+set)\\b`. Extend MEDIA with rtf, pptx, ppt, odp, epub, djvu, zip, 7z and dump. Add both to the negative test."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 1759,
+      "durationMs": 187554,
+      "sessionId": "0632ee05-83ee-45a5-9a99-a2fbcff8fe62",
+      "costUsd": 0.8472808,
+      "numTurns": 14,
+      "result": {
+        "findings": [
+          {
+            "title": "Coverage summary: 21 scenarios: 18 implemented, 3 partial, 0 missing, 0 contradicted",
+            "file": "openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md",
+            "line": 1,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "Checked 16 delta scenarios, plus admin-access 'Local network only' (3: Default binding is loopback, Configured LAN address, Database not published) and content-authoring CA-D21 (2). Implemented: bind checks (BindAddressTest, tools/lib/compose.mjs:33-42, publishedPortProblems uses `docker compose config`), compose ports (only frontend publishes, on ${DOUCKO_BIND_ADDRESS:-127.0.0.1}; db and backend publish nothing), backup/restore (BackupRestoreIT, 4 tests; OperatorToolGuardTest, 3 tests), admin 403, undeclared 404, firewall 400, no generated password, actuator 404s. Partial: Container-level errors, Nothing leaks even at TRACE / configured levels, Every fixture has a self-authored provenance entry (see the findings below). No password on any command line (restore and backup use `docker compose exec` without credentials); the Dockerfile COPYs only pom/.mvn/contract/api/src/main, and .dockerignore excludes **/.env*. The ktlint package-name rule is turned off only under adapter/in/**.",
+            "suggestion": "No action. This entry is the coverage summary."
+          },
+          {
+            "title": "Tomcat-level URL rejections bypass the problem+json path, and Tomcat logs the raw request target at INFO, which the log guard lets through",
+            "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+            "line": 22,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "Spec: 'A request to a path the contract does not declare SHALL be answered 404 ... problem+json ... A URL the security firewall rejects SHALL be answered 400 problem+json' and 'No request body, query-string or header value SHALL appear in the backend's logs at any log level'. Code: the guard only denies events below INFO (`!level.isGreaterOrEqual(Level.INFO)`) for org.apache.coyote/catalina/tomcat. Tomcat rejects some request targets in the connector, before Spring Security or MVC run: raw `|`, `{`, `}`, `^`, `[`, `]`, `\\` in the query or path, and encoded `%2F`/`%5C`. Browsers do not percent-encode `|{}^[]\\` in query strings, and nginx forwards the request line unchanged. For these requests Tomcat answers with its own ErrorReportValve HTML 400, not problem+json from the catalog. Http11Processor also logs 'Error parsing HTTP request header … Invalid character found in the request target [<target incl. query>]' at INFO (the first occurrence, then DEBUG via UserDataHelper). An INFO line passes the guard, so query content reaches the log. RequestContentNotLoggedTest and UndeclaredPathTest use MockMvc only, and the real-port IT covers only `//`, `;` and `%2e%2e`. Tests can therefore pass while this path breaks the spec.",
+            "suggestion": "Add a real-port test that sends a raw request with `?q=a|SENTINEL` and with `%2F` in the path. Assert that the response is problem+json and that the sentinel is not in the captured output. Then fix it: set Tomcat's UserDataHelper log mode to quiet (`org.apache.tomcat.util.http.parser` / `-Dorg.apache.juli.logging.UserDataHelper.CONFIG=NONE`), or cap org.apache.coyote.http11 at WARN, and set `server.tomcat.relaxed-query-chars` / relaxed-path-chars (or a custom ErrorReportValve) so these requests reach the problem+json writer. If any case stays out of scope, amend the spec to say so."
+          },
+          {
+            "title": "FixtureProvenanceTest exempts all of docs/qa/, but the spec covers every image, document, audio or video file anywhere in git",
+            "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+            "line": 24,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "Spec delta: 'In scope: ... every image, document, audio or video file anywhere in git. Exempt: application.yaml, logback-spring.xml, the message catalog, and Flyway migrations without data statements'. CA-D21: 'exits non-zero for any fixture file that is missing from the manifest'. Code: `val OUT_OF_SCOPE = listOf(\"contract/\", \"target/\", \"node_modules/\", \"docs/qa/\")`, and inScope returns false for these prefixes before the MEDIA check. A screenshot or PDF committed under docs/qa/ (the evidence directory, where screenshots are most likely to land) passes the check. That is exactly the NFR-4/NFR-3 leak the check exists to catch, and the spec lists no such exemption. A smaller gap: DATA_STATEMENT `^\\s*(insert|copy|update)\\b` misses `MERGE` and CTE-prefixed `WITH … INSERT` seed migrations, so they count as pure DDL and are exempt.",
+            "suggestion": "Remove docs/qa/ from OUT_OF_SCOPE for MEDIA files, or keep it only for non-media files. If evidence media must be allowed, amend the spec and still require manifest rows for them. Add `merge` and `with` to DATA_STATEMENT, and add the matching cases to the 'unlisted fixture' test."
+          },
+          {
+            "title": "The DNS-rebinding Host allowlist and the unpublished backend port have no backing requirement in the spec delta",
+            "file": "src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt",
+            "line": 52,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "Commit 5bf3df9 adds `setAllowedHostnames { host -> host == \"localhost\" || host == \"backend\" || IPV4.matches(host) }`, which answers any other Host with 400 problem+json, and it stops publishing the backend port (compose.yaml, the backend service has no `ports`). This behaviour is user-visible: a LAN client that uses an mDNS or hostname URL gets a 400, and the API is reachable only through the frontend's nginx. It is recorded only in design.md decision 2a and the tasks.md 4.4 note. The spec delta still only says 'A URL the security firewall rejects SHALL be answered 400 problem+json' and has no requirement or scenario for a Host allowlist or for the backend staying unpublished. Also, IPV4 = `\\d{1,3}(\\.\\d{1,3}){3}` accepts any dotted quad, including 999.1.1.1 and public addresses. That is harmless against rebinding but is not what the KDoc says ('loopback or the LAN address').",
+            "suggestion": "Amend the spec delta, and the store admin-access spec through a docs-store change. Add a 'Foreign Host refused' requirement with the scenarios already tested in DouckoBackendApplicationIT (evil.example → 400 problem+json; localhost, 127.0.0.1, backend:8080 accepted), and a 'Backend port not published' scenario. Align the KDoc with the regex, or tighten the regex."
+          },
+          {
+            "title": "/actuator discovery root is still exposed although the spec says only health is",
+            "file": "src/main/resources/application.yaml",
+            "line": 44,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "Spec: 'Only the actuator health endpoint SHALL be exposed.' Code: `management.endpoints.web.exposure.include: health`. Boot's links endpoint `/actuator` stays enabled by default (management.endpoints.web.discovery.enabled=true), so it answers 200 with `_links`. The IT checks only modulith/info/env/httpexchanges, so `/actuator` is never tested.",
+            "suggestion": "Set `management.endpoints.web.discovery.enabled: false` and add `/actuator` to the 404 list in DouckoBackendApplicationIT. Otherwise amend the spec to allow the discovery page."
+          },
+          {
+            "title": "Task 4.4 smoke is ticked, but its evidence predates the compose change and uses the now-unpublished port 8080",
+            "file": "openspec/changes/implement-platform-foundation-api/tasks.md",
+            "line": 30,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "Task 4.4 [x]: 'curl http://127.0.0.1:8080/actuator/health → UP; curl -i http://127.0.0.1:8080/api/child/nope'. Evidence: docs/qa/evidence/slice1-compose-smoke.md, last touched in f553d30, before 5bf3df9. 5bf3df9 removed the backend's published port, and the added note only says 'a re-run of this smoke goes through the frontend'. Nothing shows that re-run happened, so the ticked smoke does not describe the configuration that ships (done-claims-need-evidence).",
+            "suggestion": "Re-run the smoke through 127.0.0.1:8081: `docker compose ps` should show only 127.0.0.1:8081 and healthy backend/db, and curl through nginx should return the 404 problem+json and the Host 400. Update slice1-compose-smoke.md, or untick 4.4 until that is done."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 2028,
+      "durationMs": 13402,
+      "sessionId": "ffff29df-60f0-4868-993c-6e4417584b4f",
+      "costUsd": 0.0834826,
+      "numTurns": 3,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "verify:src/main/resources/application.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1501,
+      "durationMs": 34316,
+      "sessionId": "f2fbbe8a-f0ae-4094-9f84-6194493ca9f8",
+      "costUsd": 0.1830226,
+      "numTurns": 10,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the mechanism. In application.yaml (lines 40-45), `management.endpoints.web.exposure.include: health` is the only actuator setting, so `management.endpoints.web.discovery.enabled` keeps its default of true. Nothing else blocks `/actuator`: SecurityConfiguration only denies `/api/admin/**` and permits every other request, and the StrictHttpFirewall only checks the Host header. A request to `GET /actuator` from localhost or a LAN IP therefore reaches Actuator's discovery handler and gets 200 with a HAL `_links` document (self, health, health-path). The IT test `only the health endpoint of actuator is reachable` (DouckoBackendApplicationIT.kt:92-97) never requests `/actuator` and only checks the status code, so it can't catch this. The change spec (openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md:13) says \"Only the actuator health endpoint SHALL be exposed\", and design.md:95 says any undeclared path gets 404 problem+json. The discovery root breaks both. The health/<component> point is also plausible: by default Actuator refuses an unshown component itself with a bare 404 and no body, so the problem+json mapping never runs. I didn't run the app to confirm that part. Severity: the discovery page only reveals links to health, which is already public, so nothing sensitive is exposed. This is a real spec and contract gap, but its security impact is low. I'd downgrade it from major to minor.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/application.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1534,
+      "durationMs": 28249,
+      "sessionId": "2a271603-2cb1-4db2-982f-9678cc2fa386",
+      "costUsd": 0.1375254,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism, but it does very little harm.\n\n**What the code shows**\n- `application.yaml:40-45` sets only `management.endpoints.web.exposure.include: health`. It never sets `management.endpoints.web.discovery.enabled`, so Spring Boot's default (`true`) applies.\n- `SecurityConfiguration.kt:65-67` does `authorize(\"/api/admin/**\", denyAll)` and then `authorize(anyRequest, permitAll)`. Nothing in security or any filter blocks `/actuator`.\n- With discovery left on and at least one endpoint exposed, Boot's `WebMvcEndpointHandlerMapping` registers the links handler at the base path. `GET /actuator` therefore returns 200 with `application/vnd.spring-boot.actuator.v3+json` and `_links` (`self`, `health`, `health-path`). It does not reach MVC's `NoResourceFoundException` path, which is the one that produces the catalog-titled 404 problem+json.\n- The comment at `SecurityConfiguration.kt:25` promises \"an undeclared path is 404 problem+json\", so this is a real deviation from the stated contract.\n- The IT test at `DouckoBackendApplicationIT.kt:92-94` checks only `/modulith`, `/info`, `/env` and `/httpexchanges`, so the test-coverage gap is real too.\n- The `/actuator/health/<component>` point also holds. With the default `show-components` setting, actuator's health endpoint returns its own empty-body 404, not problem+json.\n\n**Limits**\n- I did not run the app; the Testcontainers IT needs Docker. The conclusion rests on reading the code plus Spring Boot's documented default for discovery.\n\n**Exploitability**\n- Anyone on the LAN can reproduce it with one GET.\n- All it reveals is the actuator base path and the health link. The compose healthcheck already uses that path and it carries no sensitive data.\n- No other endpoint becomes reachable, and NFR-2's intent (only health reachable) still holds in substance.\n\nSo this is a valid spec-conformance and test-coverage defect, not a security exposure. \"major\" overstates it; minor fits better. The fix is still cheap and correct: set `discovery.enabled: false`, and add `/actuator` and `/actuator/health/db` to the IT with content-type and title assertions.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1283,
+      "durationMs": 25581,
+      "sessionId": "a7d8bc41-4605-47ae-ae27-5b5826c087df",
+      "costUsd": 0.2001356,
+      "numTurns": 10,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the finding in the code. In FixtureProvenanceTest.kt:22, OUT_OF_SCOPE includes \"docs/qa/\". At line 34, inScope returns false for any path with that prefix, and it does so before the `else -> path.matches(MEDIA)` branch on line 39. So `docs/qa/evidence/shot.png` is never checked against the manifest.\n\nThe spec (openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md:137-140) puts \"every image, document, audio or video file anywhere in git\" in scope. Its only exemptions are application.yaml, logback-spring.xml, the message catalog and pure-DDL migrations, with no docs/qa exemption. The test's own KDoc (lines 13-15) doesn't mention docs/qa either, so the code contradicts both the spec and its own documentation. The negative test (lines 95-121) has no docs/qa case, so nothing catches the gap.\n\nI looked for other guards:\n- The pre-commit content guard in factory.config.json refuses `.pdf` outside `fixtures/self-authored/`, so committed PDFs under docs/qa are blocked at commit time.\n- Only the PDF part is covered. PNG, JPG, WebP, SVG, DOCX, MP4 and WebM files under docs/qa (screenshots and recordings, the likeliest QA evidence) pass both the hook and this test.\n- The hook can be skipped with `--no-verify`, and the test is the gate that `verify` enforces.\n\nThe mechanism is real and reachable, so I'm keeping the severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1316,
+      "durationMs": 26887,
+      "sessionId": "1614a94a-bbab-48cf-9966-f124609e94ed",
+      "costUsd": 0.21495920000000002,
+      "numTurns": 10,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the problem in the code. At `FixtureProvenanceTest.kt:22`, `OUT_OF_SCOPE` contains `\"docs/qa/\"`. The first branch of `inScope` (line 34) returns false for any path starting with it, so the MEDIA catch-all on line 39 never runs. A tracked file such as `docs/qa/evidence/shot.png` is never reported as missing from the manifest.\n\nThe spec doesn't allow this exemption. `openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md:137-140` puts \"every image, document, audio or video file anywhere in git\" in scope. The only exemptions it lists are `application.yaml`, `logback-spring.xml`, the message catalog and pure-DDL migrations.\n\nI looked for anything else that would catch these files:\n- **Pre-commit hook:** `scripts/hooks-pre-commit.mjs` applies the `factory.config.json` `forbidden` rules. One rule blocks `\\.pdf$` outside `fixtures/self-authored/`, so a PDF under `docs/qa/` is stopped at commit time, but only locally and `--no-verify` skips it. No rule covers png, jpg, webp or other media, so a screenshot in `docs/qa/evidence/` passes the hook.\n- **CI:** CI runs the qa-verify battery, which includes `mvnw verify` and this test. Because the test exempts `docs/qa/`, CI does not catch these files either. CI only uploads `docs/qa/` as an artifact and never scans it.\n\nThe path is also realistic. `docs/qa/evidence/` already exists and holds slice evidence, and the factory's recording and visual-diff evidence is configured under `docs/qa/**` (`quality/telemetry.config.json`). Screenshots of workbook pages or of the child's data are exactly what would end up there.\n\nThe existing negative test has no `docs/qa/` case, so nothing exercises this hole. The finding is accurate on every point I checked.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1241,
+      "durationMs": 19833,
+      "sessionId": "c8515638-9ece-4b8b-b267-1e73cfa79c58",
+      "costUsd": 0.1285532,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism by reading the code. I could not run it: the sandbox blocked the git commands, so I couldn't check this machine's `core.quotePath` setting or test a non-ASCII filename. In FixtureProvenanceTest.kt:77, `gitFiles()` runs `git ls-files --cached --others --exclude-standard` without `-z` and without `-c core.quotePath=false`. Git's documented default (`core.quotePath=true`) prints any path with bytes above 0x80 as a C-quoted string with octal escapes, e.g. `\"fixtures/\\303\\272loha.pdf\"`, with the surrounding double quotes included. Line 80 then runs `out.filter { File(it).isFile }`. That quoted string is not a real path, so the file is silently dropped and never reaches `provenanceProblems`. Nothing else in the test re-adds it: the manifest loop only checks rows that are listed, and the 'not listed' check at line 72 only iterates the filtered `files`. An unlisted `fixtures/úloha.pdf` or `src/test/resources/stránka.png` would therefore pass the test. The filter also hides other cases, such as names containing a tab, a newline or quotes. Nothing in the repo appears to set quotePath=false for the test run, and CI/Surefire won't either by default. A machine-level `core.quotePath=false` could hide the bug on one dev box, but the test can't rely on that. Czech diacritics are a realistic filename case in this project (Czech workbook content, NFR-4), so 'major' is reasonable. The suggested fix is correct: use `-c core.quotePath=false ls-files -z` and split on NUL, and fail instead of filtering when a listed path is missing.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1274,
+      "durationMs": 36700,
+      "sessionId": "2be15222-d715-4673-83ac-f48d08da70e0",
+      "costUsd": 0.1970348,
+      "numTurns": 14,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this finding. The sandbox would not let me run git, so I could not reproduce it live. The conclusion rests on reading the code plus git's documented behaviour.\n\nHow it fails:\n- `gitFiles()` (FixtureProvenanceTest.kt:76-81) runs `git ls-files --cached --others --exclude-standard`. It sets no `-c core.quotePath=false` and no `-z`.\n- `core.quotePath` defaults to true. Nothing in the repo turns it off: there is no match for \"quotepath\" in the repo config files, hooks or scripts. The CI runner in `ci.yml` would also use git's defaults.\n- With that default, git wraps any path containing a byte ≥ 0x80 in double quotes and escapes it, so `fixtures/úloha.pdf` comes out as `\"fixtures/\\303\\272loha.pdf\"`.\n- `out.filter { File(it).isFile }` then drops that string, because no file has that literal name. It is removed before `provenanceProblems()` runs, so the \"not listed in PROVENANCE.md\" check never sees it.\n- The live test `this repository's fixtures all have self-authored provenance` only asserts `files.size > 0`, so it still passes.\n\nNo other check catches it:\n- The pre-commit hook (`scripts/hooks-pre-commit.mjs`) only scans staged text for secrets and skips binaries (`BINARY` regex). It does not check provenance or block PDFs or PNGs.\n- This test is the only automated NFR-4 / CA-D21 guard for media and fixtures.\n\nCan it happen for real? Yes. Czech diacritics in workbook-derived file names are plausible in this project (e.g. `úloha.pdf`, `cvičení.png`). The error is silent: a guard that should fail passes instead.\n\nThe finding's evidence and suggested fix are both right: use `-c core.quotePath=false` with `-z`, and fail on paths that are listed but missing rather than filtering them out. Severity stays major, since the copyright/PII guard (NFR-4) is bypassed silently. The confidence is medium only because I couldn't run git here; the quoting behaviour itself is well established.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1209,
+      "durationMs": 12070,
+      "sessionId": "b3f84c42-9d6c-4184-bc4f-a61049319d02",
+      "costUsd": 0.09956759999999999,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the finding. The pattern at FixtureProvenanceTest.kt:25 is `(?im)^\\s*(insert|copy|update)\\b`. Because of the `m` flag, `^` matches only at the start of a line. That means:\n- `CREATE TABLE t(x text); INSERT INTO t VALUES ...` written on one line does not match: INSERT comes after `;`, not at the start of the line.\n- `MERGE INTO ...` does not match at all.\n- `CREATE TABLE t AS VALUES/SELECT ...` does not match.\n- `WITH s AS (...) INSERT ...` on one line does not match.\n\nAt line 36, `inScope` returns false for a migration whose content doesn't match. Such a migration is treated as exempt DDL, so line 72 never asks for a manifest row.\n\nNothing else covers this gap: the .githooks have no migration or INSERT check, and the unit test at line 110 only covers the case where INSERT starts a line.\n\nThis is only a heuristic gap in a test-time guard, and the attack needs an unusually written seed migration, so \"minor\" is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1242,
+      "durationMs": 14173,
+      "sessionId": "9fb0ce02-f1c7-46b0-9c84-e9e9deefcfc4",
+      "costUsd": 0.0973312,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. At FixtureProvenanceTest.kt:36, a Flyway migration counts as in scope only when `DATA_STATEMENT.containsMatchIn(...)` finds a match. The pattern `(?im)^\\s*(insert|copy|update)\\b` matches only when the keyword starts a line, apart from leading whitespace. Each of these would be treated as exempt pure DDL, so no provenance row would be required:\n- `CREATE TABLE t(x text); INSERT INTO t VALUES (...)` on one line (after `;` the next character is a space, not a line start)\n- `WITH s AS (...) INSERT ...` on one line\n- `MERGE INTO ...`\n- `CREATE TABLE t AS VALUES/SELECT ...`\n- `INSERT` written after a block comment on the same line\n\nNothing else guards this. No other check scans migration content, and the unit test (line 110) only covers the case where INSERT starts a line. The only migration file today is `.gitkeep`, so nothing slips through yet. But this is a guard for future seed migrations, and a single-line CTE or MERGE seed is a realistic way to write one.\n\nOn exploitability: this is a developer-process control for NFR-4 / CA-D21, not something a runtime attacker can reach. The bypass would happen by accident or carelessness, not as an attack. Also, a provenance row only records where content came from and never inspects the content itself, so the real-world impact is limited. Minor severity is the right level.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1629,
+      "durationMs": 40463,
+      "sessionId": "4e3ed39d-a676-4184-8487-bd44f64b5608",
+      "costUsd": 0.1660134,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the mechanism.\n\n1. **The guard lets INFO through.** `RequestContentLogGuard.decide` only DENYs when the level is below INFO (`!level.isGreaterOrEqual(Level.INFO)`). Nothing else touches Tomcat's INFO logs: `logback-spring.xml` only adds the turbo filter and includes Boot's `base.xml`.\n\n2. **Nothing reconfigures Tomcat.** `application.yaml` has no `server.tomcat.relaxed-query-chars`. `src/main` has no `TomcatConnectorCustomizer` or `WebServerFactoryCustomizer`, and `org.apache.juli.logging.UserDataHelper.CONFIG` is never set. So Tomcat keeps its defaults: strict query characters and UserDataHelper mode INFO_THEN_DEBUG.\n\n3. **Tomcat logs the target at INFO.** In Tomcat, `Http11InputBuffer.parseRequestLine` throws `IllegalArgumentException(sm.getString(\"iib.invalidRequestTarget\", <target>))` when a query character is not allowed. That message embeds the raw request target, query string included. `Http11Processor.service` catches it and calls `userDataHelper.getNextMode()`. The first occurrence is logged with `log.info(\"Error parsing HTTP request header ... Note: further occurrences ... DEBUG\", t)` on the logger `org.apache.coyote.http11.Http11Processor`. Because the throwable is attached, Logback prints the exception message, and with it the target. The guard prefix-matches `org.apache.coyote`, but INFO is not below INFO, so the result is NEUTRAL and the line is written at Boot's default root level of INFO.\n\n4. **Browsers really send these characters.** Under the WHATWG URL spec the query percent-encode set does not include `{`, `|` or `}`, so browsers send them raw. Tomcat rejects them by default. Clients like curl send whatever they are given.\n\n5. **The tests don't cover it.** The tests named in the finding use MockMvc or well-formed clients, so none of them reach the connector's request-line parser.\n\n**Why I downgraded it:** INFO_THEN_DEBUG logs at INFO only once per suppression window (24h by default), then drops to DEBUG, which the guard does deny. The leak also needs PII or child content in a query string with an invalid character. Each such incident is a real NFR-3 breach, but it is bounded, so major overstates it a little.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1662,
+      "durationMs": 37916,
+      "sessionId": "91e9b4e7-6fc9-4596-bc8c-7538d9e102b7",
+      "costUsd": 0.1605942,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism holds up. `RequestContentLogGuard.decide` (line 24) only DENYs a guarded logger when the level is below INFO. An INFO event from `org.apache.coyote.http11.Http11Processor` therefore returns NEUTRAL and gets logged. I found nothing in `src/main/resources` that changes this: no `relaxedQueryChars`, no `server.tomcat.*` and no UserDataHelper config.\n\nHere is the Tomcat path, as I know Tomcat's source; I couldn't open the jar because I wasn't given permission to read `~/.m2`. `Http11InputBuffer.parseRequestLine` finds a query char that is not allowed (`{`, `|`, `}` and so on). It throws `IllegalArgumentException(sm.getString(\"iib.invalidRequestTarget\", invalidRequestTarget))`, which reads \"Invalid character found in the request target [<full target incl. query>]\". `Http11Processor.service` catches it. Under UserDataHelper's default INFO_THEN_DEBUG mode it calls `log.info(\"Error parsing HTTP request header …\", t)` for the first occurrence in each suppression window. Spring Boot bridges JUL into Logback, so the throwable's message, and with it the raw query, is written at INFO. Spring Boot apps commonly show this exact log line in production, so it is not hypothetical.\n\nAnyone can reproduce it with a single `curl 'http://host/api/x?q={secret}'` or a raw socket. The MockMvc and HttpClient tests never parse a raw request line, so they don't cover this path. Tomcat also answers with its own 400 page, not problem+json.\n\nI'm recommending a downgrade for exploitability. An attacker who does this only puts their own bytes in the log. They can't pull another user's data through this path. For a real child's data to leak, the app's own frontend would have to put user content in a query string with unencoded `{|}`. Standard fetch/URLSearchParams encodes those characters. The rate limiting also means the default mode logs at INFO only once per window. So this is a real, reproducible gap in the NFR-3 guard's coverage, but it is not a major PII exposure for real users.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1204,
+      "durationMs": 15072,
+      "sessionId": "d2737975-174e-4e32-9d69-e9dea73fd12d",
+      "costUsd": 0.09087640000000001,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The guard list at RequestContentLogGuard.kt:34-47 is quoted correctly: it doesn't include `org.springframework.jdbc`. spring-jdbc is on the classpath through spring-boot-starter-data-jpa. But no code path in this repo reaches `StatementCreatorUtils`. A search for JdbcTemplate, JdbcClient and NamedParameterJdbc across the repo found nothing. Persistence goes through Spring Data JPA/Hibernate, which binds parameters with its own binders and logs them under `org.hibernate.orm.jdbc.bind` and `org.hibernate.type`, and both are guarded. Flyway runs migrations on plain JDBC, not on JdbcTemplate. The PgJDBC driver's own loggers fall under `org.postgresql`, which is guarded. So in today's code, turning on TRACE for `org.springframework.jdbc` can't log any answers. The finding admits this by pointing at \"later slices\", which makes it a possible future gap, not a correctness bug in this code. The doc comment says \"Hibernate/JDBC bound parameter values\", and that is accurate for the binders the app actually uses. Adding `org.springframework.jdbc` would be cheap hardening, but the claimed leak doesn't happen in the current code.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1237,
+      "durationMs": 11673,
+      "sessionId": "cb97211b-cd8e-4dc7-937b-73b21ebf3daf",
+      "costUsd": 0.0767086,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "I read the guard at RequestContentLogGuard.kt:34-47. It's true that `org.springframework.jdbc` is not in GUARDED. But nothing in this repo can reach the logger the finding names. I searched `src/**` and `pom.xml` for JdbcTemplate, JdbcClient, NamedParameterJdbc and spring-jdbc and found no matches. `StatementCreatorUtils` only logs parameter values when a JdbcTemplate or JdbcClient binds them. Persistence here goes through Hibernate/JPA, which binds through its own `org.hibernate.orm.jdbc.bind` logger, and that logger is guarded. Flyway runs append-only DDL with no user-supplied bind values. So no request content can reach an unguarded Spring JDBC logger in the current code. Two more things would have to happen first: an operator would have to set `logging.level.org.springframework.jdbc=TRACE`, and a future slice would have to add JdbcTemplate usage. The finding itself says \"including in later slices\", which makes this a speculative hardening suggestion rather than a bug that can be reproduced. It's still a reasonable thing to add if a later slice brings in JdbcTemplate, but it can't happen for any user or attacker today.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1570,
+      "durationMs": 25144,
+      "sessionId": "3987b040-4ae7-4f0b-a0bb-5f4e63b4920b",
+      "costUsd": 0.1645648,
+      "numTurns": 12,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the problem in the code. In FixtureProvenanceTest.kt:22, `OUT_OF_SCOPE` includes \"docs/qa/\". At line 34, `inScope()` returns false for any path with that prefix, and it does this before the `else -> path.matches(MEDIA)` branch at line 39. So a file like docs/qa/evidence/shot.png is never checked against the manifest. That breaks the test's own KDoc, which says the scope includes \"every image, document, audio or video file anywhere in git\".\n\nI looked for anything else that would catch these files:\n- The pre-commit hook (scripts/hooks-pre-commit.mjs, plus the `forbidden` list in factory.config.json) only blocks `.pdf` outside fixtures/self-authored/, and runtime-data folders such as uploads/, storage/, pgdata/ and backups/.\n- Its BINARY regex is only used to skip the secret scan, not to block files.\n- So PNG, JPG, WEBP, MP4 and WEBM files in docs/qa/ are not caught by the hook either. The hook can also be bypassed, while this test is the guard that runs in CI.\n\nRight now docs/qa holds only .md, .json and .gitkeep files: evidence/slice1-*.md, workflow-args/*.json and the reports. That matches the reason the exemption exists: generated text reports. Media files there are not exempted on purpose by anything else.\n\nThe bypass therefore works, and it is in the folder where evidence such as screenshots is likely to be saved. Narrowing the exemption to text extensions under docs/qa is the right fix. I'm keeping the severity at major because this is a guard gap, not an actual leak: no media files are in docs/qa today.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1603,
+      "durationMs": 36703,
+      "sessionId": "b8102d98-7c23-4ce3-82b7-a57b2ea8ec96",
+      "costUsd": 0.1795384,
+      "numTurns": 12,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed. Line 22 has `OUT_OF_SCOPE = listOf(\"contract/\", \"target/\", \"node_modules/\", \"docs/qa/\")`. In `inScope()` (line 34) that prefix check returns false before the `else -> path.matches(MEDIA)` branch is reached. So any docs/qa/**/*.png|jpg|webm|mp4|… file is never checked, which goes against the class KDoc's own claim of \"every image, document, audio or video file anywhere in git\". `gitFiles()` uses `git ls-files --cached --others --exclude-standard`, and .gitignore does not exclude media under docs/qa, so such a file would be listed and then silently skipped.\n\nI looked for a guard somewhere else and found none that covers it. `.githooks/pre-commit` runs `scripts/hooks-pre-commit.mjs`. Its BINARY regex only skips the secret scan for those files. The `factory.config.json` \"forbidden\" rules block only `*.pdf` outside fixtures/self-authored/ and runtime-data folders (uploads/, storage/, pgdata/, backups/, dumps). PNG, JPG, WebM and MP4 under docs/qa/ are not blocked anywhere.\n\ndocs/qa/evidence/ already exists and holds slice evidence (slice1-compose-smoke.md, slice1-review-fixes.md), so it is the natural place for an agent or developer to drop a UI screenshot or recording. That screenshot could show workbook content or the child's name, which is exactly what NFR-3/NFR-4 forbid. The provenance test stays green.\n\nOne small point against the finding: a PDF under docs/qa/ would still be stopped by the pre-commit forbidden rule. Images and video would not. The problem is a gap in a compliance guard, not something an outside attacker can exploit, but the scenario is realistic for how this harness is used. The suggested fix (exempt only the generated text reports under docs/qa/ and keep the MEDIA rule there) is right. Severity stays as reported.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1663,
+      "durationMs": 35483,
+      "sessionId": "49af393f-6eef-4c80-a6f7-30017b4a10f5",
+      "costUsd": 0.14648519999999998,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the finding. The code works the way the finding describes.\n\n1. **The guard only blocks levels below INFO.** At `RequestContentLogGuard.kt:24` the filter returns DENY only when the level is not at least INFO and the logger is guarded. `org.apache.coyote` is guarded, but an INFO event from it still gets NEUTRAL and is logged. Neither `application.yaml` nor `logback-spring.xml` raises `org.apache.coyote` above INFO.\n\n2. **Tomcat logs the rejected request at INFO.** I'm relying on what I know of Tomcat's source here. I couldn't open the local Tomcat jar because permission to read `~/.m2` was denied, and I didn't run a test.\n   - `Http11Processor.service()` catches the parse failure. It logs it through `UserDataHelper`, whose default mode is INFO_THEN_DEBUG: the first failure in each 24h window is logged at INFO with the exception, as `log.info(\"Error parsing HTTP request header…\", t)`.\n   - The exception comes from `Http11InputBuffer.parseRequestLine`. When a query character fails `httpParser.isQueryRelaxed(chr)`, it throws `IllegalArgumentException(sm.getString(\"iib.invalidRequestTarget\", parseInvalid(...)))`. That message reads \"Invalid character found in the request target [{0}]\", and `{0}` is the raw target including the query.\n   - Spring Boot sends JULI/JUL output to SLF4J/Logback, so this event reaches the turbo filter at INFO and gets through.\n\n3. **Clients can reach this path.** The WHATWG query percent-encode set leaves `|`, `{`, `}`, `^` and the backtick unencoded. Any LAN client sending a raw request line can hit it too, so the path doesn't depend on how the frontend encodes queries.\n\n4. **Nothing else stops it.** No `server.tomcat.relaxed-query-chars` setting exists. As described, the existing test's sentinel uses only legal characters, so it wouldn't catch this. The response is also Tomcat's own 400, not problem+json.\n\nThe impact is limited: the INFO line appears once per 24h window (later failures drop to DEBUG, which the guard blocks), and it is only an NFR-3 risk if the query carries PII. Minor severity fits.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1696,
+      "durationMs": 36993,
+      "sessionId": "c78f0189-e774-47bf-b508-fc59d832c313",
+      "costUsd": 0.1556502,
+      "numTurns": 9,
+      "result": {
+        "refuted": true,
+        "reasoning": "The logging mechanism is real, but the leak the finding describes doesn't happen.\n\nWhat holds up:\n- `RequestContentLogGuard.kt:24` only drops guarded events below INFO.\n- Tomcat's Http11Processor logs the first request-line parse failure at INFO (UserDataHelper's INFO_THEN_DEBUG mode), and that message includes the rejected request target.\n- Nothing sets `relaxed-query-chars`.\n\nWhat doesn't hold up:\n- **No child endpoint takes a query parameter.** In `contract/api/openapi.yaml` the only `in: query` parameters are on admin-session endpoints: task list filters including `q`, preview `locale`, stats `weeks` and flag-queue `status`. Answers are not sent in a query, so the claimed browser fetch `?answer=a|b` from the child UI does not exist in this API.\n- **None of these values is child PII.** The only free-text parameter is the admin's search `q` over Czech task prompts, and the rest are enums or integers. NFR-3 is about the child's personal data.\n- **The \"any LAN client\" case leaks nothing.** That client can only get its own chosen bytes into the log. That is self-injection, not exposure of someone else's data.\n- **Real clients encode these characters.** Clients built with URLSearchParams, encodeURIComponent or a generated client percent-encode `| { } ^ \\ \\``. A raw `|` only reaches Tomcat if someone hand-concatenates a URL or uses a raw socket.\n- **The 400 being Tomcat's own response rather than problem+json** concerns malformed request lines that never reach the app. It is not part of NFR-3.\n\nLimits of this check: I could not open the frontend source or the local Tomcat jar (permission was denied), so I did not confirm the frontend's encoding or Tomcat's exact message text.\n\nOptionally capping Http11Processor at WARN would be a small hardening step. It is not an NFR-3 leak a real user or attacker could use.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1476,
+      "durationMs": 22279,
+      "sessionId": "9f7d4f94-abc9-4cd5-86d6-d38dbf5842b5",
+      "costUsd": 0.13085439999999998,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the finding. At FixtureProvenanceTest.kt:25 the data-statement regex is `(?im)^\\s*(insert|copy|update)\\b`, so it only matches when a line starts with one of those words. On line 36, a migration counts as in scope only if that regex matches. That leaves several cases treated as pure DDL and exempted:\n- `WITH s AS (...) INSERT INTO ...` on one line\n- `MERGE INTO ...`\n- `DO $$ BEGIN INSERT ...` on one line\n- `CREATE TABLE t(...); INSERT INTO t ...` on one line\n\nThe negative test (line 110) only puts INSERT at the start of its own line, so it never exercises these forms.\n\nOutside `src/` and `fixtures/`, line 39 falls back to the MEDIA regex (line 21). It has no rtf, ppt/pptx, odp, epub, djvu, zip, 7z or dump. The class KDoc promises to cover every \"document\" file in git, so pptx, rtf and epub missing is a real gap against what the test says it does. zip and dump go beyond the stated scope, but the gap still holds.\n\nI looked for another guard that covers this and found none. The pre-commit hook's BINARY regex (`scripts/hooks-pre-commit.mjs:55`) only covers png/webm/jpg/gif/pdf/ico/woff/jar/class. No migrations exist yet (only `.gitkeep`), so this is a latent gap in coverage, not a current leak. Severity minor is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1509,
+      "durationMs": 17676,
+      "sessionId": "69e0c15d-1a96-4f27-8ddb-316e2f405803",
+      "costUsd": 0.1103004,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I read the code and the claim holds. In `FixtureProvenanceTest.kt:25`, `DATA_STATEMENT = (?im)^\\s*(insert|copy|update)\\b` only matches a data verb at the start of a line. `inScope` (line 36) puts a migration in scope only when this regex matches, so a migration file is exempt in each of these cases:\n- `WITH s AS (...) INSERT INTO task ...` on one line\n- `MERGE INTO ...`\n- `DO $$ BEGIN INSERT ... END $$` on one line\n- `CREATE TABLE t(...); INSERT INTO t ...` on one line\n\nAn exempt migration can carry task text or answer keys past the CA-D21 check. The negative test only covers an INSERT at the start of a line.\n\nThe `MEDIA` regex (line 21) is the only classifier for paths outside `src/` and `fixtures/`, and it has no zip, 7z, rtf, ppt/pptx, odp, epub, djvu or dump. `.gitignore` lists `*.dump` and `backups/`, but `git add -f` gets past that. `gitFiles()` uses `--cached`, so a force-added `.dump` or `.zip` at, say, `tools/workbook.zip` would be listed but not flagged. Nothing else catches it either: the pre-commit hook's `BINARY` regex (`scripts/hooks-pre-commit.mjs:55`) has png/jpg/gif/pdf/webm/ico/woff/jar/class but no archives, office formats or dumps.\n\nSo this can be reproduced by a contributor or an agent writing a seed migration or committing an archive. It is a gap in an internal compliance guard, not something an outside attacker can reach, and it takes a careless or deliberate commit. Minor is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1722,
+      "durationMs": 18030,
+      "sessionId": "a0959581-5a20-45b0-af7b-e0b60dd29fd8",
+      "costUsd": 0.0953438,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "This entry doesn't claim a defect. It's a coverage summary that says \"No action\" itself, and it points to other findings for the three \"partial\" items, so there's no faulty mechanism here to confirm. I spot-checked its facts and they hold: the delta spec.md has exactly 16 `Scenario:` entries, and compose.yaml publishes only one port, the frontend's, as `${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80`. The db and backend publish nothing. Because it doesn't name a specific code defect, it shouldn't count as a minor issue. Any real gaps behind the \"partial\" items (container-level errors, TRACE-level leaks, fixture provenance) belong to the separate findings it mentions and should be checked there.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1755,
+      "durationMs": 12231,
+      "sessionId": "d4958472-1c4c-486d-96a7-ba63f649e3d6",
+      "costUsd": 0.06281,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "This entry is a coverage tally, not a defect. It claims no mechanism a user or attacker could trigger: it names no code path, no input and no bad behaviour, and its own suggestion is \"No action. This entry is the coverage summary.\" The cited file exists, but line 1 of a spec delta is just a placeholder anchor, not a faulty site. The 3 \"partial\" scenarios point to other, separate findings, and each of those has to be checked on its own merits. On the exploitability/reproducibility test, nothing here can be reproduced, so as a finding it is refuted (not actionable). The summary's positive claims (for example, that only the frontend publishes a port, on loopback by default) are not disputed.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 2546,
+      "durationMs": 30662,
+      "sessionId": "172503b9-9d04-4526-8b8e-f313286c8371",
+      "costUsd": 0.1424924,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the finding; the mechanism holds. In `RequestContentLogGuard.kt:24`, the guard denies only events below INFO (`!level.isGreaterOrEqual(Level.INFO)`) for org.apache.coyote, catalina and tomcat. INFO and higher get NEUTRAL, so they pass. Nothing else offsets this. `application.yaml` has no `server.tomcat.relaxed-query-chars` or `relaxed-path-chars`, no custom ErrorReportValve and no UserDataHelper setting. `logback-spring.xml` only installs the guard on top of Boot's `base.xml`, so the root level is INFO.\n\nThe connector behavior comes from my knowledge of Tomcat; I did not run it here. With default settings, Tomcat rejects raw `|{}^[]\\` in the request target and encoded `%2F`/`%5C` in the path. The error is \"Invalid character found in the request target [...]\", and the message includes the target with its query string. Http11Processor logs the first such error through UserDataHelper at INFO (INFO_THEN_DEBUG mode), together with the exception message. Boot routes that through SLF4J to logback, and the guard lets it through. Query content therefore reaches the log, which breaks NFR-3's \"any log level\" clause. Tomcat also answers these requests itself, before Spring Security or MVC run, with its stock HTML \"HTTP Status 400 – Bad Request\" page. That is a well-known symptom in Spring Boot apps, and it means the response is not problem+json.\n\nTest coverage does not catch this. The only real-port test is `DouckoBackendApplicationIT.kt`; the guard and 404 tests use MockMvc and never go through the Tomcat connector. The trigger needs a raw client (curl, or a reverse proxy that forwards the request line unchanged). Browsers do not percent-encode some of these characters, so it is realistic, but the exposure is the first occurrence only. Severity \"major\" is reasonable for a spec violation of the privacy NFR, so I am keeping it.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 2579,
+      "durationMs": 45376,
+      "sessionId": "731341fc-9c20-43cf-be0f-b4915cd3671f",
+      "costUsd": 0.175661,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed. RequestContentLogGuard.kt:24 only drops events below INFO for org.apache.coyote, org.apache.catalina and org.apache.tomcat. INFO and higher return NEUTRAL. I found nothing in the code that changes this:\n- application.yaml sets no server.tomcat.relaxed-query-chars or relaxed-path-chars.\n- No WebServerFactoryCustomizer or TomcatServletWebServerFactory bean exists, and no custom ErrorReportValve.\n- There is no UserDataHelper setting, and no level override for org.apache.coyote.\n- logback-spring.xml only adds the turbo filter on top of Boot's base.xml, so the root level is INFO.\n\nHow it happens, based on how Tomcat behaves (I could not open the Tomcat jar in ~/.m2 from this sandbox):\n1. Http11InputBuffer.parseRequestLine throws IllegalArgumentException(\"Invalid character found in the request target [<full target including query>] ...\") when the target has a raw |, {, }, ^, [, ], \\ or similar.\n2. Http11Processor.service catches it and logs \"Error parsing HTTP request header\" at log.info(message, t), with the exception attached. That happens on the first occurrence per processor's UserDataHelper (INFO_THEN_DEBUG), then at DEBUG.\n3. The logger is org.apache.coyote.http11.Http11Processor. The event is INFO, so the guard returns NEUTRAL and the query string ends up in the console log.\n\nThe response is also not problem+json. Tomcat sets 400 itself and its ErrorReportValve writes the response. DispatcherServlet, Spring Security, and ProblemErrorController (mapped to /error) never run.\n\nThis is easy to reproduce. Anyone on the LAN can send `curl 'http://host/api/x?q=a|SENTINEL'` with no auth. Browsers also leave some of these characters unencoded in query strings. The existing tests can't catch it: MockMvc bypasses the Tomcat connector, and the real-port IT only covers //, ; and %2e%2e.\n\nCaveats on severity. The INFO line repeats only once per processor instance per day, not on every request. The leaked data is whatever the requester put in the URL, so this is mainly NFR-3 log hygiene plus an inconsistency with the problem+json contract, not an attacker reading data. A major spec-compliance finding is still reasonable.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1827,
+      "durationMs": 19736,
+      "sessionId": "27998312-930b-4ed9-b358-5ea96903e0ed",
+      "costUsd": 0.1215012,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. `FixtureProvenanceTest.kt:22` sets `OUT_OF_SCOPE = listOf(\"contract/\", \"target/\", \"node_modules/\", \"docs/qa/\")`. In `inScope`, line 34 returns false for any path with one of those prefixes, and this happens before the MEDIA fallback on line 39. So a file like `docs/qa/evidence/screenshot.png` or `docs/qa/scan.pdf` is never checked against the manifest. The spec has no such exemption. Its \"Fixture provenance\" requirement (platform-foundation spec.md, lines 130–139) puts \"every image, document, audio or video file anywhere in git\" in scope. The only files it exempts are application.yaml, logback-spring.xml, the message catalog and pure-DDL migrations. `contract/`, `target/` and `node_modules/` can be argued to fall outside \"in git\" for this repo: contract/ is a submodule, and target/ and node_modules/ are ignored. That argument doesn't work for `docs/qa/`, which is tracked in git (`git ls-files` shows evidence/*.md and other files there). It is also where evidence screenshots are most likely to be committed. I found nothing that covers the gap elsewhere: the .githooks scripts don't mention docs/qa or png/pdf. The unit test 'an unlisted fixture...' has no docs/qa case, so nothing pins the behaviour. The second, smaller gap is also real. `DATA_STATEMENT` = `^\\s*(insert|copy|update)\\b` doesn't match `MERGE INTO ...`. It also misses a `WITH x AS (...) INSERT ...` where the INSERT sits on the same line as the WITH or follows a `)` on its line. Those seed migrations would count as DDL and be exempt. A multi-line CTE with INSERT at the start of a line would still be caught, so this part is partial. Today docs/qa holds no media, so nothing is leaking yet. Still, the mechanism contradicts the spec and silently weakens the NFR-4/NFR-3 guard on a tracked directory where evidence media is likely to land. Keeping severity at major is reasonable.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1860,
+      "durationMs": 53812,
+      "sessionId": "d8635a8c-1241-4dc2-bf7a-d6d2b38b02aa",
+      "costUsd": 0.162052,
+      "numTurns": 11,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed by reading the code. In FixtureProvenanceTest.kt, line 22 sets OUT_OF_SCOPE = listOf(\"contract/\", \"target/\", \"node_modules/\", \"docs/qa/\"). Line 34 checks those prefixes first and returns false, so the MEDIA check (`else -> path.matches(MEDIA)`) never runs for anything under docs/qa/. The spec says the opposite. platform-foundation spec.md lines 137-140 put \"every image, document, audio or video file anywhere in git\" in scope, and the only exemptions are application.yaml, logback-spring.xml, the message catalog and pure-DDL migrations. docs/qa/ is not one of them. The test's own KDoc (lines 13-15) repeats the spec and also leaves docs/qa/ out.\n\nCan it actually happen? Yes. If someone commits docs/qa/evidence/screenshot.png or scan.pdf, gitFiles() lists it, inScope() returns false, and the test passes. Nothing else catches it:\n- scripts/hooks-pre-commit.mjs line 55-57 skips binary files (png/jpg/pdf/webm) entirely before its content scan.\n- No other script checks media under docs/qa.\n\ndocs/qa/evidence/ is the declared home for QA evidence. Tasks 2.9 and 4.4 point there, so screenshots are likely to land in this folder. Today it holds only .md/.json files, so nothing is leaking yet, but the check would let a leak through.\n\nThe smaller claim also holds. DATA_STATEMENT `(?im)^\\s*(insert|copy|update)\\b` does not match a migration whose seed rows come from `MERGE INTO …`, or from `WITH x AS (...) INSERT …` when the INSERT sits on the same line as WITH. Such a migration counts as pure DDL and is exempt.\n\nSeverity: this is a hole in a CI guard (NFR-4/NFR-3), not a runtime exploit. Still, it sits in the folder where evidence screenshots are expected to go, and the spec gives no exemption for it, so \"major\" for spec compliance holds.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1957,
+      "durationMs": 14861,
+      "sessionId": "f5d7ebd3-a464-4d25-b80b-ebff6f29262f",
+      "costUsd": 0.0911688,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this finding. The code does what the finding says, and the spec gap is real.\n\n1. **The allowlist exists.** `SecurityConfiguration.kt:52` uses `StrictHttpFirewall.setAllowedHostnames` to accept only `localhost`, `backend` or anything matching `IPV4`. Any other Host is rejected. The rejection goes to `requestRejectedHandler`, which answers 400 problem+json.\n\n2. **The regex is looser than the KDoc.** `IPV4` (line 85) is `\\d{1,3}(\\.\\d{1,3}){3}`. It matches 999.1.1.1 and any public dotted quad. The KDoc at line 44 says \"loopback or the LAN address\". As the finding says, this does not weaken the rebinding defence: an attacker's domain name never matches a dotted quad. But the comment and the code disagree.\n\n3. **The spec delta has no requirement for either behaviour.** The only related line in `specs/platform-foundation/spec.md` is line 81: \"A URL the security firewall rejects SHALL be answered 400 problem+json\". There is no Host-allowlist requirement or scenario. Its port requirement (lines 5–19) only forbids publishing the database port. It says nothing about keeping the backend port unpublished. Both behaviours appear only in `design.md` decision 2a (and lines 22–24) and in the `tasks.md` line-31 note.\n\n4. **The proposal now contradicts itself.** `proposal.md:17-18` still says the backend and the frontend are published on `${DOUCKO_BIND_ADDRESS}`. Since 5bf3df9 the backend publishes no port, so the docs are out of step with each other, which makes the spec-compliance gap stronger.\n\n**Severity:** minor is right. The runtime security behaviour is correct; the gaps are a missing spec requirement and an inaccurate comment.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1990,
+      "durationMs": 18957,
+      "sessionId": "c56396bb-84fb-4ce1-baeb-882c19319f63",
+      "costUsd": 0.11769299999999999,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed both parts of the finding against the code and the spec delta.\n\n**What the code does**\n- `SecurityConfiguration.kt:52` sets `StrictHttpFirewall.setAllowedHostnames` to accept only `localhost`, `backend` or an IPv4 address.\n- `SecurityConfiguration.kt:85` defines that address check as the regex `\\d{1,3}(\\.\\d{1,3}){3}`. It accepts any dotted quad, such as `999.1.1.1` or `8.8.8.8`. The KDoc says \"loopback or the LAN address\", so the doc and the regex disagree.\n- `compose.yaml` no longer publishes the backend service. The only explanation is a comment there.\n\n**What the spec delta says**\nIn `openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md`:\n- \"Loopback or LAN binding only\" says every published port uses the bind address and the database publishes none. It says nothing about the backend staying unpublished.\n- \"Undeclared paths answer problem+json\" only says \"A URL the security firewall rejects SHALL be answered 400\". No requirement or scenario mentions a Host allowlist or a foreign Host being refused.\n\nSo a deliberate, tested behaviour has no requirement behind it. The finding is accurate.\n\n**How much a user would notice**\nLess than the finding implies. Because the backend port is unpublished, a LAN client using an mDNS name reaches the frontend's nginx first. Per the KDoc, nginx applies the same Host rule, so that 400 comes from the frontend repo, not this code. The backend's allowlist only matters for dev runs or a port published by mistake.\n\nThe loose regex can't be used for DNS rebinding, because an attacker's domain name never matches a dotted quad. It is a doc mismatch, not a security hole.\n\n**Verdict**\nThe spec-compliance gap and the KDoc/regex mismatch are both real and repeatable. Neither is an exploitable defect, so \"minor\" is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/application.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1152,
+      "durationMs": 24078,
+      "sessionId": "4cd0e3fd-5740-4bdd-96f6-481f0fbc7a9a",
+      "costUsd": 0.1300132,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism holds. `application.yaml:40-45` sets only `management.endpoints.web.exposure.include: health`. Nothing turns off `management.endpoints.web.discovery.enabled`, and I found no other `management.*` setting or `MANAGEMENT_*` override in the repo. The only profile file is `application.yaml`. With discovery left at Boot's default (true), the web endpoint handler mapping serves the links resource at the base path `/actuator`. `SecurityConfiguration.kt:66-67` denies only `/api/admin/**` and ends with `authorize(anyRequest, permitAll)`, so nothing blocks `/actuator`. The test `DouckoBackendApplicationIT.kt:92-97` asserts 404 only for `/actuator/modulith`, `/info`, `/env` and `/httpexchanges`. It never requests `/actuator` itself, so the gap is real and untested. The spec text `openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md:13` says \"Only the actuator health endpoint SHALL be exposed.\" Two things soften it. First, Boot doesn't treat the discovery page as an endpoint in its own terms (it has no endpoint ID). Second, the page only lists `self` and `health` links, so it leaks almost nothing. I didn't run the IT myself; the conclusion rests on Boot's documented default for discovery and the absence of any override. Severity stays minor: the deviation from the spec and the missing test are real, but the security impact is negligible.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/application.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1185,
+      "durationMs": 21435,
+      "sessionId": "07d4263d-3a86-4def-a212-8b3aecc4f427",
+      "costUsd": 0.10645700000000001,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I couldn't refute this. The finding holds up, but it is low-impact.\n\n1. **Nothing turns discovery off.** `application.yaml` (lines 40–45) sets only `management.endpoints.web.exposure.include: health`. There is no `management.endpoints.web.discovery.enabled` setting, and this is the only application config file in `src/`, so no profile overrides it. Spring Boot leaves the links handler at `/actuator` on by default whenever at least one web endpoint is exposed. Here, health is exposed.\n2. **Security doesn't block it.** `SecurityConfiguration.kt:65-67` denies only `/api/admin/**` and permits every other request, so `GET /actuator` is reachable from the LAN without logging in.\n3. **No test covers it.** `DouckoBackendApplicationIT.kt:94` expects 404 only for `/actuator/modulith`, `/actuator/info`, `/actuator/env` and `/actuator/httpexchanges`. Nothing asserts on the bare `/actuator`, so the gap is untested.\n\n**Impact:** The response is just `_links` (self, health, health-path). That's a HAL links page, not a separate endpoint, and it reveals nothing beyond the health URL that is public anyway. This is a real mismatch with the NFR-2 statement that only health is exposed, but it has almost no exploit value. \"Minor\" is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-platform-foundation-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1403,
+      "durationMs": 22415,
+      "sessionId": "fb85132f-2250-433e-9452-bf2107a908d9",
+      "costUsd": 0.118225,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. One detail is wrong: the evidence file was last changed in 24d6c7a, not f553d30. Both commits come before 5bf3df9, so the argument is unaffected.\n\n- **The task is ticked against the old setup.** tasks.md:30 is ticked [x] and says to curl 127.0.0.1:8080. The 5bf3df9 commit message says the backend no longer publishes port 8080 (it touched compose.yaml).\n- **The recorded evidence shows the old setup.** docs/qa/evidence/slice1-compose-smoke.md still shows `backend | 127.0.0.1:8080->8080/tcp` and runs every backend check (health, 404 problem+json, the 403 for admin) directly on 8080. The only check through the frontend on 8081 is a bare status code (404), without the problem+json body.\n- **The new behaviour was never smoked.** 5bf3df9 added a Host guard (StrictHttpFirewall returns 400 problem+json for other Host headers). Nothing in the evidence exercises it.\n- **The re-run is only described, not done.** The note added at line 31 is dated 2026-10-04 and says how a re-run would work. No re-run output exists, and the evidence file is unchanged since before the compose change.\n\nSo a ticked task cites evidence for a configuration that no longer ships, which is what the done-claims-need-evidence rule forbids. Minor severity is right: the change makes things more locked down, and the integration tests cover the new behaviour.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-platform-foundation-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Write,Bash --json-schema <…>",
+      "promptChars": 1436,
+      "durationMs": 15439,
+      "sessionId": "69d763ab-09e9-41d6-a775-86ebcc029ab5",
+      "costUsd": 0.10341120000000001,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. Task 4.4 at tasks.md:30 is ticked [x]. Its only evidence file is docs/qa/evidence/slice1-compose-smoke.md, and that file's history ends at 24d6c7a, which is earlier than 5bf3df9. The evidence shows `backend | 127.0.0.1:8080->8080/tcp` and curls 127.0.0.1:8080 directly. Commit 5bf3df9 removed the backend `ports:` mapping from compose.yaml, so those 8080 commands now fail to connect. Two things the shipped setup needs were never run: a smoke through 8081 and a check of the new Host-guard 400. The 2026-10-04 note under 4.4 only says a re-run \"goes through the frontend\". It does not record that re-run, and the working tree has no change to the evidence file. This is a process and evidence problem (done-claims-need-evidence), not a runtime bug. A user or attacker cannot exploit it, and the code change itself has RED-first unit and integration tests. So minor severity is right.",
+        "severityAdjustment": "keep"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "15 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 12, contested: 1, rejected: 2"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/implement-platform-foundation-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "slice 1 platform-foundation (backend): openspec/changes/implement-platform-foundation-api",
+    "summary": "Review gate for slice 1 platform-foundation (backend): openspec/changes/implement-platform-foundation-api: 12 confirmed, 1 contested (treat as confirmed unless trivially wrong), 2 rejected.",
+    "confirmed": [
+      {
+        "title": "Actuator discovery root /actuator stays exposed and answers 200 HAL JSON, not 404 problem+json",
+        "file": "src/main/resources/application.yaml",
+        "line": 45,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "`management.endpoints.web.exposure.include: health` limits which endpoints are exposed, but it leaves `management.endpoints.web.discovery.enabled` at its default (true). So `GET /actuator` returns 200 with an `application/vnd.spring-boot.actuator.v3+json` `_links` document. The spec says only the health endpoint is exposed and that any undeclared path is 404 problem+json. The IT test `only the health endpoint of actuator is reachable` checks only /actuator/modulith, /info, /env and /httpexchanges, so it passes while this violation ships. Similar gap: /actuator/health/<component> is refused by actuator itself with an empty-body 404, not problem+json.",
+        "suggestion": "Set `management.endpoints.web.discovery.enabled: false`. Add `/actuator` (and e.g. `/actuator/health/db`) to the IT test, and check the problem+json content type and catalog title as well as the status.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute the mechanism. In application.yaml (lines 40-45), `management.endpoints.web.exposure.include: health` is the only actuator setting, so `management.endpoints.web.discovery.enabled` keeps its default of true. Nothing else blocks `/actuator`: SecurityConfiguration only denies `/api/admin/**` and permits every other request, and the StrictHttpFirewall only checks the Host header. A request to `GET /actuator` from localhost or a LAN IP therefore reaches Actuator's discovery handler and gets 200 with a HAL `_links` document (self, health, health-path). The IT test `only the health endpoint of actuator is reachable` (DouckoBackendApplicationIT.kt:92-97) never requests `/actuator` and only checks the status code, so it can't catch this. The change spec (openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md:13) says \"Only the actuator health endpoint SHALL be exposed\", and design.md:95 says any undeclared path gets 404 problem+json. The discovery root breaks both. The health/<component> point is also plausible: by default Actuator refuses an unshown component itself with a bare 404 and no body, so the problem+json mapping never runs. I didn't run the app to confirm that part. Severity: the discovery page only reveals links to health, which is already public, so nothing sensitive is exposed. This is a real spec and contract gap, but its security impact is low. I'd downgrade it from major to minor.",
+          "I confirmed the mechanism, but it does very little harm.\n\n**What the code shows**\n- `application.yaml:40-45` sets only `management.endpoints.web.exposure.include: health`. It never sets `management.endpoints.web.discovery.enabled`, so Spring Boot's default (`true`) applies.\n- `SecurityConfiguration.kt:65-67` does `authorize(\"/api/admin/**\", denyAll)` and then `authorize(anyRequest, permitAll)`. Nothing in security or any filter blocks `/actuator`.\n- With discovery left on and at least one endpoint exposed, Boot's `WebMvcEndpointHandlerMapping` registers the links handler at the base path. `GET /actuator` therefore returns 200 with `application/vnd.spring-boot.actuator.v3+json` and `_links` (`self`, `health`, `health-path`). It does not reach MVC's `NoResourceFoundException` path, which is the one that produces the catalog-titled 404 problem+json.\n- The comment at `SecurityConfiguration.kt:25` promises \"an undeclared path is 404 problem+json\", so this is a real deviation from the stated contract.\n- The IT test at `DouckoBackendApplicationIT.kt:92-94` checks only `/modulith`, `/info`, `/env` and `/httpexchanges`, so the test-coverage gap is real too.\n- The `/actuator/health/<component>` point also holds. With the default `show-components` setting, actuator's health endpoint returns its own empty-body 404, not problem+json.\n\n**Limits**\n- I did not run the app; the Testcontainers IT needs Docker. The conclusion rests on reading the code plus Spring Boot's documented default for discovery.\n\n**Exploitability**\n- Anyone on the LAN can reproduce it with one GET.\n- All it reveals is the actuator base path and the health link. The compose healthcheck already uses that path and it carries no sensitive data.\n- No other endpoint becomes reachable, and NFR-2's intent (only health reachable) still holds in substance.\n\nSo this is a valid spec-conformance and test-coverage defect, not a security exposure. \"major\" overstates it; minor fits better. The fix is still cheap and correct: set `discovery.enabled: false`, and add `/actuator` and `/actuator/health/db` to the IT with content-type and title assertions."
+        ]
+      },
+      {
+        "title": "FixtureProvenanceTest exempts docs/qa/ wholesale, so screenshots or PDFs there skip the 'any media file anywhere in git' rule",
+        "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+        "line": 22,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "`val OUT_OF_SCOPE = listOf(\"contract/\", \"target/\", \"node_modules/\", \"docs/qa/\")` is checked first in `inScope`, so `docs/qa/evidence/page.png` returns false before the MEDIA rule runs. The spec delta puts in scope \"every image, document, audio or video file anywhere in git\" and lists no docs/qa exemption. QA evidence screenshots are exactly where workbook pages or the child's data (NFR-3/NFR-4) would end up, and the test stays green.",
+        "suggestion": "Remove `docs/qa/` from OUT_OF_SCOPE, or apply only the MEDIA rule to it. Add a case such as `docs/qa/evidence/shot.png` to the negative test.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the finding in the code. In FixtureProvenanceTest.kt:22, OUT_OF_SCOPE includes \"docs/qa/\". At line 34, inScope returns false for any path with that prefix, and it does so before the `else -> path.matches(MEDIA)` branch on line 39. So `docs/qa/evidence/shot.png` is never checked against the manifest.\n\nThe spec (openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md:137-140) puts \"every image, document, audio or video file anywhere in git\" in scope. Its only exemptions are application.yaml, logback-spring.xml, the message catalog and pure-DDL migrations, with no docs/qa exemption. The test's own KDoc (lines 13-15) doesn't mention docs/qa either, so the code contradicts both the spec and its own documentation. The negative test (lines 95-121) has no docs/qa case, so nothing catches the gap.\n\nI looked for other guards:\n- The pre-commit content guard in factory.config.json refuses `.pdf` outside `fixtures/self-authored/`, so committed PDFs under docs/qa are blocked at commit time.\n- Only the PDF part is covered. PNG, JPG, WebP, SVG, DOCX, MP4 and WebM files under docs/qa (screenshots and recordings, the likeliest QA evidence) pass both the hook and this test.\n- The hook can be skipped with `--no-verify`, and the test is the gate that `verify` enforces.\n\nThe mechanism is real and reachable, so I'm keeping the severity.",
+          "I confirmed the problem in the code. At `FixtureProvenanceTest.kt:22`, `OUT_OF_SCOPE` contains `\"docs/qa/\"`. The first branch of `inScope` (line 34) returns false for any path starting with it, so the MEDIA catch-all on line 39 never runs. A tracked file such as `docs/qa/evidence/shot.png` is never reported as missing from the manifest.\n\nThe spec doesn't allow this exemption. `openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md:137-140` puts \"every image, document, audio or video file anywhere in git\" in scope. The only exemptions it lists are `application.yaml`, `logback-spring.xml`, the message catalog and pure-DDL migrations.\n\nI looked for anything else that would catch these files:\n- **Pre-commit hook:** `scripts/hooks-pre-commit.mjs` applies the `factory.config.json` `forbidden` rules. One rule blocks `\\.pdf$` outside `fixtures/self-authored/`, so a PDF under `docs/qa/` is stopped at commit time, but only locally and `--no-verify` skips it. No rule covers png, jpg, webp or other media, so a screenshot in `docs/qa/evidence/` passes the hook.\n- **CI:** CI runs the qa-verify battery, which includes `mvnw verify` and this test. Because the test exempts `docs/qa/`, CI does not catch these files either. CI only uploads `docs/qa/` as an artifact and never scans it.\n\nThe path is also realistic. `docs/qa/evidence/` already exists and holds slice evidence, and the factory's recording and visual-diff evidence is configured under `docs/qa/**` (`quality/telemetry.config.json`). Screenshots of workbook pages or of the child's data are exactly what would end up there.\n\nThe existing negative test has no `docs/qa/` case, so nothing exercises this hole. The finding is accurate on every point I checked."
+        ]
+      },
+      {
+        "title": "git ls-files output is C-quoted for non-ASCII names, so Czech-named fixtures are silently dropped from the provenance check",
+        "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+        "line": 77,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "`git ls-files --cached --others --exclude-standard` prints names with non-ASCII bytes as `\"fixtures/\\303\\272loha.png\"` under the default `core.quotePath=true`. `gitFiles()` then applies `out.filter { File(it).isFile }`, which drops those quoted strings because no such file exists. A file named with Czech diacritics (e.g. `úloha.pdf`) is never checked, and the test passes with workbook content committed.",
+        "suggestion": "Run `git -c core.quotePath=false ls-files -z ...` and split on NUL. Fail, rather than filter, when a listed path does not exist on disk.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the mechanism by reading the code. I could not run it: the sandbox blocked the git commands, so I couldn't check this machine's `core.quotePath` setting or test a non-ASCII filename. In FixtureProvenanceTest.kt:77, `gitFiles()` runs `git ls-files --cached --others --exclude-standard` without `-z` and without `-c core.quotePath=false`. Git's documented default (`core.quotePath=true`) prints any path with bytes above 0x80 as a C-quoted string with octal escapes, e.g. `\"fixtures/\\303\\272loha.pdf\"`, with the surrounding double quotes included. Line 80 then runs `out.filter { File(it).isFile }`. That quoted string is not a real path, so the file is silently dropped and never reaches `provenanceProblems`. Nothing else in the test re-adds it: the manifest loop only checks rows that are listed, and the 'not listed' check at line 72 only iterates the filtered `files`. An unlisted `fixtures/úloha.pdf` or `src/test/resources/stránka.png` would therefore pass the test. The filter also hides other cases, such as names containing a tab, a newline or quotes. Nothing in the repo appears to set quotePath=false for the test run, and CI/Surefire won't either by default. A machine-level `core.quotePath=false` could hide the bug on one dev box, but the test can't rely on that. Czech diacritics are a realistic filename case in this project (Czech workbook content, NFR-4), so 'major' is reasonable. The suggested fix is correct: use `-c core.quotePath=false ls-files -z` and split on NUL, and fail instead of filtering when a listed path is missing.",
+          "I could not refute this finding. The sandbox would not let me run git, so I could not reproduce it live. The conclusion rests on reading the code plus git's documented behaviour.\n\nHow it fails:\n- `gitFiles()` (FixtureProvenanceTest.kt:76-81) runs `git ls-files --cached --others --exclude-standard`. It sets no `-c core.quotePath=false` and no `-z`.\n- `core.quotePath` defaults to true. Nothing in the repo turns it off: there is no match for \"quotepath\" in the repo config files, hooks or scripts. The CI runner in `ci.yml` would also use git's defaults.\n- With that default, git wraps any path containing a byte ≥ 0x80 in double quotes and escapes it, so `fixtures/úloha.pdf` comes out as `\"fixtures/\\303\\272loha.pdf\"`.\n- `out.filter { File(it).isFile }` then drops that string, because no file has that literal name. It is removed before `provenanceProblems()` runs, so the \"not listed in PROVENANCE.md\" check never sees it.\n- The live test `this repository's fixtures all have self-authored provenance` only asserts `files.size > 0`, so it still passes.\n\nNo other check catches it:\n- The pre-commit hook (`scripts/hooks-pre-commit.mjs`) only scans staged text for secrets and skips binaries (`BINARY` regex). It does not check provenance or block PDFs or PNGs.\n- This test is the only automated NFR-4 / CA-D21 guard for media and fixtures.\n\nCan it happen for real? Yes. Czech diacritics in workbook-derived file names are plausible in this project (e.g. `úloha.pdf`, `cvičení.png`). The error is silent: a guard that should fail passes instead.\n\nThe finding's evidence and suggested fix are both right: use `-c core.quotePath=false` with `-z`, and fail on paths that are listed but missing rather than filtering them out. Severity stays major, since the copyright/PII guard (NFR-4) is bypassed silently. The confidence is medium only because I couldn't run git here; the quoting behaviour itself is well established."
+        ]
+      },
+      {
+        "title": "Migration 'pure DDL' exemption only spots INSERT/COPY/UPDATE at line start",
+        "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+        "line": 25,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`Regex(\"\"\"(?im)^\\s*(insert|copy|update)\\b\"\"\")` misses data written as `CREATE TABLE t(x text); INSERT INTO t ...` on one line, `WITH s AS (...) INSERT ...`, `MERGE`, and `CREATE TABLE ... AS SELECT/VALUES`. A seed migration written in any of these forms counts as exempt DDL, so answer keys can enter a migration without a provenance row.",
+        "suggestion": "Match the data keywords at any statement boundary (`(^|;)\\s*(with|insert|copy|update|merge)\\b`) and also look for `VALUES`/`AS SELECT`. Simpler: treat every migration as in scope unless it is explicitly allowlisted.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the finding. The pattern at FixtureProvenanceTest.kt:25 is `(?im)^\\s*(insert|copy|update)\\b`. Because of the `m` flag, `^` matches only at the start of a line. That means:\n- `CREATE TABLE t(x text); INSERT INTO t VALUES ...` written on one line does not match: INSERT comes after `;`, not at the start of the line.\n- `MERGE INTO ...` does not match at all.\n- `CREATE TABLE t AS VALUES/SELECT ...` does not match.\n- `WITH s AS (...) INSERT ...` on one line does not match.\n\nAt line 36, `inScope` returns false for a migration whose content doesn't match. Such a migration is treated as exempt DDL, so line 72 never asks for a manifest row.\n\nNothing else covers this gap: the .githooks have no migration or INSERT check, and the unit test at line 110 only covers the case where INSERT starts a line.\n\nThis is only a heuristic gap in a test-time guard, and the attack needs an unusually written seed migration, so \"minor\" is the right severity.",
+          "The mechanism is real. At FixtureProvenanceTest.kt:36, a Flyway migration counts as in scope only when `DATA_STATEMENT.containsMatchIn(...)` finds a match. The pattern `(?im)^\\s*(insert|copy|update)\\b` matches only when the keyword starts a line, apart from leading whitespace. Each of these would be treated as exempt pure DDL, so no provenance row would be required:\n- `CREATE TABLE t(x text); INSERT INTO t VALUES (...)` on one line (after `;` the next character is a space, not a line start)\n- `WITH s AS (...) INSERT ...` on one line\n- `MERGE INTO ...`\n- `CREATE TABLE t AS VALUES/SELECT ...`\n- `INSERT` written after a block comment on the same line\n\nNothing else guards this. No other check scans migration content, and the unit test (line 110) only covers the case where INSERT starts a line. The only migration file today is `.gitkeep`, so nothing slips through yet. But this is a guard for future seed migrations, and a single-line CTE or MERGE seed is a realistic way to write one.\n\nOn exploitability: this is a developer-process control for NFR-4 / CA-D21, not something a runtime attacker can reach. The bypass would happen by accident or carelessness, not as an attack. Also, a provenance row only records where content came from and never inspects the content itself, so the real-world impact is limited. Minor severity is the right level."
+        ]
+      },
+      {
+        "title": "Tomcat logs the raw request target (query string included) at INFO when a request line has an invalid character, and the INFO cap does not stop it",
+        "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+        "line": 41,
+        "severity": "major",
+        "confidence": "low",
+        "evidence": "The guard denies only levels below INFO for `org.apache.coyote`. When a query contains characters outside Tomcat's relaxedQueryChars, Tomcat's Http11Processor logs `Error parsing HTTP request header` at INFO for the first occurrence. Browsers leave `{`, `|` and `}` unencoded in queries. The nested IllegalArgumentException message `Invalid character found in the request target [...]` contains the target and its query. That puts request content in the log at the configured level (NFR-3). The same request also gets Tomcat's own 400 rather than problem+json. The tests use MockMvc and a well-formed HttpClient, so they never exercise this path.",
+        "suggestion": "Cap `org.apache.coyote.http11` (or all of `org.apache.coyote`) at WARN in the guard, or set `org.apache.juli.logging.UserDataHelper.CONFIG=NONE`. Add a raw-socket IT case that sends a sentinel in an invalid query and checks it does not appear in CapturedOutput.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute the mechanism.\n\n1. **The guard lets INFO through.** `RequestContentLogGuard.decide` only DENYs when the level is below INFO (`!level.isGreaterOrEqual(Level.INFO)`). Nothing else touches Tomcat's INFO logs: `logback-spring.xml` only adds the turbo filter and includes Boot's `base.xml`.\n\n2. **Nothing reconfigures Tomcat.** `application.yaml` has no `server.tomcat.relaxed-query-chars`. `src/main` has no `TomcatConnectorCustomizer` or `WebServerFactoryCustomizer`, and `org.apache.juli.logging.UserDataHelper.CONFIG` is never set. So Tomcat keeps its defaults: strict query characters and UserDataHelper mode INFO_THEN_DEBUG.\n\n3. **Tomcat logs the target at INFO.** In Tomcat, `Http11InputBuffer.parseRequestLine` throws `IllegalArgumentException(sm.getString(\"iib.invalidRequestTarget\", <target>))` when a query character is not allowed. That message embeds the raw request target, query string included. `Http11Processor.service` catches it and calls `userDataHelper.getNextMode()`. The first occurrence is logged with `log.info(\"Error parsing HTTP request header ... Note: further occurrences ... DEBUG\", t)` on the logger `org.apache.coyote.http11.Http11Processor`. Because the throwable is attached, Logback prints the exception message, and with it the target. The guard prefix-matches `org.apache.coyote`, but INFO is not below INFO, so the result is NEUTRAL and the line is written at Boot's default root level of INFO.\n\n4. **Browsers really send these characters.** Under the WHATWG URL spec the query percent-encode set does not include `{`, `|` or `}`, so browsers send them raw. Tomcat rejects them by default. Clients like curl send whatever they are given.\n\n5. **The tests don't cover it.** The tests named in the finding use MockMvc or well-formed clients, so none of them reach the connector's request-line parser.\n\n**Why I downgraded it:** INFO_THEN_DEBUG logs at INFO only once per suppression window (24h by default), then drops to DEBUG, which the guard does deny. The leak also needs PII or child content in a query string with an invalid character. Each such incident is a real NFR-3 breach, but it is bounded, so major overstates it a little.",
+          "The mechanism holds up. `RequestContentLogGuard.decide` (line 24) only DENYs a guarded logger when the level is below INFO. An INFO event from `org.apache.coyote.http11.Http11Processor` therefore returns NEUTRAL and gets logged. I found nothing in `src/main/resources` that changes this: no `relaxedQueryChars`, no `server.tomcat.*` and no UserDataHelper config.\n\nHere is the Tomcat path, as I know Tomcat's source; I couldn't open the jar because I wasn't given permission to read `~/.m2`. `Http11InputBuffer.parseRequestLine` finds a query char that is not allowed (`{`, `|`, `}` and so on). It throws `IllegalArgumentException(sm.getString(\"iib.invalidRequestTarget\", invalidRequestTarget))`, which reads \"Invalid character found in the request target [<full target incl. query>]\". `Http11Processor.service` catches it. Under UserDataHelper's default INFO_THEN_DEBUG mode it calls `log.info(\"Error parsing HTTP request header …\", t)` for the first occurrence in each suppression window. Spring Boot bridges JUL into Logback, so the throwable's message, and with it the raw query, is written at INFO. Spring Boot apps commonly show this exact log line in production, so it is not hypothetical.\n\nAnyone can reproduce it with a single `curl 'http://host/api/x?q={secret}'` or a raw socket. The MockMvc and HttpClient tests never parse a raw request line, so they don't cover this path. Tomcat also answers with its own 400 page, not problem+json.\n\nI'm recommending a downgrade for exploitability. An attacker who does this only puts their own bytes in the log. They can't pull another user's data through this path. For a real child's data to leak, the app's own frontend would have to put user content in a query string with unencoded `{|}`. Standard fetch/URLSearchParams encodes those characters. The rate limiting also means the default mode logs at INFO only once per window. So this is a real, reproducible gap in the NFR-3 guard's coverage, but it is not a major PII exposure for real users."
+        ]
+      },
+      {
+        "title": "FixtureProvenanceTest skips every file under docs/qa/, so screenshots and recordings can be committed there without failing the check",
+        "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+        "line": 22,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "The spec delta covers 'every image, document, audio or video file anywhere in git', but `OUT_OF_SCOPE` contains \"docs/qa/\". `inScope()` returns false for those paths before it ever reaches the `MEDIA` check. docs/qa/evidence/ is where this harness writes slice evidence (slice1-compose-smoke.md, review-fixes). Suppose an agent or developer saves a UI screenshot there, e.g. docs/qa/evidence/slice2-practice.png showing a workbook page or the child's name. The provenance test stays green and the CA-D21 / NFR-3 / NFR-4 guard is bypassed in exactly the folder where screenshots are most likely to be saved.",
+        "suggestion": "Exempt only the generated text reports under docs/qa (for example *.md, *.json and *.jsonl there). Keep the MEDIA rule for every path except contract/, target/ and node_modules/. Add a case with `docs/qa/evidence/shot.png` to the 'unlisted fixture … fails' test.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the problem in the code. In FixtureProvenanceTest.kt:22, `OUT_OF_SCOPE` includes \"docs/qa/\". At line 34, `inScope()` returns false for any path with that prefix, and it does this before the `else -> path.matches(MEDIA)` branch at line 39. So a file like docs/qa/evidence/shot.png is never checked against the manifest. That breaks the test's own KDoc, which says the scope includes \"every image, document, audio or video file anywhere in git\".\n\nI looked for anything else that would catch these files:\n- The pre-commit hook (scripts/hooks-pre-commit.mjs, plus the `forbidden` list in factory.config.json) only blocks `.pdf` outside fixtures/self-authored/, and runtime-data folders such as uploads/, storage/, pgdata/ and backups/.\n- Its BINARY regex is only used to skip the secret scan, not to block files.\n- So PNG, JPG, WEBP, MP4 and WEBM files in docs/qa/ are not caught by the hook either. The hook can also be bypassed, while this test is the guard that runs in CI.\n\nRight now docs/qa holds only .md, .json and .gitkeep files: evidence/slice1-*.md, workflow-args/*.json and the reports. That matches the reason the exemption exists: generated text reports. Media files there are not exempted on purpose by anything else.\n\nThe bypass therefore works, and it is in the folder where evidence such as screenshots is likely to be saved. Narrowing the exemption to text extensions under docs/qa is the right fix. I'm keeping the severity at major because this is a guard gap, not an actual leak: no media files are in docs/qa today.",
+          "Confirmed. Line 22 has `OUT_OF_SCOPE = listOf(\"contract/\", \"target/\", \"node_modules/\", \"docs/qa/\")`. In `inScope()` (line 34) that prefix check returns false before the `else -> path.matches(MEDIA)` branch is reached. So any docs/qa/**/*.png|jpg|webm|mp4|… file is never checked, which goes against the class KDoc's own claim of \"every image, document, audio or video file anywhere in git\". `gitFiles()` uses `git ls-files --cached --others --exclude-standard`, and .gitignore does not exclude media under docs/qa, so such a file would be listed and then silently skipped.\n\nI looked for a guard somewhere else and found none that covers it. `.githooks/pre-commit` runs `scripts/hooks-pre-commit.mjs`. Its BINARY regex only skips the secret scan for those files. The `factory.config.json` \"forbidden\" rules block only `*.pdf` outside fixtures/self-authored/ and runtime-data folders (uploads/, storage/, pgdata/, backups/, dumps). PNG, JPG, WebM and MP4 under docs/qa/ are not blocked anywhere.\n\ndocs/qa/evidence/ already exists and holds slice evidence (slice1-compose-smoke.md, slice1-review-fixes.md), so it is the natural place for an agent or developer to drop a UI screenshot or recording. That screenshot could show workbook content or the child's name, which is exactly what NFR-3/NFR-4 forbid. The provenance test stays green.\n\nOne small point against the finding: a PDF under docs/qa/ would still be stopped by the pre-commit forbidden rule. Images and video would not. The problem is a gap in a compliance guard, not something an outside attacker can exploit, but the scenario is realistic for how this harness is used. The suggested fix (exempt only the generated text reports under docs/qa/ and keep the MEDIA rule there) is right. Severity stays as reported."
+        ]
+      },
+      {
+        "title": "The provenance test's scope classifiers miss common document types and data-bearing migrations",
+        "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+        "line": 25,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`DATA_STATEMENT` only matches `insert|copy|update` at the start of a line. A seed migration written as `WITH s AS (...) INSERT INTO task ...`, `MERGE INTO …`, `DO $$ BEGIN INSERT …`, or `CREATE TABLE …; INSERT …` on one line is treated as pure DDL and exempted, so workbook task text or answer keys in a Flyway migration pass the CA-D21 check. Outside src/ and fixtures/, `MEDIA` (line 21) also misses document and archive formats such as rtf, pptx/odp, epub, djvu, zip and the backup format `.dump`. A `git add -f` of a backup or a workbook archive therefore goes unflagged.",
+        "suggestion": "Match data statements anywhere in a statement, e.g. `(?i)\\b(insert\\s+into|copy\\s+\\w+\\s+from|merge\\s+into|update\\s+\\w+\\s+set)\\b`. Extend MEDIA with rtf, pptx, ppt, odp, epub, djvu, zip, 7z and dump. Add both to the negative test.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the finding. At FixtureProvenanceTest.kt:25 the data-statement regex is `(?im)^\\s*(insert|copy|update)\\b`, so it only matches when a line starts with one of those words. On line 36, a migration counts as in scope only if that regex matches. That leaves several cases treated as pure DDL and exempted:\n- `WITH s AS (...) INSERT INTO ...` on one line\n- `MERGE INTO ...`\n- `DO $$ BEGIN INSERT ...` on one line\n- `CREATE TABLE t(...); INSERT INTO t ...` on one line\n\nThe negative test (line 110) only puts INSERT at the start of its own line, so it never exercises these forms.\n\nOutside `src/` and `fixtures/`, line 39 falls back to the MEDIA regex (line 21). It has no rtf, ppt/pptx, odp, epub, djvu, zip, 7z or dump. The class KDoc promises to cover every \"document\" file in git, so pptx, rtf and epub missing is a real gap against what the test says it does. zip and dump go beyond the stated scope, but the gap still holds.\n\nI looked for another guard that covers this and found none. The pre-commit hook's BINARY regex (`scripts/hooks-pre-commit.mjs:55`) only covers png/webm/jpg/gif/pdf/ico/woff/jar/class. No migrations exist yet (only `.gitkeep`), so this is a latent gap in coverage, not a current leak. Severity minor is appropriate.",
+          "I read the code and the claim holds. In `FixtureProvenanceTest.kt:25`, `DATA_STATEMENT = (?im)^\\s*(insert|copy|update)\\b` only matches a data verb at the start of a line. `inScope` (line 36) puts a migration in scope only when this regex matches, so a migration file is exempt in each of these cases:\n- `WITH s AS (...) INSERT INTO task ...` on one line\n- `MERGE INTO ...`\n- `DO $$ BEGIN INSERT ... END $$` on one line\n- `CREATE TABLE t(...); INSERT INTO t ...` on one line\n\nAn exempt migration can carry task text or answer keys past the CA-D21 check. The negative test only covers an INSERT at the start of a line.\n\nThe `MEDIA` regex (line 21) is the only classifier for paths outside `src/` and `fixtures/`, and it has no zip, 7z, rtf, ppt/pptx, odp, epub, djvu or dump. `.gitignore` lists `*.dump` and `backups/`, but `git add -f` gets past that. `gitFiles()` uses `--cached`, so a force-added `.dump` or `.zip` at, say, `tools/workbook.zip` would be listed but not flagged. Nothing else catches it either: the pre-commit hook's `BINARY` regex (`scripts/hooks-pre-commit.mjs:55`) has png/jpg/gif/pdf/webm/ico/woff/jar/class but no archives, office formats or dumps.\n\nSo this can be reproduced by a contributor or an agent writing a seed migration or committing an archive. It is a gap in an internal compliance guard, not something an outside attacker can reach, and it takes a careless or deliberate commit. Minor is the right severity."
+        ]
+      },
+      {
+        "title": "Tomcat-level URL rejections bypass the problem+json path, and Tomcat logs the raw request target at INFO, which the log guard lets through",
+        "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+        "line": 22,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "Spec: 'A request to a path the contract does not declare SHALL be answered 404 ... problem+json ... A URL the security firewall rejects SHALL be answered 400 problem+json' and 'No request body, query-string or header value SHALL appear in the backend's logs at any log level'. Code: the guard only denies events below INFO (`!level.isGreaterOrEqual(Level.INFO)`) for org.apache.coyote/catalina/tomcat. Tomcat rejects some request targets in the connector, before Spring Security or MVC run: raw `|`, `{`, `}`, `^`, `[`, `]`, `\\` in the query or path, and encoded `%2F`/`%5C`. Browsers do not percent-encode `|{}^[]\\` in query strings, and nginx forwards the request line unchanged. For these requests Tomcat answers with its own ErrorReportValve HTML 400, not problem+json from the catalog. Http11Processor also logs 'Error parsing HTTP request header … Invalid character found in the request target [<target incl. query>]' at INFO (the first occurrence, then DEBUG via UserDataHelper). An INFO line passes the guard, so query content reaches the log. RequestContentNotLoggedTest and UndeclaredPathTest use MockMvc only, and the real-port IT covers only `//`, `;` and `%2e%2e`. Tests can therefore pass while this path breaks the spec.",
+        "suggestion": "Add a real-port test that sends a raw request with `?q=a|SENTINEL` and with `%2F` in the path. Assert that the response is problem+json and that the sentinel is not in the captured output. Then fix it: set Tomcat's UserDataHelper log mode to quiet (`org.apache.tomcat.util.http.parser` / `-Dorg.apache.juli.logging.UserDataHelper.CONFIG=NONE`), or cap org.apache.coyote.http11 at WARN, and set `server.tomcat.relaxed-query-chars` / relaxed-path-chars (or a custom ErrorReportValve) so these requests reach the problem+json writer. If any case stays out of scope, amend the spec to say so.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute the finding; the mechanism holds. In `RequestContentLogGuard.kt:24`, the guard denies only events below INFO (`!level.isGreaterOrEqual(Level.INFO)`) for org.apache.coyote, catalina and tomcat. INFO and higher get NEUTRAL, so they pass. Nothing else offsets this. `application.yaml` has no `server.tomcat.relaxed-query-chars` or `relaxed-path-chars`, no custom ErrorReportValve and no UserDataHelper setting. `logback-spring.xml` only installs the guard on top of Boot's `base.xml`, so the root level is INFO.\n\nThe connector behavior comes from my knowledge of Tomcat; I did not run it here. With default settings, Tomcat rejects raw `|{}^[]\\` in the request target and encoded `%2F`/`%5C` in the path. The error is \"Invalid character found in the request target [...]\", and the message includes the target with its query string. Http11Processor logs the first such error through UserDataHelper at INFO (INFO_THEN_DEBUG mode), together with the exception message. Boot routes that through SLF4J to logback, and the guard lets it through. Query content therefore reaches the log, which breaks NFR-3's \"any log level\" clause. Tomcat also answers these requests itself, before Spring Security or MVC run, with its stock HTML \"HTTP Status 400 – Bad Request\" page. That is a well-known symptom in Spring Boot apps, and it means the response is not problem+json.\n\nTest coverage does not catch this. The only real-port test is `DouckoBackendApplicationIT.kt`; the guard and 404 tests use MockMvc and never go through the Tomcat connector. The trigger needs a raw client (curl, or a reverse proxy that forwards the request line unchanged). Browsers do not percent-encode some of these characters, so it is realistic, but the exposure is the first occurrence only. Severity \"major\" is reasonable for a spec violation of the privacy NFR, so I am keeping it.",
+          "Confirmed. RequestContentLogGuard.kt:24 only drops events below INFO for org.apache.coyote, org.apache.catalina and org.apache.tomcat. INFO and higher return NEUTRAL. I found nothing in the code that changes this:\n- application.yaml sets no server.tomcat.relaxed-query-chars or relaxed-path-chars.\n- No WebServerFactoryCustomizer or TomcatServletWebServerFactory bean exists, and no custom ErrorReportValve.\n- There is no UserDataHelper setting, and no level override for org.apache.coyote.\n- logback-spring.xml only adds the turbo filter on top of Boot's base.xml, so the root level is INFO.\n\nHow it happens, based on how Tomcat behaves (I could not open the Tomcat jar in ~/.m2 from this sandbox):\n1. Http11InputBuffer.parseRequestLine throws IllegalArgumentException(\"Invalid character found in the request target [<full target including query>] ...\") when the target has a raw |, {, }, ^, [, ], \\ or similar.\n2. Http11Processor.service catches it and logs \"Error parsing HTTP request header\" at log.info(message, t), with the exception attached. That happens on the first occurrence per processor's UserDataHelper (INFO_THEN_DEBUG), then at DEBUG.\n3. The logger is org.apache.coyote.http11.Http11Processor. The event is INFO, so the guard returns NEUTRAL and the query string ends up in the console log.\n\nThe response is also not problem+json. Tomcat sets 400 itself and its ErrorReportValve writes the response. DispatcherServlet, Spring Security, and ProblemErrorController (mapped to /error) never run.\n\nThis is easy to reproduce. Anyone on the LAN can send `curl 'http://host/api/x?q=a|SENTINEL'` with no auth. Browsers also leave some of these characters unencoded in query strings. The existing tests can't catch it: MockMvc bypasses the Tomcat connector, and the real-port IT only covers //, ; and %2e%2e.\n\nCaveats on severity. The INFO line repeats only once per processor instance per day, not on every request. The leaked data is whatever the requester put in the URL, so this is mainly NFR-3 log hygiene plus an inconsistency with the problem+json contract, not an attacker reading data. A major spec-compliance finding is still reasonable."
+        ]
+      },
+      {
+        "title": "FixtureProvenanceTest exempts all of docs/qa/, but the spec covers every image, document, audio or video file anywhere in git",
+        "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+        "line": 24,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "Spec delta: 'In scope: ... every image, document, audio or video file anywhere in git. Exempt: application.yaml, logback-spring.xml, the message catalog, and Flyway migrations without data statements'. CA-D21: 'exits non-zero for any fixture file that is missing from the manifest'. Code: `val OUT_OF_SCOPE = listOf(\"contract/\", \"target/\", \"node_modules/\", \"docs/qa/\")`, and inScope returns false for these prefixes before the MEDIA check. A screenshot or PDF committed under docs/qa/ (the evidence directory, where screenshots are most likely to land) passes the check. That is exactly the NFR-4/NFR-3 leak the check exists to catch, and the spec lists no such exemption. A smaller gap: DATA_STATEMENT `^\\s*(insert|copy|update)\\b` misses `MERGE` and CTE-prefixed `WITH … INSERT` seed migrations, so they count as pure DDL and are exempt.",
+        "suggestion": "Remove docs/qa/ from OUT_OF_SCOPE for MEDIA files, or keep it only for non-media files. If evidence media must be allowed, amend the spec and still require manifest rows for them. Add `merge` and `with` to DATA_STATEMENT, and add the matching cases to the 'unlisted fixture' test.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds. `FixtureProvenanceTest.kt:22` sets `OUT_OF_SCOPE = listOf(\"contract/\", \"target/\", \"node_modules/\", \"docs/qa/\")`. In `inScope`, line 34 returns false for any path with one of those prefixes, and this happens before the MEDIA fallback on line 39. So a file like `docs/qa/evidence/screenshot.png` or `docs/qa/scan.pdf` is never checked against the manifest. The spec has no such exemption. Its \"Fixture provenance\" requirement (platform-foundation spec.md, lines 130–139) puts \"every image, document, audio or video file anywhere in git\" in scope. The only files it exempts are application.yaml, logback-spring.xml, the message catalog and pure-DDL migrations. `contract/`, `target/` and `node_modules/` can be argued to fall outside \"in git\" for this repo: contract/ is a submodule, and target/ and node_modules/ are ignored. That argument doesn't work for `docs/qa/`, which is tracked in git (`git ls-files` shows evidence/*.md and other files there). It is also where evidence screenshots are most likely to be committed. I found nothing that covers the gap elsewhere: the .githooks scripts don't mention docs/qa or png/pdf. The unit test 'an unlisted fixture...' has no docs/qa case, so nothing pins the behaviour. The second, smaller gap is also real. `DATA_STATEMENT` = `^\\s*(insert|copy|update)\\b` doesn't match `MERGE INTO ...`. It also misses a `WITH x AS (...) INSERT ...` where the INSERT sits on the same line as the WITH or follows a `)` on its line. Those seed migrations would count as DDL and be exempt. A multi-line CTE with INSERT at the start of a line would still be caught, so this part is partial. Today docs/qa holds no media, so nothing is leaking yet. Still, the mechanism contradicts the spec and silently weakens the NFR-4/NFR-3 guard on a tracked directory where evidence media is likely to land. Keeping severity at major is reasonable.",
+          "Confirmed by reading the code. In FixtureProvenanceTest.kt, line 22 sets OUT_OF_SCOPE = listOf(\"contract/\", \"target/\", \"node_modules/\", \"docs/qa/\"). Line 34 checks those prefixes first and returns false, so the MEDIA check (`else -> path.matches(MEDIA)`) never runs for anything under docs/qa/. The spec says the opposite. platform-foundation spec.md lines 137-140 put \"every image, document, audio or video file anywhere in git\" in scope, and the only exemptions are application.yaml, logback-spring.xml, the message catalog and pure-DDL migrations. docs/qa/ is not one of them. The test's own KDoc (lines 13-15) repeats the spec and also leaves docs/qa/ out.\n\nCan it actually happen? Yes. If someone commits docs/qa/evidence/screenshot.png or scan.pdf, gitFiles() lists it, inScope() returns false, and the test passes. Nothing else catches it:\n- scripts/hooks-pre-commit.mjs line 55-57 skips binary files (png/jpg/pdf/webm) entirely before its content scan.\n- No other script checks media under docs/qa.\n\ndocs/qa/evidence/ is the declared home for QA evidence. Tasks 2.9 and 4.4 point there, so screenshots are likely to land in this folder. Today it holds only .md/.json files, so nothing is leaking yet, but the check would let a leak through.\n\nThe smaller claim also holds. DATA_STATEMENT `(?im)^\\s*(insert|copy|update)\\b` does not match a migration whose seed rows come from `MERGE INTO …`, or from `WITH x AS (...) INSERT …` when the INSERT sits on the same line as WITH. Such a migration counts as pure DDL and is exempt.\n\nSeverity: this is a hole in a CI guard (NFR-4/NFR-3), not a runtime exploit. Still, it sits in the folder where evidence screenshots are expected to go, and the spec gives no exemption for it, so \"major\" for spec compliance holds."
+        ]
+      },
+      {
+        "title": "The DNS-rebinding Host allowlist and the unpublished backend port have no backing requirement in the spec delta",
+        "file": "src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt",
+        "line": 52,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "Commit 5bf3df9 adds `setAllowedHostnames { host -> host == \"localhost\" || host == \"backend\" || IPV4.matches(host) }`, which answers any other Host with 400 problem+json, and it stops publishing the backend port (compose.yaml, the backend service has no `ports`). This behaviour is user-visible: a LAN client that uses an mDNS or hostname URL gets a 400, and the API is reachable only through the frontend's nginx. It is recorded only in design.md decision 2a and the tasks.md 4.4 note. The spec delta still only says 'A URL the security firewall rejects SHALL be answered 400 problem+json' and has no requirement or scenario for a Host allowlist or for the backend staying unpublished. Also, IPV4 = `\\d{1,3}(\\.\\d{1,3}){3}` accepts any dotted quad, including 999.1.1.1 and public addresses. That is harmless against rebinding but is not what the KDoc says ('loopback or the LAN address').",
+        "suggestion": "Amend the spec delta, and the store admin-access spec through a docs-store change. Add a 'Foreign Host refused' requirement with the scenarios already tested in DouckoBackendApplicationIT (evil.example → 400 problem+json; localhost, 127.0.0.1, backend:8080 accepted), and a 'Backend port not published' scenario. Align the KDoc with the regex, or tighten the regex.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute this finding. The code does what the finding says, and the spec gap is real.\n\n1. **The allowlist exists.** `SecurityConfiguration.kt:52` uses `StrictHttpFirewall.setAllowedHostnames` to accept only `localhost`, `backend` or anything matching `IPV4`. Any other Host is rejected. The rejection goes to `requestRejectedHandler`, which answers 400 problem+json.\n\n2. **The regex is looser than the KDoc.** `IPV4` (line 85) is `\\d{1,3}(\\.\\d{1,3}){3}`. It matches 999.1.1.1 and any public dotted quad. The KDoc at line 44 says \"loopback or the LAN address\". As the finding says, this does not weaken the rebinding defence: an attacker's domain name never matches a dotted quad. But the comment and the code disagree.\n\n3. **The spec delta has no requirement for either behaviour.** The only related line in `specs/platform-foundation/spec.md` is line 81: \"A URL the security firewall rejects SHALL be answered 400 problem+json\". There is no Host-allowlist requirement or scenario. Its port requirement (lines 5–19) only forbids publishing the database port. It says nothing about keeping the backend port unpublished. Both behaviours appear only in `design.md` decision 2a (and lines 22–24) and in the `tasks.md` line-31 note.\n\n4. **The proposal now contradicts itself.** `proposal.md:17-18` still says the backend and the frontend are published on `${DOUCKO_BIND_ADDRESS}`. Since 5bf3df9 the backend publishes no port, so the docs are out of step with each other, which makes the spec-compliance gap stronger.\n\n**Severity:** minor is right. The runtime security behaviour is correct; the gaps are a missing spec requirement and an inaccurate comment.",
+          "I confirmed both parts of the finding against the code and the spec delta.\n\n**What the code does**\n- `SecurityConfiguration.kt:52` sets `StrictHttpFirewall.setAllowedHostnames` to accept only `localhost`, `backend` or an IPv4 address.\n- `SecurityConfiguration.kt:85` defines that address check as the regex `\\d{1,3}(\\.\\d{1,3}){3}`. It accepts any dotted quad, such as `999.1.1.1` or `8.8.8.8`. The KDoc says \"loopback or the LAN address\", so the doc and the regex disagree.\n- `compose.yaml` no longer publishes the backend service. The only explanation is a comment there.\n\n**What the spec delta says**\nIn `openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md`:\n- \"Loopback or LAN binding only\" says every published port uses the bind address and the database publishes none. It says nothing about the backend staying unpublished.\n- \"Undeclared paths answer problem+json\" only says \"A URL the security firewall rejects SHALL be answered 400\". No requirement or scenario mentions a Host allowlist or a foreign Host being refused.\n\nSo a deliberate, tested behaviour has no requirement behind it. The finding is accurate.\n\n**How much a user would notice**\nLess than the finding implies. Because the backend port is unpublished, a LAN client using an mDNS name reaches the frontend's nginx first. Per the KDoc, nginx applies the same Host rule, so that 400 comes from the frontend repo, not this code. The backend's allowlist only matters for dev runs or a port published by mistake.\n\nThe loose regex can't be used for DNS rebinding, because an attacker's domain name never matches a dotted quad. It is a doc mismatch, not a security hole.\n\n**Verdict**\nThe spec-compliance gap and the KDoc/regex mismatch are both real and repeatable. Neither is an exploitable defect, so \"minor\" is the right severity."
+        ]
+      },
+      {
+        "title": "/actuator discovery root is still exposed although the spec says only health is",
+        "file": "src/main/resources/application.yaml",
+        "line": 44,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "Spec: 'Only the actuator health endpoint SHALL be exposed.' Code: `management.endpoints.web.exposure.include: health`. Boot's links endpoint `/actuator` stays enabled by default (management.endpoints.web.discovery.enabled=true), so it answers 200 with `_links`. The IT checks only modulith/info/env/httpexchanges, so `/actuator` is never tested.",
+        "suggestion": "Set `management.endpoints.web.discovery.enabled: false` and add `/actuator` to the 404 list in DouckoBackendApplicationIT. Otherwise amend the spec to allow the discovery page.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism holds. `application.yaml:40-45` sets only `management.endpoints.web.exposure.include: health`. Nothing turns off `management.endpoints.web.discovery.enabled`, and I found no other `management.*` setting or `MANAGEMENT_*` override in the repo. The only profile file is `application.yaml`. With discovery left at Boot's default (true), the web endpoint handler mapping serves the links resource at the base path `/actuator`. `SecurityConfiguration.kt:66-67` denies only `/api/admin/**` and ends with `authorize(anyRequest, permitAll)`, so nothing blocks `/actuator`. The test `DouckoBackendApplicationIT.kt:92-97` asserts 404 only for `/actuator/modulith`, `/info`, `/env` and `/httpexchanges`. It never requests `/actuator` itself, so the gap is real and untested. The spec text `openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md:13` says \"Only the actuator health endpoint SHALL be exposed.\" Two things soften it. First, Boot doesn't treat the discovery page as an endpoint in its own terms (it has no endpoint ID). Second, the page only lists `self` and `health` links, so it leaks almost nothing. I didn't run the IT myself; the conclusion rests on Boot's documented default for discovery and the absence of any override. Severity stays minor: the deviation from the spec and the missing test are real, but the security impact is negligible.",
+          "I couldn't refute this. The finding holds up, but it is low-impact.\n\n1. **Nothing turns discovery off.** `application.yaml` (lines 40–45) sets only `management.endpoints.web.exposure.include: health`. There is no `management.endpoints.web.discovery.enabled` setting, and this is the only application config file in `src/`, so no profile overrides it. Spring Boot leaves the links handler at `/actuator` on by default whenever at least one web endpoint is exposed. Here, health is exposed.\n2. **Security doesn't block it.** `SecurityConfiguration.kt:65-67` denies only `/api/admin/**` and permits every other request, so `GET /actuator` is reachable from the LAN without logging in.\n3. **No test covers it.** `DouckoBackendApplicationIT.kt:94` expects 404 only for `/actuator/modulith`, `/actuator/info`, `/actuator/env` and `/actuator/httpexchanges`. Nothing asserts on the bare `/actuator`, so the gap is untested.\n\n**Impact:** The response is just `_links` (self, health, health-path). That's a HAL links page, not a separate endpoint, and it reveals nothing beyond the health URL that is public anyway. This is a real mismatch with the NFR-2 statement that only health is exposed, but it has almost no exploit value. \"Minor\" is the right severity."
+        ]
+      },
+      {
+        "title": "Task 4.4 smoke is ticked, but its evidence predates the compose change and uses the now-unpublished port 8080",
+        "file": "openspec/changes/implement-platform-foundation-api/tasks.md",
+        "line": 30,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "Task 4.4 [x]: 'curl http://127.0.0.1:8080/actuator/health → UP; curl -i http://127.0.0.1:8080/api/child/nope'. Evidence: docs/qa/evidence/slice1-compose-smoke.md, last touched in f553d30, before 5bf3df9. 5bf3df9 removed the backend's published port, and the added note only says 'a re-run of this smoke goes through the frontend'. Nothing shows that re-run happened, so the ticked smoke does not describe the configuration that ships (done-claims-need-evidence).",
+        "suggestion": "Re-run the smoke through 127.0.0.1:8081: `docker compose ps` should show only 127.0.0.1:8081 and healthy backend/db, and curl through nginx should return the 404 problem+json and the Host 400. Update slice1-compose-smoke.md, or untick 4.4 until that is done.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds. One detail is wrong: the evidence file was last changed in 24d6c7a, not f553d30. Both commits come before 5bf3df9, so the argument is unaffected.\n\n- **The task is ticked against the old setup.** tasks.md:30 is ticked [x] and says to curl 127.0.0.1:8080. The 5bf3df9 commit message says the backend no longer publishes port 8080 (it touched compose.yaml).\n- **The recorded evidence shows the old setup.** docs/qa/evidence/slice1-compose-smoke.md still shows `backend | 127.0.0.1:8080->8080/tcp` and runs every backend check (health, 404 problem+json, the 403 for admin) directly on 8080. The only check through the frontend on 8081 is a bare status code (404), without the problem+json body.\n- **The new behaviour was never smoked.** 5bf3df9 added a Host guard (StrictHttpFirewall returns 400 problem+json for other Host headers). Nothing in the evidence exercises it.\n- **The re-run is only described, not done.** The note added at line 31 is dated 2026-10-04 and says how a re-run would work. No re-run output exists, and the evidence file is unchanged since before the compose change.\n\nSo a ticked task cites evidence for a configuration that no longer ships, which is what the done-claims-need-evidence rule forbids. Minor severity is right: the change makes things more locked down, and the integration tests cover the new behaviour.",
+          "The finding holds. Task 4.4 at tasks.md:30 is ticked [x]. Its only evidence file is docs/qa/evidence/slice1-compose-smoke.md, and that file's history ends at 24d6c7a, which is earlier than 5bf3df9. The evidence shows `backend | 127.0.0.1:8080->8080/tcp` and curls 127.0.0.1:8080 directly. Commit 5bf3df9 removed the backend `ports:` mapping from compose.yaml, so those 8080 commands now fail to connect. Two things the shipped setup needs were never run: a smoke through 8081 and a check of the new Host-guard 400. The 2026-10-04 note under 4.4 only says a re-run \"goes through the frontend\". It does not record that re-run, and the working tree has no change to the evidence file. This is a process and evidence problem (done-claims-need-evidence), not a runtime bug. A user or attacker cannot exploit it, and the code change itself has RED-first unit and integration tests. So minor severity is right."
+        ]
+      }
+    ],
+    "contested": [
+      {
+        "title": "Tomcat logs a rejected request target, query string included, at INFO, which the log guard lets through",
+        "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+        "line": 24,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The guard only drops events below INFO (`!level.isGreaterOrEqual(Level.INFO)`). Tomcat's Http11Processor logs the first request-line parse failure in each suppression window at INFO, as 'Error parsing HTTP request header … Invalid character found in the request target [<path>?<query>]'. The WHATWG URL rules do not percent-encode `{ } | ^ \\ `` ` in a query, so a browser fetch such as `?answer=a|b` from the child UI, or a request from any LAN client, puts the raw query value in the backend log. RequestContentNotLoggedTest only sends a sentinel made of legal characters, so it passes while this NFR-3 path stays open. The response is also Tomcat's own 400 rather than problem+json.",
+        "suggestion": "Cap org.apache.coyote.http11.Http11Processor (or all org.apache.coyote) at WARN in the guard, or set `server.tomcat.relaxed-query-chars` and handle the input in the app. Add a raw-socket test case that sends a sentinel containing `|` in the query and asserts the captured output does not contain it.",
+        "dimension": "security",
+        "verdict": "contested",
+        "verifierNotes": [
+          "I could not refute the finding. The code works the way the finding describes.\n\n1. **The guard only blocks levels below INFO.** At `RequestContentLogGuard.kt:24` the filter returns DENY only when the level is not at least INFO and the logger is guarded. `org.apache.coyote` is guarded, but an INFO event from it still gets NEUTRAL and is logged. Neither `application.yaml` nor `logback-spring.xml` raises `org.apache.coyote` above INFO.\n\n2. **Tomcat logs the rejected request at INFO.** I'm relying on what I know of Tomcat's source here. I couldn't open the local Tomcat jar because permission to read `~/.m2` was denied, and I didn't run a test.\n   - `Http11Processor.service()` catches the parse failure. It logs it through `UserDataHelper`, whose default mode is INFO_THEN_DEBUG: the first failure in each 24h window is logged at INFO with the exception, as `log.info(\"Error parsing HTTP request header…\", t)`.\n   - The exception comes from `Http11InputBuffer.parseRequestLine`. When a query character fails `httpParser.isQueryRelaxed(chr)`, it throws `IllegalArgumentException(sm.getString(\"iib.invalidRequestTarget\", parseInvalid(...)))`. That message reads \"Invalid character found in the request target [{0}]\", and `{0}` is the raw target including the query.\n   - Spring Boot sends JULI/JUL output to SLF4J/Logback, so this event reaches the turbo filter at INFO and gets through.\n\n3. **Clients can reach this path.** The WHATWG query percent-encode set leaves `|`, `{`, `}`, `^` and the backtick unencoded. Any LAN client sending a raw request line can hit it too, so the path doesn't depend on how the frontend encodes queries.\n\n4. **Nothing else stops it.** No `server.tomcat.relaxed-query-chars` setting exists. As described, the existing test's sentinel uses only legal characters, so it wouldn't catch this. The response is also Tomcat's own 400, not problem+json.\n\nThe impact is limited: the INFO line appears once per 24h window (later failures drop to DEBUG, which the guard blocks), and it is only an NFR-3 risk if the query carries PII. Minor severity fits.",
+          "The logging mechanism is real, but the leak the finding describes doesn't happen.\n\nWhat holds up:\n- `RequestContentLogGuard.kt:24` only drops guarded events below INFO.\n- Tomcat's Http11Processor logs the first request-line parse failure at INFO (UserDataHelper's INFO_THEN_DEBUG mode), and that message includes the rejected request target.\n- Nothing sets `relaxed-query-chars`.\n\nWhat doesn't hold up:\n- **No child endpoint takes a query parameter.** In `contract/api/openapi.yaml` the only `in: query` parameters are on admin-session endpoints: task list filters including `q`, preview `locale`, stats `weeks` and flag-queue `status`. Answers are not sent in a query, so the claimed browser fetch `?answer=a|b` from the child UI does not exist in this API.\n- **None of these values is child PII.** The only free-text parameter is the admin's search `q` over Czech task prompts, and the rest are enums or integers. NFR-3 is about the child's personal data.\n- **The \"any LAN client\" case leaks nothing.** That client can only get its own chosen bytes into the log. That is self-injection, not exposure of someone else's data.\n- **Real clients encode these characters.** Clients built with URLSearchParams, encodeURIComponent or a generated client percent-encode `| { } ^ \\ \\``. A raw `|` only reaches Tomcat if someone hand-concatenates a URL or uses a raw socket.\n- **The 400 being Tomcat's own response rather than problem+json** concerns malformed request lines that never reach the app. It is not part of NFR-3.\n\nLimits of this check: I could not open the frontend source or the local Tomcat jar (permission was denied), so I did not confirm the frontend's encoding or Tomcat's exact message text.\n\nOptionally capping Http11Processor at WARN would be a small hardening step. It is not an NFR-3 leak a real user or attacker could use."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "JDBC bind-value logger of Spring JDBC not covered by the guard",
+        "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+        "line": 46,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "GUARDED covers Hibernate's `org.hibernate.orm.jdbc.bind` and `org.postgresql`. It does not cover `org.springframework.jdbc`, whose `StatementCreatorUtils` logs every bound parameter value at TRACE (`Setting SQL statement parameter value: ... parameter value [...]`). The spec says the 'Hibernate/JDBC bind values' loggers are capped. Any JdbcTemplate/JdbcClient use (including in later slices) would log answers at TRACE, and the TRACE test, which never touches the database, cannot catch it.",
+        "suggestion": "Add `org.springframework.jdbc` (and `org.springframework.orm`) to GUARDED.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The guard list at RequestContentLogGuard.kt:34-47 is quoted correctly: it doesn't include `org.springframework.jdbc`. spring-jdbc is on the classpath through spring-boot-starter-data-jpa. But no code path in this repo reaches `StatementCreatorUtils`. A search for JdbcTemplate, JdbcClient and NamedParameterJdbc across the repo found nothing. Persistence goes through Spring Data JPA/Hibernate, which binds parameters with its own binders and logs them under `org.hibernate.orm.jdbc.bind` and `org.hibernate.type`, and both are guarded. Flyway runs migrations on plain JDBC, not on JdbcTemplate. The PgJDBC driver's own loggers fall under `org.postgresql`, which is guarded. So in today's code, turning on TRACE for `org.springframework.jdbc` can't log any answers. The finding admits this by pointing at \"later slices\", which makes it a possible future gap, not a correctness bug in this code. The doc comment says \"Hibernate/JDBC bound parameter values\", and that is accurate for the binders the app actually uses. Adding `org.springframework.jdbc` would be cheap hardening, but the claimed leak doesn't happen in the current code.",
+          "I read the guard at RequestContentLogGuard.kt:34-47. It's true that `org.springframework.jdbc` is not in GUARDED. But nothing in this repo can reach the logger the finding names. I searched `src/**` and `pom.xml` for JdbcTemplate, JdbcClient, NamedParameterJdbc and spring-jdbc and found no matches. `StatementCreatorUtils` only logs parameter values when a JdbcTemplate or JdbcClient binds them. Persistence here goes through Hibernate/JPA, which binds through its own `org.hibernate.orm.jdbc.bind` logger, and that logger is guarded. Flyway runs append-only DDL with no user-supplied bind values. So no request content can reach an unguarded Spring JDBC logger in the current code. Two more things would have to happen first: an operator would have to set `logging.level.org.springframework.jdbc=TRACE`, and a future slice would have to add JdbcTemplate usage. The finding itself says \"including in later slices\", which makes this a speculative hardening suggestion rather than a bug that can be reproduced. It's still a reasonable thing to add if a later slice brings in JdbcTemplate, but it can't happen for any user or attacker today."
+        ]
+      },
+      {
+        "title": "Coverage summary: 21 scenarios: 18 implemented, 3 partial, 0 missing, 0 contradicted",
+        "file": "openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md",
+        "line": 1,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "Checked 16 delta scenarios, plus admin-access 'Local network only' (3: Default binding is loopback, Configured LAN address, Database not published) and content-authoring CA-D21 (2). Implemented: bind checks (BindAddressTest, tools/lib/compose.mjs:33-42, publishedPortProblems uses `docker compose config`), compose ports (only frontend publishes, on ${DOUCKO_BIND_ADDRESS:-127.0.0.1}; db and backend publish nothing), backup/restore (BackupRestoreIT, 4 tests; OperatorToolGuardTest, 3 tests), admin 403, undeclared 404, firewall 400, no generated password, actuator 404s. Partial: Container-level errors, Nothing leaks even at TRACE / configured levels, Every fixture has a self-authored provenance entry (see the findings below). No password on any command line (restore and backup use `docker compose exec` without credentials); the Dockerfile COPYs only pom/.mvn/contract/api/src/main, and .dockerignore excludes **/.env*. The ktlint package-name rule is turned off only under adapter/in/**.",
+        "suggestion": "No action. This entry is the coverage summary.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "This entry doesn't claim a defect. It's a coverage summary that says \"No action\" itself, and it points to other findings for the three \"partial\" items, so there's no faulty mechanism here to confirm. I spot-checked its facts and they hold: the delta spec.md has exactly 16 `Scenario:` entries, and compose.yaml publishes only one port, the frontend's, as `${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80`. The db and backend publish nothing. Because it doesn't name a specific code defect, it shouldn't count as a minor issue. Any real gaps behind the \"partial\" items (container-level errors, TRACE-level leaks, fixture provenance) belong to the separate findings it mentions and should be checked there.",
+          "This entry is a coverage tally, not a defect. It claims no mechanism a user or attacker could trigger: it names no code path, no input and no bad behaviour, and its own suggestion is \"No action. This entry is the coverage summary.\" The cited file exists, but line 1 of a spec delta is just a placeholder anchor, not a faulty site. The 3 \"partial\" scenarios point to other, separate findings, and each of those has to be checked on its own merits. On the exploitability/reproducibility test, nothing here can be reproduced, so as a finding it is refuted (not actionable). The summary's positive claims (for example, that only the frontend publishes a port, on loopback by default) are not disputed."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/implement-platform-foundation-api/review-findings.json"
+  }
+}

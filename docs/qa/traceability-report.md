@@ -64,8 +64,8 @@ Result: PASS, 48 warning(s)
 |---|---|---|
 | NFR-1 | backend | - |
 | NFR-2 | backend | 11 |
-| NFR-3 | backend, frontend | 5 |
-| NFR-4 | backend, frontend | 3 |
+| NFR-3 | backend, frontend | 6 |
+| NFR-4 | backend, frontend | 6 |
 | NFR-5 | backend, frontend | - |
 | NFR-6 | frontend | n/a |
 | NFR-7 | frontend | n/a |
