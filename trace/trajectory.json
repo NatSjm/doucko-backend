@@ -23,7 +23,7 @@
     {
       "slice": "2026-10-04-implement-authoring-tasks-api",
       "reviewEvidence": "unclean",
-      "trailerCommits": 3,
+      "trailerCommits": 4,
       "libDomains": [
         "content"
       ],

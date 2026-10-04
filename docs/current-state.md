@@ -24,11 +24,11 @@
   migration `V1__child_profile.sql` (single-row `child_profile`), profile created on first start from
   `DOUCKO_CHILD_DISPLAY_NAME` (validated, startup refusal never echoes it), `getProfileSettings` /
   `updateProfileSettings` login-free with presence-aware PATCH, configured task locales (`uk`).
-- **Next task:** owner merges slice 5 (backend and frontend), runs the slice-5 smoke (`docs/qa/evidence/slice5-compose-smoke.md`), then slice 6 (authoring-missions).
+- **Next task:** slice 6 (authoring-missions) per the capability plan.
 - **Claims:**
   - Slice 5 QA battery passes (548 unit, 44 integration tests incl. `ContentAuthoringIT`, `UploadLimitsIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
   - Slice 5 review gate clean (14 findings: 11 fixed in `3738bfe`, 3 waived) — evidence: `openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/review-findings.json`
-  - Slice 5 RED run — evidence: `docs/qa/evidence/slice5-red-run.md`; real-stack smoke NOT RUN (owner stack on 8081) — evidence: `docs/qa/evidence/slice5-compose-smoke.md`
+  - Slice 5 RED run — evidence: `docs/qa/evidence/slice5-red-run.md`; real-stack smoke PASS after the merge (2026-10-04) — evidence: `docs/qa/evidence/slice5-compose-smoke.md`
   - Slice 3 QA battery passes (347 unit, 25 integration tests; 217 golden cases, checker p95 37–73 µs; review gate 14 findings dispositioned) — evidence: `docs/qa/automated-verification-latest.md`, `docs/qa/evidence/slice3-checker-run.md` (2026-10-04)
   - Slice 3 review gate clean (14 findings: 8 fixed in `f26150d` and `6343ca7`, 6 waived with reasons) — evidence: `openspec/changes/archive/2026-10-04-implement-answer-checking-api/review-findings.json`
   - Slice 3 RED run — evidence: `docs/qa/evidence/slice3-red-run.md`

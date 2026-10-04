@@ -26,6 +26,6 @@
 - [x] 5.1 `npm run qa:verify` green (546 unit, 44 integration); coverage ratchet updated to lines 98.97, statements 97, functions 96.88, branches 88.77. Evidence: `docs/qa/automated-verification-latest.md`. `compose.yaml`: the db healthcheck now uses TCP (`pg_isready -h 127.0.0.1`), which removed the `BackupRestoreIT` "database system is shutting down" race that failed two runs in a row here.
 - [x] 5.2 `npx openspec validate implement-authoring-tasks-api --strict`.
 - [x] 5.3 review-gate workflow (14 findings: 11 fixed in `3738bfe`, 3 waived); `review-findings.json` clean; 5.1 re-run green after `mvnw clean`.
-- [x] 5.4 Real-stack smoke: NOT RUN, not a pass (ticked only because the archive check requires every task closed; the open smoke is tracked in `docs/qa/evidence/slice5-compose-smoke.md` and current-state "Scope NOT delivered") (the owner's stack from the main checkout uses Compose project `doucko` and port 8081). Click path recorded in `docs/qa/evidence/slice5-compose-smoke.md` for after the merge.
+- [x] 5.4 Real-stack smoke: PASS after the merge (2026-10-04) — evidence: `docs/qa/evidence/slice5-compose-smoke.md`. API click path and UI click path both passed through 127.0.0.1:8081.
 - [x] 5.5 Update `docs/current-state.md`.
 - [x] 5.6 Archive; commit with `Slice: implement-authoring-tasks-api` + `Refs: FR-1, FR-2, FR-3, FR-4, FR-5, FR-6, FR-7, FR-8, FR-10, FR-11, FR-13, NFR-17`.
