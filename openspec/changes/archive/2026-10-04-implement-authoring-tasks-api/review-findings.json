@@ -181,7 +181,7 @@
       "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
       "line": 114,
       "status": "waived",
-      "resolution": "Mission/attempt guards for deleteTask and setTaskStatus belong to slice 6 (no missions or attempts exist yet); documented in design.md split table."
+      "reason": "Mission/attempt guards for deleteTask and setTaskStatus belong to slice 6 (no missions or attempts exist yet); documented in design.md split table."
     },
     {
       "id": "F14",
@@ -192,7 +192,7 @@
       "file": "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
       "line": 227,
       "status": "waived",
-      "resolution": "Contract info Conventions: a path id that is not a UUID is 400 before any lookup, for every operation."
+      "reason": "Contract info Conventions: a path id that is not a UUID is 400 before any lookup, for every operation."
     }
   ],
   "clean": true,
