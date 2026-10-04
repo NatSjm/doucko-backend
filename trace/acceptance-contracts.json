@@ -263,8 +263,8 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "NFR-9": [

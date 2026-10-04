@@ -35,7 +35,8 @@
       "title": "Format-tip fallback can return an example that is CORRECT (it reveals an answer) or UNPARSEABLE",
       "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
       "line": 55,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "f26150d"
     },
     {
       "id": "F02",
@@ -45,7 +46,8 @@
       "title": "The format-tip example works as an answer-key oracle: skipped examples show the child which values are correct, and the fallback example can be a correct answer (FR-27)",
       "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
       "line": 57,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "f26150d"
     },
     {
       "id": "F03",
@@ -55,7 +57,8 @@
       "title": "NFR-5 travels with slice 3 but has no traced enforcement point (trace.json tests: [], acceptance status 'planned')",
       "file": "src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt",
       "line": 275,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "f26150d"
     },
     {
       "id": "F04",
@@ -65,7 +68,8 @@
       "title": "Format-tip example falls back to a CORRECT (answer-revealing) or non-WRONG candidate when no candidate grades WRONG",
       "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
       "line": 264,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "f26150d"
     },
     {
       "id": "F05",
@@ -75,7 +79,8 @@
       "title": "Golden-table scenario clause 'every scenario input is present with its verdict' is not mechanically checked",
       "file": "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
       "line": 33,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "f26150d"
     },
     {
       "id": "F06",
@@ -85,7 +90,8 @@
       "title": "Format tips read a classpath file during the first check, and the purity test cannot detect file/process access",
       "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
       "line": 225,
-      "status": "open"
+      "status": "waived",
+      "reason": "The catalog is read once when FormatTips initializes (class load of an in-jar resource), not during any check; NFR-9 requires the catalog and the module may not use Spring's MessageSource. CheckerTimingTest includes that first load and the p95 stays at about 40 us."
     },
     {
       "id": "F07",
@@ -95,7 +101,8 @@
       "title": "NUMBER_WITH_UNIT tip can exceed 120 characters for long unit spellings",
       "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
       "line": 257,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "f26150d"
     },
     {
       "id": "F08",
@@ -105,7 +112,8 @@
       "title": "A negative `exactDecimals` makes the checker throw, despite its documented 'never throws for any spec' guarantee",
       "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
       "line": 63,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "f26150d"
     },
     {
       "id": "F09",
@@ -115,7 +123,8 @@
       "title": "Unit value matching ignores which accepted entry the unit belongs to; correctness depends on an authoring invariant the checker never checks",
       "file": "src/main/kotlin/cz/doucko/checking/domain/Grader.kt",
       "line": 80,
-      "status": "open"
+      "status": "waived",
+      "reason": "The contract (AnswerSpec.unit) and content-authoring require all accepted values of a NUMBER_WITH_UNIT part to share one normalized unit and refuse other specs with 400 at authoring (slice 5). The checker follows the store spec: the part's unit is the one shared unit."
     },
     {
       "id": "F10",
@@ -125,7 +134,8 @@
       "title": "The space-character set is defined twice, as a regex class and as a hand-coded predicate",
       "file": "src/main/kotlin/cz/doucko/checking/domain/FractionNotation.kt",
       "line": 107,
-      "status": "open"
+      "status": "waived",
+      "reason": "Two representations of the same three characters for two uses (a regex class inside NumericNotation patterns and a char predicate for trimming around the slash), both documented; merging them adds indirection without changing behavior."
     },
     {
       "id": "F11",
@@ -135,7 +145,8 @@
       "title": "Checklist results for the rest of this slice: no endpoints, so authz, auth/session, upload, exposure and CORS are not applicable; no issues in injection, secrets, privacy or dependencies",
       "file": "src/main/kotlin/cz/doucko/checking/AnswerChecker.kt",
       "line": 11,
-      "status": "open"
+      "status": "waived",
+      "reason": "Informational checklist result with no issue: the slice has no endpoint, so authz, session, upload, exposure and CORS do not apply."
     },
     {
       "id": "F12",
@@ -145,7 +156,8 @@
       "title": "Undocumented behavior: an input shape that does not match the part type is UNPARSEABLE, and invalid tolerance silently means exact",
       "file": "src/main/kotlin/cz/doucko/checking/domain/Grader.kt",
       "line": 92,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "f26150d"
     },
     {
       "id": "F13",
@@ -155,7 +167,8 @@
       "title": "Store-spec endpoint requirements (FR-22 refusal, who can trigger a check) are not covered and are deferred outside this change's tasks",
       "file": "contract/openspec/specs/answer-checking/spec.md",
       "line": 719,
-      "status": "open"
+      "status": "waived",
+      "reason": "Explicitly out of scope by the capability plan section 4.3 (attempt bookkeeping is slice 7, the admin tester slice 5) and the store spec states these endpoint rules apart from the pure checker; they are listed under Scope NOT delivered in docs/current-state.md."
     },
     {
       "id": "F14",
@@ -165,9 +178,10 @@
       "title": "Coverage summary",
       "file": "openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md",
       "line": null,
-      "status": "open"
+      "status": "waived",
+      "reason": "Coverage summary with no defect of its own; the gaps it lists are F03 and F05, both fixed in f26150d."
     }
   ],
-  "clean": false,
+  "clean": true,
   "generatedAt": "2026-10-04T15:39:27Z"
 }

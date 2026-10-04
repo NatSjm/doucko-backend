@@ -18,7 +18,8 @@ import java.util.ResourceBundle
  * example as not WRONG (it lies in the accepted region) is it replaced by a computed example that lies outside
  * every accepted value plus the tolerance and is graded WRONG before use. There is no list of candidates to
  * skip through, so the example does not act as an oracle over a set of values, and an ungraded example is
- * never returned. When the tip would exceed 120 characters, the short template `checking.tip.short` is used.
+ * never returned. When the tip would exceed 120 characters, the short template `checking.tip.short` is used; when no
+ * example can be graded WRONG (a degenerate spec), `checking.tip.noexample` is used and nothing is revealed.
  */
 internal object FormatTips {
     private const val MAX_LENGTH = 120
@@ -29,7 +30,9 @@ internal object FormatTips {
                 Locale.ROOT,
                 FormatTips::class.java.classLoader,
                 ResourceBundle.Control.getNoFallbackControl(ResourceBundle.Control.FORMAT_PROPERTIES),
-            ).let { bundle -> (AnswerType.entries.map { it.name } + "short").associateWith { bundle.getString("checking.tip.$it") } }
+            ).let { bundle ->
+                (AnswerType.entries.map { it.name } + "short" + "noexample").associateWith { bundle.getString("checking.tip.$it") }
+            }
 
     private val FIXED_INTEGER = BigInteger.valueOf(4827)
     private const val FIXED_FRACTION = "48/29"
@@ -38,17 +41,30 @@ internal object FormatTips {
     fun tipFor(spec: AnswerSpec): String {
         val template = TIPS.getValue(spec.type.name)
         if (!template.contains("{0}")) return template
-        val example = example(spec)
+        val example = example(spec) ?: return TIPS.getValue("noexample")
         val tip = template.replace("{0}", example)
         return if (tip.length <= MAX_LENGTH) tip else TIPS.getValue("short").replace("{0}", example)
     }
 
-    private fun example(spec: AnswerSpec): String {
-        val fixed = render(spec, FIXED_INTEGER, fixed = true)
-        if (isWrong(spec, fixed)) return fixed
-        val far = render(spec, farInteger(spec), fixed = false)
-        check(isWrong(spec, far)) { "no WRONG example for a ${spec.type} part" }
-        return far
+    /**
+     * The fixed example, else the computed far one, else the far one in its most compact spelling (a long
+     * unit can push the others past the 100-code-point input limit). Null when none is graded WRONG.
+     */
+    private fun example(spec: AnswerSpec): String? {
+        val far = farInteger(spec)
+        return sequenceOf(
+            { render(spec, FIXED_INTEGER, fixed = true) },
+            { render(spec, far, fixed = false) },
+            { compact(spec, far) },
+        ).map { it() }.firstOrNull { isWrong(spec, it) }
+    }
+
+    private fun compact(
+        spec: AnswerSpec,
+        whole: BigInteger,
+    ): String {
+        val unit = spec.accepted.firstNotNullOfOrNull { UnitNotation.parse(Whitespace.trim(it))?.unit }
+        return if (spec.type == AnswerType.NUMBER_WITH_UNIT && unit != null) "$whole${unit.display}" else whole.toString()
     }
 
     private fun isWrong(

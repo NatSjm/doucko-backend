@@ -327,6 +327,10 @@
         "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
         "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
         "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "src/test/kotlin/cz/doucko/checking/CheckerEdgeCasesTest.kt",
+        "src/test/kotlin/cz/doucko/checking/CheckerEdgeCasesTest.kt",
+        "src/test/kotlin/cz/doucko/checking/CheckerEdgeCasesTest.kt",
+        "src/test/kotlin/cz/doucko/checking/CheckerEdgeCasesTest.kt",
         "src/test/kotlin/cz/doucko/checking/CheckingContractAlignmentTest.kt",
         "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt"
       ],
@@ -344,6 +348,7 @@
       "planned": true,
       "tests": [
         "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "src/test/kotlin/cz/doucko/checking/CheckerEdgeCasesTest.kt",
         "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt"
       ],
       "recordings": []
@@ -441,6 +446,7 @@
       ],
       "planned": true,
       "tests": [
+        "src/test/kotlin/cz/doucko/checking/CheckerEdgeCasesTest.kt",
         "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt"
       ],
       "recordings": []

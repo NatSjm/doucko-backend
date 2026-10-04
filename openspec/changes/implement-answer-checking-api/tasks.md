@@ -26,7 +26,7 @@
 
 - [x] 5.1 `npm run qa:verify` green.
 - [x] 5.2 `npx openspec validate implement-answer-checking-api --strict`.
-- [ ] 5.3 review-gate workflow; disposition the findings in `review-findings.json`; re-run 5.1.
+- [x] 5.3 review-gate workflow; disposition the findings in `review-findings.json`; re-run 5.1. 2026-10-04: 14 findings; F01-F05, F07, F08, F12 fixed in `f26150d`, the rest waived with reasons; 5.1 re-run PASS.
 - [x] 5.4 Smoke: no endpoint, so the smoke is the golden table and timing run inside `mvnw verify` (counts recorded in `docs/qa/evidence/slice3-checker-run.md`).
 - [x] 5.5 Update `docs/current-state.md`.
 - [ ] 5.6 Archive; commit with `Slice: implement-answer-checking-api` + `Refs: FR-14, FR-15, FR-16, FR-17, FR-18, FR-19, FR-20, FR-21, FR-23`.

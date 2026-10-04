@@ -25,14 +25,14 @@ Result: PASS, 39 warning(s)
 | FR-55 | yes | yes | backend, frontend | - | - |
 | FR-56 | yes | yes | backend | - | - |
 | FR-57 | yes | yes | backend | - | - |
-| FR-14 | yes | yes | backend | 5 | - |
-| FR-15 | yes | yes | backend | 2 | - |
+| FR-14 | yes | yes | backend | 9 | - |
+| FR-15 | yes | yes | backend | 3 | - |
 | FR-16 | yes | yes | backend | 2 | - |
 | FR-17 | yes | yes | backend | 2 | - |
 | FR-18 | yes | yes | backend | 1 | - |
 | FR-19 | yes | yes | backend | 3 | - |
 | FR-20 | yes | yes | backend | 1 | - |
-| FR-21 | yes | yes | backend | 1 | - |
+| FR-21 | yes | yes | backend | 2 | - |
 | FR-22 | yes | yes | backend, frontend | - | - |
 | FR-23 | yes | yes | backend | 7 | - |
 | FR-24 | yes | yes | backend, frontend | - | - |
