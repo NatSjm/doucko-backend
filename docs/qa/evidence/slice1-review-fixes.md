@@ -63,3 +63,68 @@ The truncated dump dropped the live table; restored the flag afterwards.
 | Provenance roots too narrow; rows outside roots / malformed accepted | roots incl. main resources and non-Kotlin test files; row and root checks | `FixtureProvenanceTest` negative cases |
 | ktlint package-name off repo-wide | exemption scoped to `**/adapter/in/**.kt` | spotless check |
 | Plain `docker compose up` bypasses the guard | documented (compose.yaml, design.md risks) | — |
+
+# Round 2 (2026-10-04)
+
+Review gate `trace/workflow-runs/20261004-051324-review-gate.json`: 17 confirmed + 5
+contested findings on top of round 1. Tests first; RED run with `.env` moved aside so
+the pre-fix `stack up --env-file` could not start anything.
+
+## Red (tests only)
+
+```
+BackupRestoreIT.restoring an older dump leaves no object from the newer schema behind
+BindAddressTest.up refuses --env-file, so the configuration it checks is the one it starts   expected:<2> but was:<1>
+DockerContextTest.dockerignore excludes env files, dumps and fixtures at any depth
+DouckoBackendApplicationIT.container-level errors are problem+json … (/error, text/html, //, ;, %2e%2e)
+DouckoBackendApplicationIT.startup mints and logs no generated password
+OperatorToolGuardTest.a link that leads into a git working tree is refused
+OperatorToolGuardTest.on Windows a backup directory outside the user profile is refused
+OperatorToolGuardTest.restore given a directory prints its usage, not a stack trace          expected:<2> but was:<1>
+RequestContentNotLoggedTest.a bound body, query and header values stay out of the logs even at TRACE
+RequestContentNotLoggedTest.the capture sees application DEBUG lines and the guard drops …   (after raising web/security to DEBUG in the control)
+Unit: Tests run: 48, Failures: 6 · IT: Tests run: 13, Failures: 7
+```
+
+The capture control first passed for the wrong reason (application.yaml already kept
+those loggers at INFO); it now raises them to DEBUG itself and was RED before the guard.
+
+## Green
+
+`npm run verify`: 48 unit, 13 integration tests; `npm run qa:verify`: Overall Pass
+(trajectory PLANNED). The regenerated QA report holds no generated password.
+
+## Mutation checks (also the RED record for task 2.9)
+
+One unit run with all of these applied, then reverted with `git checkout`:
+
+| Mutation | Caught by |
+|---|---|
+| db publishes `5432:5432` | `ComposeConfigurationTest` — database port is not published |
+| backend port without `${DOUCKO_BIND_ADDRESS…}` | `ComposeConfigurationTest` — every published port binds the configurable address |
+| `bindAddressProblem` accepts `0.0.0.0` | `BindAddressTest` — refused cases; effective-binding case |
+| `/api/admin/**` → `permitAll` | `UndeclaredPathTest` — admin area closed |
+| catalog title for 404 removed | `UndeclaredPathTest` — 404 cases |
+| `RequestContentLogGuard` removed from `logback-spring.xml` | `RequestContentNotLoggedTest` — TRACE case and capture control |
+| `**/.env` removed from `.dockerignore` | `DockerContextTest` |
+| unlisted `fixtures/self-authored/probe.json` | `FixtureProvenanceTest` — repository check |
+
+```
+Tests run: 48, Failures: 8, Errors: 5
+```
+
+Integration mutation, restore without `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`:
+
+```
+BackupRestoreIT.restoring an older dump leaves no object from the newer schema behind … exit 1: node tools/restore.mjs …
+```
+
+(the replay hit the newer objects and rolled back: caught, and nothing changed).
+Earlier: restore without `--single-transaction` → broken-dump test `expected:<live> but was:<empty>`.
+Not mutated: `ContractGenerationTest`, `ModularityTest`, `PackageLayoutTest`, the
+`stack up --env-file` refusal (a mutant would start the stack).
+
+## Accepted, not changed
+
+- A plain `docker compose up` skips the NFR-2 guard (spec says the guard runs in
+  `npm run stack:up`; compose.yaml header and design risks say so).

@@ -13,7 +13,7 @@
 - [x] 2.6 `ContractGenerationTest` (NFR-12): the generated `*Api` interfaces of every contract tag are on the classpath, generated from the pinned `contract/api/openapi.yaml`.
 - [x] 2.7 `ModularityTest` traced to NFR-11.
 - [x] 2.8 `BackupRestoreIT` (NFR-10, Docker): write a row, back up, drop the volume, restore, read the row back.
-- [ ] 2.9 Run the tests and confirm RED on assertions, not on compile errors. **Open:** no recorded RED run; only the two logging tests were seen failing against a deliberate leak (2026-10-03).
+- [x] 2.9 Run the tests and confirm RED on assertions, not on compile errors. Recorded after the fact by mutation (one targeted mutation per guarded behaviour), plus test-first RED for both review rounds: `docs/qa/evidence/slice1-review-fixes.md`.
 
 ## 3. Implementation (green)
 
