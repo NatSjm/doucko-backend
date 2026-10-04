@@ -12,7 +12,7 @@ Result: PASS, 1 warning(s)
 |---|---|---|---|---|
 | 2026-10-04-implement-admin-access-api | clean | 4 | yes | admin, shared |
 | 2026-10-04-implement-answer-checking-api | clean | 4 | yes | checking |
-| 2026-10-04-implement-authoring-tasks-api | **unclean** | 4 | yes | content |
+| 2026-10-04-implement-authoring-tasks-api | **unclean** | 5 | yes | content |
 | 2026-10-04-implement-child-profile-api | clean | 4 | yes | profile, shared |
 | 2026-10-04-implement-platform-foundation-api | clean | 8 | yes | shared |
 
@@ -26,4 +26,4 @@ None.
 
 ## Warnings
 
-- **review-evidence**: 2026-10-04-implement-authoring-tasks-api: review-findings.json is unclean — F09: a major finding cannot be waived in review evidence — fix it; F13: waived without a reason; F14: waived without a reason (review must have run, and its findings be dispositioned, before archive)
+- **review-evidence**: 2026-10-04-implement-authoring-tasks-api: review-findings.json is unclean — F13: waived without a reason; F14: waived without a reason (review must have run, and its findings be dispositioned, before archive)

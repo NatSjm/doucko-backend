@@ -23,7 +23,7 @@
     {
       "slice": "2026-10-04-implement-authoring-tasks-api",
       "reviewEvidence": "unclean",
-      "trailerCommits": 4,
+      "trailerCommits": 5,
       "libDomains": [
         "content"
       ],
@@ -54,7 +54,7 @@
   "warnings": [
     {
       "check": "review-evidence",
-      "msg": "2026-10-04-implement-authoring-tasks-api: review-findings.json is unclean — F09: a major finding cannot be waived in review evidence — fix it; F13: waived without a reason; F14: waived without a reason (review must have run, and its findings be dispositioned, before archive)"
+      "msg": "2026-10-04-implement-authoring-tasks-api: review-findings.json is unclean — F13: waived without a reason; F14: waived without a reason (review must have run, and its findings be dispositioned, before archive)"
     }
   ]
 }

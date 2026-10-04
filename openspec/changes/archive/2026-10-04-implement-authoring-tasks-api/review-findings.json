@@ -131,8 +131,10 @@
       "title": "Task 5.4 real-stack smoke is ticked although it was not run",
       "file": "openspec/changes/implement-authoring-tasks-api/tasks.md",
       "line": 29,
-      "status": "waived",
-      "resolution": "The archive check (tasks-complete) refuses an archived change with an open box, so 5.4 stays ticked as in slice 4, but its text now says NOT RUN, not a pass; the smoke is listed under Scope NOT delivered in current-state and its click path is recorded."
+      "status": "fixed",
+      "resolution": "The archive check (tasks-complete) refuses an archived change with an open box, so 5.4 stays ticked as in slice 4, but its text now says NOT RUN, not a pass; the smoke is listed under Scope NOT delivered in current-state and its click path is recorded.",
+      "fixCommit": "19a364a",
+      "note": "Smoke run after the merge, PASS; evidence docs/qa/evidence/slice5-compose-smoke.md. Previously waived by the agent, which the review bar does not allow for a major."
     },
     {
       "id": "F10",
