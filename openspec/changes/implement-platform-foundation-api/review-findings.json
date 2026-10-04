@@ -1,0 +1,176 @@
+{
+  "generatedBy": "review-gate",
+  "scope": "slice 1 platform-foundation (backend): openspec/changes/implement-platform-foundation-api",
+  "change": "implement-platform-foundation-api",
+  "baseRef": "6e13f53",
+  "headRef": "HEAD",
+  "dimensions": {
+    "correctness": {
+      "confirmed": 5,
+      "contested": 0,
+      "rejected": 1
+    },
+    "security": {
+      "confirmed": 2,
+      "contested": 1,
+      "rejected": 0
+    },
+    "spec-compliance": {
+      "confirmed": 5,
+      "contested": 0,
+      "rejected": 1
+    },
+    "visual": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "major",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Actuator discovery root /actuator stays exposed and answers 200 HAL JSON, not 404 problem+json",
+      "file": "src/main/resources/application.yaml",
+      "line": 45,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    },
+    {
+      "id": "F02",
+      "severity": "major",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "FixtureProvenanceTest exempts docs/qa/ wholesale, so screenshots or PDFs there skip the 'any media file anywhere in git' rule",
+      "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "line": 22,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    },
+    {
+      "id": "F03",
+      "severity": "major",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "git ls-files output is C-quoted for non-ASCII names, so Czech-named fixtures are silently dropped from the provenance check",
+      "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "line": 77,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    },
+    {
+      "id": "F04",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Migration 'pure DDL' exemption only spots INSERT/COPY/UPDATE at line start",
+      "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "line": 25,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    },
+    {
+      "id": "F05",
+      "severity": "major",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Tomcat logs the raw request target (query string included) at INFO when a request line has an invalid character, and the INFO cap does not stop it",
+      "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "line": 41,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    },
+    {
+      "id": "F06",
+      "severity": "major",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "FixtureProvenanceTest skips every file under docs/qa/, so screenshots and recordings can be committed there without failing the check",
+      "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "line": 22,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    },
+    {
+      "id": "F07",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "The provenance test's scope classifiers miss common document types and data-bearing migrations",
+      "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "line": 25,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    },
+    {
+      "id": "F08",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Tomcat-level URL rejections bypass the problem+json path, and Tomcat logs the raw request target at INFO, which the log guard lets through",
+      "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "line": 22,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    },
+    {
+      "id": "F09",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "FixtureProvenanceTest exempts all of docs/qa/, but the spec covers every image, document, audio or video file anywhere in git",
+      "file": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+      "line": 24,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    },
+    {
+      "id": "F10",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "The DNS-rebinding Host allowlist and the unpublished backend port have no backing requirement in the spec delta",
+      "file": "src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt",
+      "line": 52,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    },
+    {
+      "id": "F11",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "/actuator discovery root is still exposed although the spec says only health is",
+      "file": "src/main/resources/application.yaml",
+      "line": 44,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    },
+    {
+      "id": "F12",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Task 4.4 smoke is ticked, but its evidence predates the compose change and uses the now-unpublished port 8080",
+      "file": "openspec/changes/implement-platform-foundation-api/tasks.md",
+      "line": 30,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    },
+    {
+      "id": "F13",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "contested",
+      "title": "Tomcat logs a rejected request target, query string included, at INFO, which the log guard lets through",
+      "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "line": 24,
+      "status": "fixed",
+      "fixCommit": "d2cb340"
+    }
+  ],
+  "clean": false,
+  "generatedAt": "2026-10-04T12:15:32Z"
+}
