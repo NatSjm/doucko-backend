@@ -1,0 +1,212 @@
+{"id":"VN-01","req":"Verdicts and normalized interpretation","spec":{"type":"INTEGER","accepted":["1000"]},"input":"1 000","verdict":"CORRECT","normalized":"1000"}
+{"id":"VN-02","req":"Verdicts and normalized interpretation","spec":{"type":"INTEGER","accepted":["42"]},"input":"41","verdict":"WRONG","normalized":"41"}
+{"id":"VN-03","req":"Verdicts and normalized interpretation","spec":{"type":"INTEGER","accepted":["42"]},"input":"42","verdict":"CORRECT","normalized":"42"}
+{"id":"VN-04","req":"Verdicts and normalized interpretation","spec":{"type":"DECIMAL","accepted":["2.5"]},"input":"2,5","verdict":"CORRECT","normalized":"2.5"}
+{"id":"VN-05","req":"Verdicts and normalized interpretation","spec":{"type":"DECIMAL","accepted":["2.5"]},"input":"2,6","verdict":"WRONG","normalized":"2.6"}
+{"id":"VN-06","req":"Verdicts and normalized interpretation","spec":{"type":"TEXT","accepted":["pes"]},"input":"kočka","verdict":"WRONG","normalized":"kočka"}
+{"id":"VN-07","req":"Verdicts and normalized interpretation","spec":{"type":"INTEGER","accepted":["42"]},"input":"čtyřicet","verdict":"UNPARSEABLE","normalized":null}
+{"id":"VN-08","req":"Verdicts and normalized interpretation","spec":{"type":"DECIMAL","accepted":["-1.25"]},"input":"−1,250","verdict":"CORRECT","normalized":"-1.25"}
+{"id":"VN-09","req":"Verdicts and normalized interpretation","spec":{"type":"INTEGER","accepted":["1000"]},"input":"1 000","verdict":"CORRECT","normalized":"1000"}
+{"id":"NN-01","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["1000000"]},"input":"1000000","verdict":"CORRECT","normalized":"1000000"}
+{"id":"NN-02","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["1000000"]},"input":"1 000 000","verdict":"CORRECT","normalized":"1000000"}
+{"id":"NN-03","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["1000000"]},"input":"1 000 000","verdict":"CORRECT","normalized":"1000000"}
+{"id":"NN-04","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["123"]},"input":"1 2 3","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-05","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["1250"]},"input":"12 50","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-06","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["10000"]},"input":"1 0000","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-07","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["10000"]},"input":"10  000","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-08","req":"Numeric notation","spec":{"type":"DECIMAL","accepted":["0.123456"]},"input":"0,123 456","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-09","req":"Numeric notation","spec":{"type":"DECIMAL","accepted":["-0.5"]},"input":"-0,5","verdict":"CORRECT","normalized":"-0.5"}
+{"id":"NN-10","req":"Numeric notation","spec":{"type":"DECIMAL","accepted":["-0.5"]},"input":"−0,5","verdict":"CORRECT","normalized":"-0.5"}
+{"id":"NN-11","req":"Numeric notation","spec":{"type":"DECIMAL","accepted":["-0.5"]},"input":"–0,5","verdict":"CORRECT","normalized":"-0.5"}
+{"id":"NN-12","req":"Numeric notation","spec":{"type":"DECIMAL","accepted":["-0.5"]},"input":"-,5","verdict":"CORRECT","normalized":"-0.5"}
+{"id":"NN-13","req":"Numeric notation","spec":{"type":"DECIMAL","accepted":["-0.5"]},"input":"-0.50","verdict":"CORRECT","normalized":"-0.5"}
+{"id":"NN-14","req":"Numeric notation","spec":{"type":"DECIMAL","accepted":["0.5"]},"input":"+,5","verdict":"CORRECT","normalized":"0.5"}
+{"id":"NN-15","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["0"]},"input":"-0","verdict":"CORRECT","normalized":"0"}
+{"id":"NN-16","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["0"]},"input":"+0","verdict":"CORRECT","normalized":"0"}
+{"id":"NN-17","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["0"]},"input":"0","verdict":"CORRECT","normalized":"0"}
+{"id":"NN-18","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["0"]},"input":"-0,0","verdict":"CORRECT","normalized":"0"}
+{"id":"NN-19","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["5"]},"input":"--5","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-20","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["5"]},"input":"+-5","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-21","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["5"]},"input":"- 5","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-22","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["5"]},"input":"5-","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-23","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["5"]},"input":"—5","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-24","req":"Numeric notation","spec":{"type":"DECIMAL","accepted":["5"]},"input":"5,","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-25","req":"Numeric notation","spec":{"type":"DECIMAL","accepted":["5"]},"input":"5.","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-26","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["7"]},"input":"007","verdict":"CORRECT","normalized":"7"}
+{"id":"NN-27","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["1000"]},"input":"1 000","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-28","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["1000"]},"input":"1,000.5","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-29","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["3"]},"input":"٣","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NN-30","req":"Numeric notation","spec":{"type":"INTEGER","accepted":["1000"]},"input":"1e3","verdict":"UNPARSEABLE","normalized":null}
+{"id":"LA-01","req":"Input length and exact arithmetic","spec":{"type":"TEXT","accepted":["pes"]},"input":{"repeat":"a","times":10000},"verdict":"UNPARSEABLE","normalized":null}
+{"id":"LA-02","req":"Input length and exact arithmetic","spec":{"type":"INTEGER","accepted":["1"]},"input":{"repeat":"9","times":500},"verdict":"UNPARSEABLE","normalized":null}
+{"id":"LA-03","req":"Input length and exact arithmetic","spec":{"type":"INTEGER","accepted":["1"]},"input":{"prefix":"1","repeat":"0","times":99},"verdict":"WRONG","normalized":{"prefix":"1","repeat":"0","times":99}}
+{"id":"LA-04","req":"Input length and exact arithmetic","spec":{"type":"INTEGER","accepted":["1"]},"input":{"prefix":"1","repeat":"0","times":100},"verdict":"UNPARSEABLE","normalized":null}
+{"id":"LA-05","req":"Input length and exact arithmetic","spec":{"type":"INTEGER","accepted":["99999999999999999999"]},"input":"99 999 999 999 999 999 999","verdict":"CORRECT","normalized":"99999999999999999999"}
+{"id":"LA-06","req":"Input length and exact arithmetic","spec":{"type":"INTEGER","accepted":["99999999999999999999"]},"input":"100000000000000000000","verdict":"WRONG","normalized":"100000000000000000000"}
+{"id":"LA-07","req":"Input length and exact arithmetic","spec":{"type":"DECIMAL","accepted":["0.1"]},"input":"0,10000000000000000000000001","verdict":"WRONG","normalized":"0.10000000000000000000000001"}
+{"id":"LA-08","req":"Input length and exact arithmetic","spec":{"type":"TEXT","accepted":["pes"]},"input":{"prefix":"   ","repeat":"b","times":100},"verdict":"WRONG","normalized":{"repeat":"b","times":100}}
+{"id":"LA-09","req":"Input length and exact arithmetic","spec":{"type":"TEXT","accepted":["pes"]},"input":{"repeat":"b","times":101},"verdict":"UNPARSEABLE","normalized":null}
+{"id":"II-01","req":"Integer input","spec":{"type":"INTEGER","accepted":["12500"]},"input":"12500","verdict":"CORRECT","normalized":"12500"}
+{"id":"II-02","req":"Integer input","spec":{"type":"INTEGER","accepted":["12500"]},"input":"  12500  ","verdict":"CORRECT","normalized":"12500"}
+{"id":"II-03","req":"Integer input","spec":{"type":"INTEGER","accepted":["12500"]},"input":"+12500","verdict":"CORRECT","normalized":"12500"}
+{"id":"II-04","req":"Integer input","spec":{"type":"INTEGER","accepted":["12500"]},"input":"12 500","verdict":"CORRECT","normalized":"12500"}
+{"id":"II-05","req":"Integer input","spec":{"type":"INTEGER","accepted":["12500"]},"input":"12 500","verdict":"CORRECT","normalized":"12500"}
+{"id":"II-06","req":"Integer input","spec":{"type":"INTEGER","accepted":["12500"]},"input":"12 500","verdict":"CORRECT","normalized":"12500"}
+{"id":"II-07","req":"Integer input","spec":{"type":"INTEGER","accepted":["-7"]},"input":"-7","verdict":"CORRECT","normalized":"-7"}
+{"id":"II-08","req":"Integer input","spec":{"type":"INTEGER","accepted":["-7"]},"input":"−7","verdict":"CORRECT","normalized":"-7"}
+{"id":"II-09","req":"Integer input","spec":{"type":"INTEGER","accepted":["12"]},"input":"12,5","verdict":"WRONG","normalized":"12.5"}
+{"id":"II-10","req":"Integer input","spec":{"type":"INTEGER","accepted":["12"]},"input":"12,0","verdict":"CORRECT","normalized":"12"}
+{"id":"II-11","req":"Integer input","spec":{"type":"INTEGER","accepted":["12500"]},"input":"12.500","verdict":"WRONG","normalized":"12.5"}
+{"id":"II-12","req":"Integer input","spec":{"type":"INTEGER","accepted":["12"]},"input":"12a","verdict":"UNPARSEABLE","normalized":null}
+{"id":"II-13","req":"Integer input","spec":{"type":"INTEGER","accepted":["12"]},"input":"++5","verdict":"UNPARSEABLE","normalized":null}
+{"id":"II-14","req":"Integer input","spec":{"type":"INTEGER","accepted":["12"]},"input":"5-","verdict":"UNPARSEABLE","normalized":null}
+{"id":"II-15","req":"Integer input","spec":{"type":"INTEGER","accepted":["12"]},"input":"abc","verdict":"UNPARSEABLE","normalized":null}
+{"id":"II-16","req":"Integer input","spec":{"type":"INTEGER","accepted":["12"]},"input":"24/2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"II-17","req":"Integer input","spec":{"type":"INTEGER","accepted":["12"]},"input":"","verdict":"UNPARSEABLE","normalized":null}
+{"id":"II-18","req":"Integer input","spec":{"type":"INTEGER","accepted":["12"]},"input":"    ","verdict":"UNPARSEABLE","normalized":null}
+{"id":"DI-01","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["0.5"]},"input":"0,5","verdict":"CORRECT","normalized":"0.5"}
+{"id":"DI-02","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["0.5"]},"input":"0.5","verdict":"CORRECT","normalized":"0.5"}
+{"id":"DI-03","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["0.5"]},"input":"0,50","verdict":"CORRECT","normalized":"0.5"}
+{"id":"DI-04","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["0.5"]},"input":",5","verdict":"CORRECT","normalized":"0.5"}
+{"id":"DI-05","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["0.5"]},"input":".5","verdict":"CORRECT","normalized":"0.5"}
+{"id":"DI-06","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["0.5"],"exactDecimals":2},"input":"0,50","verdict":"CORRECT","normalized":"0.5"}
+{"id":"DI-07","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["0.5"],"exactDecimals":2},"input":"0,5","verdict":"WRONG","normalized":"0.5"}
+{"id":"DI-08","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["0.5"],"exactDecimals":2},"input":"0,500","verdict":"WRONG","normalized":"0.5"}
+{"id":"DI-09","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["1250.75"]},"input":"1 250,75","verdict":"CORRECT","normalized":"1250.75"}
+{"id":"DI-10","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["1250.75"]},"input":"1 250,75","verdict":"CORRECT","normalized":"1250.75"}
+{"id":"DI-11","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["1250.75"]},"input":"1 250.75","verdict":"CORRECT","normalized":"1250.75"}
+{"id":"DI-12","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["1250.75"]},"input":"1250.75","verdict":"CORRECT","normalized":"1250.75"}
+{"id":"DI-13","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["5.2"]},"input":"5,2,1","verdict":"UNPARSEABLE","normalized":null}
+{"id":"DI-14","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["5.2"]},"input":"5.2.1","verdict":"UNPARSEABLE","normalized":null}
+{"id":"DI-15","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["1250.75"]},"input":"1.250,75","verdict":"UNPARSEABLE","normalized":null}
+{"id":"DI-16","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["0.5"]},"input":",","verdict":"UNPARSEABLE","normalized":null}
+{"id":"DI-17","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["0.5"]},"input":"0, 5","verdict":"UNPARSEABLE","normalized":null}
+{"id":"DI-18","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["0.5"]},"input":"1/2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"DI-19","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["5.2"]},"input":"5,,2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"DI-20","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["3"],"exactDecimals":0},"input":"3","verdict":"CORRECT","normalized":"3"}
+{"id":"DI-21","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["3"],"exactDecimals":0},"input":"3,0","verdict":"WRONG","normalized":"3"}
+{"id":"DI-22","req":"Decimal input","spec":{"type":"DECIMAL","accepted":["12"]},"input":"12,000","verdict":"CORRECT","normalized":"12"}
+{"id":"FI-01","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"1/2","verdict":"CORRECT","normalized":"1/2"}
+{"id":"FI-02","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"1 / 2","verdict":"CORRECT","normalized":"1/2"}
+{"id":"FI-03","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"1 / 2","verdict":"CORRECT","normalized":"1/2"}
+{"id":"FI-04","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"2/4","verdict":"CORRECT","normalized":"2/4"}
+{"id":"FI-05","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"0,5","verdict":"CORRECT","normalized":"0.5"}
+{"id":"FI-06","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"0.5","verdict":"CORRECT","normalized":"0.5"}
+{"id":"FI-07","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"],"allowEquivalent":false},"input":"0,5","verdict":"WRONG","normalized":"0.5"}
+{"id":"FI-08","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"],"allowEquivalent":false},"input":"2/4","verdict":"WRONG","normalized":"2/4"}
+{"id":"FI-09","req":"Fraction input","spec":{"type":"FRACTION","accepted":["3/2"],"allowEquivalent":false},"input":"1 1/2","verdict":"WRONG","normalized":"3/2"}
+{"id":"FI-10","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1 1/2"],"allowEquivalent":false},"input":"1 1/2","verdict":"CORRECT","normalized":"3/2"}
+{"id":"FI-11","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1 1/2"],"allowEquivalent":false},"input":"3/2","verdict":"WRONG","normalized":"3/2"}
+{"id":"FI-12","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"],"requireLowestTerms":true},"input":"2/4","verdict":"WRONG","normalized":"2/4"}
+{"id":"FI-13","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"],"requireLowestTerms":true},"input":"1/2","verdict":"CORRECT","normalized":"1/2"}
+{"id":"FI-14","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"],"requireLowestTerms":true},"input":"0,5","verdict":"CORRECT","normalized":"0.5"}
+{"id":"FI-15","req":"Fraction input","spec":{"type":"FRACTION","accepted":["3/2"]},"input":"1 1/2","verdict":"CORRECT","normalized":"3/2"}
+{"id":"FI-16","req":"Fraction input","spec":{"type":"FRACTION","accepted":["3/2"]},"input":"1 1 / 2","verdict":"CORRECT","normalized":"3/2"}
+{"id":"FI-17","req":"Fraction input","spec":{"type":"FRACTION","accepted":["2001/2"]},"input":"1 000 1/2","verdict":"CORRECT","normalized":"2001/2"}
+{"id":"FI-18","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"12 500/3","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FI-19","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"1 3/2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FI-20","req":"Fraction input","spec":{"type":"FRACTION","accepted":["-1/2"]},"input":"-1/2","verdict":"CORRECT","normalized":"-1/2"}
+{"id":"FI-21","req":"Fraction input","spec":{"type":"FRACTION","accepted":["-1/2"]},"input":"−1/2","verdict":"CORRECT","normalized":"-1/2"}
+{"id":"FI-22","req":"Fraction input","spec":{"type":"FRACTION","accepted":["-1/2"]},"input":"-2/4","verdict":"CORRECT","normalized":"-2/4"}
+{"id":"FI-23","req":"Fraction input","spec":{"type":"FRACTION","accepted":["-1/2"]},"input":"-0,5","verdict":"CORRECT","normalized":"-0.5"}
+{"id":"FI-24","req":"Fraction input","spec":{"type":"FRACTION","accepted":["-3/2"]},"input":"-1 1/2","verdict":"CORRECT","normalized":"-3/2"}
+{"id":"FI-25","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"3/0","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FI-26","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"1//2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FI-27","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"1/","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FI-28","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"/2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FI-29","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"1/2/3","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FI-30","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"1/-2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FI-31","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"1,5/2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FI-32","req":"Fraction input","spec":{"type":"FRACTION","accepted":["1/2"]},"input":"1 000/3","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FI-33","req":"Fraction input","spec":{"type":"FRACTION","accepted":["7/3"]},"input":"7/3","verdict":"CORRECT","normalized":"7/3"}
+{"id":"FI-34","req":"Fraction input","spec":{"type":"FRACTION","accepted":["2/3"]},"input":"0,67","verdict":"WRONG","normalized":"0.67"}
+{"id":"NU-01","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"24 cm2","verdict":"CORRECT","normalized":"24 cm²"}
+{"id":"NU-02","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"24cm²","verdict":"CORRECT","normalized":"24 cm²"}
+{"id":"NU-03","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"24 cm^2","verdict":"CORRECT","normalized":"24 cm²"}
+{"id":"NU-04","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"24 cm²","verdict":"CORRECT","normalized":"24 cm²"}
+{"id":"NU-05","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"24 CM2","verdict":"CORRECT","normalized":"24 cm²"}
+{"id":"NU-06","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["250 ml"]},"input":"250 mL","verdict":"CORRECT","normalized":"250 ml"}
+{"id":"NU-07","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["250 ml"]},"input":"250 ML","verdict":"CORRECT","normalized":"250 ml"}
+{"id":"NU-08","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"24 xyz","verdict":"WRONG","normalized":"24 xyz"}
+{"id":"NU-09","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"24 cm³","verdict":"WRONG","normalized":"24 cm³"}
+{"id":"NU-10","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"24 cm","verdict":"WRONG","normalized":"24 cm"}
+{"id":"NU-11","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"24","verdict":"WRONG","normalized":"24"}
+{"id":"NU-12","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"],"unitRequired":false},"input":"24","verdict":"CORRECT","normalized":"24"}
+{"id":"NU-13","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"],"unitRequired":false},"input":"24 mm²","verdict":"WRONG","normalized":"24 mm²"}
+{"id":"NU-14","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["2 dm²"]},"input":"200 cm²","verdict":"WRONG","normalized":"200 cm²"}
+{"id":"NU-15","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["2.5 m"]},"input":"2,5 m","verdict":"CORRECT","normalized":"2.5 m"}
+{"id":"NU-16","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["-5 °C"]},"input":"−5 °C","verdict":"CORRECT","normalized":"-5 °C"}
+{"id":"NU-17","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"cm²","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NU-18","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"5,,2 cm","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NU-19","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"24 cm 2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NU-20","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"24 2cm","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NU-21","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"1/2 m","verdict":"UNPARSEABLE","normalized":null}
+{"id":"NU-22","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 m²"]},"input":"24 M3","verdict":"WRONG","normalized":"24 M³"}
+{"id":"NU-23","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["1250 m"]},"input":"1 250 m","verdict":"CORRECT","normalized":"1250 m"}
+{"id":"NU-24","req":"Numbers with units","spec":{"type":"NUMBER_WITH_UNIT","accepted":["8 m³"]},"input":"8m^3","verdict":"CORRECT","normalized":"8 m³"}
+{"id":"MC-01","req":"Multiple choice","spec":{"type":"CHOICE_SINGLE","accepted":["B"],"options":["A","B","C","D"]},"input":["B"],"verdict":"CORRECT","normalized":"B"}
+{"id":"MC-02","req":"Multiple choice","spec":{"type":"CHOICE_SINGLE","accepted":["B"],"options":["A","B","C","D"]},"input":["C"],"verdict":"WRONG","normalized":"C"}
+{"id":"MC-03","req":"Multiple choice","spec":{"type":"CHOICE_SINGLE","accepted":["B"],"options":["A","B","C","D"]},"input":["B","C"],"verdict":"UNPARSEABLE","normalized":null}
+{"id":"MC-04","req":"Multiple choice","spec":{"type":"CHOICE_SINGLE","accepted":["B"],"options":["A","B","C","D"]},"input":["B","B"],"verdict":"CORRECT","normalized":"B"}
+{"id":"MC-05","req":"Multiple choice","spec":{"type":"CHOICE_SINGLE","accepted":["B"],"options":["A","B","C","D"]},"input":[],"verdict":"UNPARSEABLE","normalized":null}
+{"id":"MC-06","req":"Multiple choice","spec":{"type":"CHOICE_SINGLE","accepted":["B"],"options":["A","B","C","D"]},"input":["E"],"verdict":"UNPARSEABLE","normalized":null}
+{"id":"MC-07","req":"Multiple choice","spec":{"type":"CHOICE_SINGLE","accepted":["B"],"options":["A","B","C","D"]},"input":["b"],"verdict":"UNPARSEABLE","normalized":null}
+{"id":"MC-08","req":"Multiple choice","spec":{"type":"CHOICE_MULTI","accepted":["A","C"],"options":["A","B","C","D"]},"input":["C","A"],"verdict":"CORRECT","normalized":"A,C"}
+{"id":"MC-09","req":"Multiple choice","spec":{"type":"CHOICE_MULTI","accepted":["A","C"],"options":["A","B","C","D"]},"input":["A","A","C"],"verdict":"CORRECT","normalized":"A,C"}
+{"id":"MC-10","req":"Multiple choice","spec":{"type":"CHOICE_MULTI","accepted":["A","C"],"options":["A","B","C","D"]},"input":["A"],"verdict":"WRONG","normalized":"A"}
+{"id":"MC-11","req":"Multiple choice","spec":{"type":"CHOICE_MULTI","accepted":["A","C"],"options":["A","B","C","D"]},"input":["A","B","C"],"verdict":"WRONG","normalized":"A,B,C"}
+{"id":"MC-12","req":"Multiple choice","spec":{"type":"CHOICE_MULTI","accepted":["A","C"],"options":["A","B","C","D"]},"input":[],"verdict":"UNPARSEABLE","normalized":null}
+{"id":"MC-13","req":"Multiple choice","spec":{"type":"CHOICE_MULTI","accepted":["A","C"],"options":["A","B","C","D"]},"input":["A","E"],"verdict":"UNPARSEABLE","normalized":null}
+{"id":"MC-14","req":"Multiple choice","spec":{"type":"CHOICE_MULTI","accepted":["A","C"],"options":["A","B","C","D"]},"input":["D","B"],"verdict":"WRONG","normalized":"B,D"}
+{"id":"ST-01","req":"Short text","spec":{"type":"TEXT","accepted":["Žirafa"]},"input":"žirafa","verdict":"CORRECT","normalized":"žirafa"}
+{"id":"ST-02","req":"Short text","spec":{"type":"TEXT","accepted":["Žirafa"]},"input":"  ZIRAFA  ","verdict":"CORRECT","normalized":"ZIRAFA"}
+{"id":"ST-03","req":"Short text","spec":{"type":"TEXT","accepted":["Žirafa"]},"input":"zirafa","verdict":"CORRECT","normalized":"zirafa"}
+{"id":"ST-04","req":"Short text","spec":{"type":"TEXT","accepted":["pravý úhel"]},"input":"pravy   uhel","verdict":"CORRECT","normalized":"pravy uhel"}
+{"id":"ST-05","req":"Short text","spec":{"type":"TEXT","accepted":["pravý úhel"]},"input":"pravý úhel","verdict":"CORRECT","normalized":"pravý úhel"}
+{"id":"ST-06","req":"Short text","spec":{"type":"TEXT","accepted":["Žirafa"],"diacriticsStrict":true},"input":"Žirafa","verdict":"CORRECT","normalized":"Žirafa"}
+{"id":"ST-07","req":"Short text","spec":{"type":"TEXT","accepted":["Žirafa"],"diacriticsStrict":true},"input":"zirafa","verdict":"WRONG","normalized":"zirafa"}
+{"id":"ST-08","req":"Short text","spec":{"type":"TEXT","accepted":["Žirafa"],"diacriticsStrict":true},"input":"ŽIRAFA","verdict":"CORRECT","normalized":"ŽIRAFA"}
+{"id":"ST-09","req":"Short text","spec":{"type":"TEXT","accepted":["pravý"]},"input":"pravý.","verdict":"WRONG","normalized":"pravý."}
+{"id":"ST-10","req":"Short text","spec":{"type":"TEXT","accepted":["pravý"]},"input":"","verdict":"UNPARSEABLE","normalized":null}
+{"id":"ST-11","req":"Short text","spec":{"type":"TEXT","accepted":["pravý"]},"input":" \t ","verdict":"UNPARSEABLE","normalized":null}
+{"id":"ST-12","req":"Short text","spec":{"type":"TEXT","accepted":["kůň"],"diacriticsStrict":true},"input":"kun","verdict":"WRONG","normalized":"kun"}
+{"id":"AA-01","req":"Accepted alternatives","spec":{"type":"TEXT","accepted":["pravý úhel","pravý"]},"input":"pravy","verdict":"CORRECT","normalized":"pravy"}
+{"id":"AA-02","req":"Accepted alternatives","spec":{"type":"TEXT","accepted":["pravý úhel","pravý"]},"input":"Pravý úhel","verdict":"CORRECT","normalized":"Pravý úhel"}
+{"id":"AA-03","req":"Accepted alternatives","spec":{"type":"TEXT","accepted":["pravý úhel","pravý"]},"input":"prava","verdict":"WRONG","normalized":"prava"}
+{"id":"AA-04","req":"Accepted alternatives","spec":{"type":"INTEGER","accepted":["4","-4"]},"input":"-4","verdict":"CORRECT","normalized":"-4"}
+{"id":"AA-05","req":"Accepted alternatives","spec":{"type":"INTEGER","accepted":["4","-4"]},"input":"4","verdict":"CORRECT","normalized":"4"}
+{"id":"AA-06","req":"Accepted alternatives","spec":{"type":"INTEGER","accepted":["4","-4"]},"input":"3","verdict":"WRONG","normalized":"3"}
+{"id":"AA-07","req":"Accepted alternatives","spec":{"type":"CHOICE_SINGLE","accepted":["A","D"],"options":["A","B","C","D"]},"input":["D"],"verdict":"CORRECT","normalized":"D"}
+{"id":"AA-08","req":"Accepted alternatives","spec":{"type":"NUMBER_WITH_UNIT","accepted":["3 m","-3 m"]},"input":"−3 M","verdict":"CORRECT","normalized":"-3 m"}
+{"id":"NT-01","req":"Numeric tolerance","spec":{"type":"DECIMAL","accepted":["3.14"]},"input":"3,141","verdict":"WRONG","normalized":"3.141"}
+{"id":"NT-02","req":"Numeric tolerance","spec":{"type":"DECIMAL","accepted":["3.14"],"tolerance":"0.01"},"input":"3,13","verdict":"CORRECT","normalized":"3.13"}
+{"id":"NT-03","req":"Numeric tolerance","spec":{"type":"DECIMAL","accepted":["3.14"],"tolerance":"0.01"},"input":"3,15","verdict":"CORRECT","normalized":"3.15"}
+{"id":"NT-04","req":"Numeric tolerance","spec":{"type":"DECIMAL","accepted":["3.14"],"tolerance":"0.01"},"input":"3,145","verdict":"CORRECT","normalized":"3.145"}
+{"id":"NT-05","req":"Numeric tolerance","spec":{"type":"DECIMAL","accepted":["3.14"],"tolerance":"0.01"},"input":"3,16","verdict":"WRONG","normalized":"3.16"}
+{"id":"NT-06","req":"Numeric tolerance","spec":{"type":"DECIMAL","accepted":["3.14"],"tolerance":"0.01"},"input":"3,1500000001","verdict":"WRONG","normalized":"3.1500000001"}
+{"id":"NT-07","req":"Numeric tolerance","spec":{"type":"DECIMAL","accepted":["2.5","-2.5"],"tolerance":"0.1"},"input":"-2,45","verdict":"CORRECT","normalized":"-2.45"}
+{"id":"NT-08","req":"Numeric tolerance","spec":{"type":"FRACTION","accepted":["1/3"],"tolerance":"0.01"},"input":"0,33","verdict":"CORRECT","normalized":"0.33"}
+{"id":"NT-09","req":"Numeric tolerance","spec":{"type":"FRACTION","accepted":["1/3"],"tolerance":"0.01"},"input":"33/100","verdict":"CORRECT","normalized":"33/100"}
+{"id":"NT-10","req":"Numeric tolerance","spec":{"type":"FRACTION","accepted":["1/3"],"tolerance":"0.01"},"input":"0,32","verdict":"WRONG","normalized":"0.32"}
+{"id":"NT-11","req":"Numeric tolerance","spec":{"type":"FRACTION","accepted":["1/2"],"allowEquivalent":false,"tolerance":"0.01"},"input":"0,49","verdict":"WRONG","normalized":"0.49"}
+{"id":"NT-12","req":"Numeric tolerance","spec":{"type":"FRACTION","accepted":["1/2"],"allowEquivalent":false,"tolerance":"0.01"},"input":"49/100","verdict":"WRONG","normalized":"49/100"}
+{"id":"NT-13","req":"Numeric tolerance","spec":{"type":"FRACTION","accepted":["1/2"],"allowEquivalent":false,"tolerance":"0.01"},"input":"0,5","verdict":"WRONG","normalized":"0.5"}
+{"id":"NT-14","req":"Numeric tolerance","spec":{"type":"FRACTION","accepted":["1/2"],"allowEquivalent":false,"tolerance":"0.01"},"input":"1/2","verdict":"CORRECT","normalized":"1/2"}
+{"id":"NT-15","req":"Numeric tolerance","spec":{"type":"DECIMAL","accepted":["3.14"],"tolerance":"0.01","exactDecimals":2},"input":"3,15","verdict":"CORRECT","normalized":"3.15"}
+{"id":"NT-16","req":"Numeric tolerance","spec":{"type":"DECIMAL","accepted":["3.14"],"tolerance":"0.01","exactDecimals":2},"input":"3,140","verdict":"WRONG","normalized":"3.14"}
+{"id":"NT-17","req":"Numeric tolerance","spec":{"type":"NUMBER_WITH_UNIT","accepted":["12.5 cm"],"tolerance":"0.1"},"input":"12,5 mm","verdict":"WRONG","normalized":"12.5 mm"}
+{"id":"NT-18","req":"Numeric tolerance","spec":{"type":"INTEGER","accepted":["100"],"tolerance":"2"},"input":"102","verdict":"CORRECT","normalized":"102"}
+{"id":"NT-19","req":"Numeric tolerance","spec":{"type":"INTEGER","accepted":["100"],"tolerance":"2"},"input":"103","verdict":"WRONG","normalized":"103"}
+{"id":"NT-20","req":"Numeric tolerance","spec":{"type":"INTEGER","accepted":["100"],"tolerance":"0"},"input":"101","verdict":"WRONG","normalized":"101"}
+{"id":"NT-21","req":"Numeric tolerance","spec":{"type":"NUMBER_WITH_UNIT","accepted":["12.5 cm"],"tolerance":"0,1"},"input":"12,4 cm","verdict":"CORRECT","normalized":"12.4 cm"}
+{"id":"NT-22","req":"Numeric tolerance","spec":{"type":"FRACTION","accepted":["1/2"],"requireLowestTerms":true,"tolerance":"0.1"},"input":"2/4","verdict":"WRONG","normalized":"2/4"}
+{"id":"FT-01","req":"Format tip for unreadable input","spec":{"type":"DECIMAL","accepted":["3.7"]},"input":"5,,2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-02","req":"Format tip for unreadable input","spec":{"type":"DECIMAL","accepted":["5.2"]},"input":"5,,2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-03","req":"Format tip for unreadable input","spec":{"type":"NUMBER_WITH_UNIT","accepted":["24 cm²"]},"input":"24 cm 2","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-04","req":"Format tip for unreadable input","spec":{"type":"TEXT","accepted":["pes"]},"input":"","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-05","req":"Format tip for unreadable input","spec":{"type":"CHOICE_SINGLE","accepted":["C"],"options":["A","B","C","D"]},"input":["A","B"],"verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-06","req":"Format tip for unreadable input","spec":{"type":"FRACTION","accepted":["3/4"]},"input":"3/0","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-07","req":"Format tip for unreadable input","spec":{"type":"INTEGER","accepted":["12"]},"input":"12a","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-08","req":"Format tip for unreadable input","spec":{"type":"CHOICE_MULTI","accepted":["A","B"],"options":["A","B","C"]},"input":["Z"],"verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-09","req":"Format tip for unreadable input","spec":{"type":"DECIMAL","accepted":["5.25"],"exactDecimals":2},"input":"5,2x","verdict":"UNPARSEABLE","normalized":null}
+{"id":"FT-10","req":"Format tip for unreadable input","spec":{"type":"NUMBER_WITH_UNIT","accepted":["5.2 kg"],"unitRequired":false},"input":"kg","verdict":"UNPARSEABLE","normalized":null}

@@ -8,7 +8,7 @@
 - **Date and time:** 2026-10-04 (Europe/Prague)
 - **Current phase:** Phase 4
 - **Last completed gate:** G3
-- **Active change:** none. Slice 2 `implement-admin-access-api` archived 2026-10-04 (branch `slice2-admin-access`, not pushed or merged).
+- **Active change:** `implement-answer-checking-api` (slice 3, branch `slice3-answer-checking`, not pushed or merged). Slice 2 `implement-admin-access-api` archived 2026-10-04.
 - **Contract pin:** `contract/` submodule (`url = ../docs`) at docs `4c87d67`, API 0.5.1
 - **Progress:** Spring Boot 4.1.1 / Kotlin 2.3 / JVM 21 scaffold (ADR-0003) plus slice 1 platform
   foundation: Compose stack (db, backend, frontend; only the frontend's 8081 published, on
@@ -17,9 +17,13 @@
   request content never logged (log guard incl. Tomcat parser), DNS-rebinding Host allowlist
   (`StrictHttpFirewall`), fixture provenance test. Slice 2: module `cz.doucko.admin` with
   its own chain for `/api/admin/**` (sign-in, session check, sign-out, CSRF, 401 before 403, 8 h idle
-  expiry on an injectable `Clock`, startup password policy).
-- **Next task:** slice 3 (answer-checker) or 4 (child-profile) per the capability plan.
+  expiry on an injectable `Clock`, startup password policy). Slice 3: pure module `cz.doucko.checking`
+  (`AnswerChecker.check`, no Spring or DB) for all seven answer types, exact rational arithmetic, tolerance,
+  alternatives and Czech format tips from `messages.properties`; 212-case golden table.
+- **Next task:** slice 3 review gate, finding dispositions and archive; then slice 4 (child-profile) or 5 per the capability plan.
 - **Claims:**
+  - Slice 3 QA battery passes (335 unit, 25 integration tests; 212 golden cases, checker p95 36–51 µs) — evidence: `docs/qa/automated-verification-latest.md`, `docs/qa/evidence/slice3-checker-run.md` (2026-10-04)
+  - Slice 3 RED run — evidence: `docs/qa/evidence/slice3-red-run.md`
   - Slice 2 QA battery passes (108 unit, 25 integration tests incl. `AdminSessionIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
   - Slice 2 RED run — evidence: `docs/qa/evidence/slice2-red-run.md`; real-stack smoke — evidence: `docs/qa/evidence/slice2-compose-smoke.md`
   - QA battery passes — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
@@ -28,7 +32,7 @@
     `openspec/changes/archive/*implement-platform-foundation-api/review-findings.json`
   - G0, G2, G4, G5, G6, G8 PASS (G4 audits the archived slice); G1 and G3 need the owner's sign-off; G7 (release) fails until every
     MVP slice is archived. Evidence: `npm run gate:status`
-- **Scope NOT delivered:** the "Child write is limited to its own practice" scenario (needs slice 7 attempts); every product capability after slice 1 (authoring, practice, gamification,
+- **Scope NOT delivered:** the answer-checking endpoint rules (FR-22 whole-submission refusal, answer tester, re-evaluation: slices 5, 7, 9); the "Child write is limited to its own practice" scenario (needs slice 7 attempts); every product capability after slice 1 (authoring, practice, gamification,
   admin-access, stats); Modulith JPA event registry (deferred, ADR-0003); the round-3 review fixes
   were not re-confirmed by a further review round (owner's choice).
 

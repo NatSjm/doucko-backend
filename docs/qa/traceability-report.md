@@ -5,7 +5,7 @@ requirements/spec/test/recording change; CI runs `--check-fresh`.
 
 Repo: backend (contract: submodule).
 Scope: 48 MVP functional requirements, 47 owned by backend.
-Result: PASS, 47 warning(s)
+Result: PASS, 39 warning(s)
 
 | FR | Spec | Plan | Owner repo(s) | Test trace here | Recording here |
 |---|---|---|---|---|---|
@@ -25,16 +25,16 @@ Result: PASS, 47 warning(s)
 | FR-55 | yes | yes | backend, frontend | - | - |
 | FR-56 | yes | yes | backend | - | - |
 | FR-57 | yes | yes | backend | - | - |
-| FR-14 | yes | yes | backend | - | - |
-| FR-15 | yes | yes | backend | - | - |
-| FR-16 | yes | yes | backend | - | - |
-| FR-17 | yes | yes | backend | - | - |
-| FR-18 | yes | yes | backend | - | - |
-| FR-19 | yes | yes | backend | - | - |
-| FR-20 | yes | yes | backend | - | - |
-| FR-21 | yes | yes | backend | - | - |
+| FR-14 | yes | yes | backend | 5 | - |
+| FR-15 | yes | yes | backend | 2 | - |
+| FR-16 | yes | yes | backend | 2 | - |
+| FR-17 | yes | yes | backend | 2 | - |
+| FR-18 | yes | yes | backend | 1 | - |
+| FR-19 | yes | yes | backend | 3 | - |
+| FR-20 | yes | yes | backend | 1 | - |
+| FR-21 | yes | yes | backend | 1 | - |
 | FR-22 | yes | yes | backend, frontend | - | - |
-| FR-23 | yes | yes | backend | - | - |
+| FR-23 | yes | yes | backend | 6 | - |
 | FR-24 | yes | yes | backend, frontend | - | - |
 | FR-25 | yes | yes | backend, frontend | - | - |
 | FR-26 | yes | yes | backend, frontend | - | - |
@@ -113,16 +113,7 @@ None.
 - **test-trace**: FR-55 (owned by backend) has no test annotated "@trace FR-55"
 - **test-trace**: FR-56 (owned by backend) has no test annotated "@trace FR-56"
 - **test-trace**: FR-57 (owned by backend) has no test annotated "@trace FR-57"
-- **test-trace**: FR-14 (owned by backend) has no test annotated "@trace FR-14"
-- **test-trace**: FR-15 (owned by backend) has no test annotated "@trace FR-15"
-- **test-trace**: FR-16 (owned by backend) has no test annotated "@trace FR-16"
-- **test-trace**: FR-17 (owned by backend) has no test annotated "@trace FR-17"
-- **test-trace**: FR-18 (owned by backend) has no test annotated "@trace FR-18"
-- **test-trace**: FR-19 (owned by backend) has no test annotated "@trace FR-19"
-- **test-trace**: FR-20 (owned by backend) has no test annotated "@trace FR-20"
-- **test-trace**: FR-21 (owned by backend) has no test annotated "@trace FR-21"
 - **test-trace**: FR-22 (owned by backend) has no test annotated "@trace FR-22"
-- **test-trace**: FR-23 (owned by backend) has no test annotated "@trace FR-23"
 - **test-trace**: FR-24 (owned by backend) has no test annotated "@trace FR-24"
 - **test-trace**: FR-25 (owned by backend) has no test annotated "@trace FR-25"
 - **test-trace**: FR-26 (owned by backend) has no test annotated "@trace FR-26"
@@ -144,3 +135,4 @@ None.
 - **test-trace**: FR-42 (owned by backend) has no test annotated "@trace FR-42"
 - **test-trace**: FR-43 (owned by backend) has no test annotated "@trace FR-43"
 - **test-trace**: FR-44 (owned by backend) has no test annotated "@trace FR-44"
+- **active-changes**: active change "implement-answer-checking-api" is not archived

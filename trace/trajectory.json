@@ -4,7 +4,7 @@
     {
       "slice": "2026-10-04-implement-admin-access-api",
       "reviewEvidence": "clean",
-      "trailerCommits": 3,
+      "trailerCommits": 4,
       "libDomains": [
         "admin",
         "shared"

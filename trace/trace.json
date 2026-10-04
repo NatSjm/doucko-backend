@@ -319,10 +319,17 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/answer-checking/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md",
+        "openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "src/test/kotlin/cz/doucko/checking/CheckingContractAlignmentTest.kt",
+        "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -335,7 +342,10 @@
         "contract/openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -348,7 +358,10 @@
         "contract/openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -362,7 +375,10 @@
         "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -375,7 +391,9 @@
         "contract/openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -388,7 +406,11 @@
         "contract/openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -402,7 +424,9 @@
         "contract/openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -412,10 +436,13 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/answer-checking/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md",
+        "openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -439,10 +466,18 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/answer-checking/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md",
+        "openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt",
+        "src/test/kotlin/cz/doucko/checking/CheckingPurityTest.kt",
+        "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
+        "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
+        "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
+        "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -1116,43 +1151,7 @@
     },
     {
       "check": "test-trace",
-      "msg": "FR-14 (owned by backend) has no test annotated \"@trace FR-14\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-15 (owned by backend) has no test annotated \"@trace FR-15\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-16 (owned by backend) has no test annotated \"@trace FR-16\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-17 (owned by backend) has no test annotated \"@trace FR-17\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-18 (owned by backend) has no test annotated \"@trace FR-18\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-19 (owned by backend) has no test annotated \"@trace FR-19\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-20 (owned by backend) has no test annotated \"@trace FR-20\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-21 (owned by backend) has no test annotated \"@trace FR-21\""
-    },
-    {
-      "check": "test-trace",
       "msg": "FR-22 (owned by backend) has no test annotated \"@trace FR-22\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-23 (owned by backend) has no test annotated \"@trace FR-23\""
     },
     {
       "check": "test-trace",
@@ -1237,6 +1236,10 @@
     {
       "check": "test-trace",
       "msg": "FR-44 (owned by backend) has no test annotated \"@trace FR-44\""
+    },
+    {
+      "check": "active-changes",
+      "msg": "active change \"implement-answer-checking-api\" is not archived"
     }
   ]
 }

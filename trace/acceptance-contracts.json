@@ -71,64 +71,64 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-15": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-16": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-17": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-18": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-19": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-20": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-21": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-22": [
@@ -143,8 +143,8 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-27": [
