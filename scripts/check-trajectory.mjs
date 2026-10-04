@@ -29,7 +29,7 @@
 import { readdirSync, readFileSync, statSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { loadConfig, startedSlices } from "./lib/factory-config.mjs";
+import { loadConfig, reviewDisposition, startedSlices } from "./lib/factory-config.mjs";
 
 const root = process.cwd();
 const flags = new Set(process.argv.slice(2));
@@ -78,17 +78,22 @@ for (const slice of slices) {
   const trailerName = slice.replace(/^\d{4}-\d{2}-\d{2}-/, "");
 
   // 1. review evidence
+  // PD-15: clean = nothing confirmed, or every finding dispositioned (majors fixed in a real commit).
   let reviewEvidence = "missing";
+  let reviewOpen = [];
   const rf = read(join(dir, "review-findings.json"));
   if (rf) {
     try {
-      reviewEvidence = JSON.parse(rf).clean === true ? "clean" : "unclean";
+      const verdict = reviewDisposition(JSON.parse(rf), (sha) => git(["cat-file", "-e", `${sha}^{commit}`]).ok);
+      reviewEvidence = verdict.clean ? "clean" : "unclean";
+      reviewOpen = verdict.open;
     } catch {
       reviewEvidence = "unparseable";
     }
   }
   if (reviewEvidence !== "clean") {
-    gated(flags.has("--release"), "review-evidence", `${slice}: review-findings.json is ${reviewEvidence} (review must have run clean before archive)`);
+    const why = reviewOpen.length ? ` — ${reviewOpen.slice(0, 5).join("; ")}${reviewOpen.length > 5 ? ` (+${reviewOpen.length - 5} more)` : ""}` : "";
+    gated(flags.has("--release"), "review-evidence", `${slice}: review-findings.json is ${reviewEvidence}${why} (review must have run, and its findings be dispositioned, before archive)`);
   }
 
   // 2. process completeness

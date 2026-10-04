@@ -1,8 +1,8 @@
 {
-  "createdAt": "2026-10-03T23:30:40.738Z",
-  "gitHead": "69ea34355d323c9d40100011b8f047e3b9bf31a1",
+  "createdAt": "2026-10-04T05:49:42.961Z",
+  "gitHead": "af9a4c2499b6ff24f2b65b3219616b97da0b65ec",
   "files": {
-    ".claude/workflows/review-gate.js": "7295d8e94ba347213120b9d190b9ebbb88dee373173cfc7daba2114b726ca76b",
+    ".claude/workflows/review-gate.js": "9f9e52f080beac273019e5a4bd704e50b67d340925d613f16bfacc106dac4428",
     ".claude/workflows/trajectory-eval.js": "ea229b3a57f6e0723c27e9f3148fdd5df17181225349d8b0770dc346efe47715",
     ".githooks/commit-msg": "252e926124a88e9b45eb58d44a3de1ab61527305a77ce0bc75c8db9319e218f8",
     ".githooks/pre-commit": "dffa1154686e27f1fa24323e95371be4ada9cbbe096580049be113dc8e08ce06",
@@ -14,14 +14,14 @@
     "scripts/check-acceptance-methods.mjs": "1f7ce3e924b64a93a4b0b63ffa36bf6bdc16fa5ffb19caf6621fac7aea54fc39",
     "scripts/check-coverage-ratchet.mjs": "99acb7e873845655fa21c202a199e57716757e269f5209d25d8315458ede9e33",
     "scripts/check-factory-integrity.mjs": "40aae2f7f12ae0a1f30897977e08ce9ad2617e9a4f7d007361fe75b460fd9883",
-    "scripts/check-process-ratchet.mjs": "417743a1465e7d4735d5da1f50dd50ec4bfa114153e0e76f37c9c0f3061ceb6c",
+    "scripts/check-process-ratchet.mjs": "2aaf87ec0d262659e70906f32a83700e60d48d562d5cf3d036957402835db38d",
     "scripts/check-traceability.mjs": "489a1532aad09eef4f2b8a9dbef9fbf7e20b42d60919bcc51108b842d254090e",
-    "scripts/check-trajectory.mjs": "79fcfe10d671998f48ac14e44ab65ebafa10445a6b8de97aac881fe2d971e916",
+    "scripts/check-trajectory.mjs": "674917612cf4419aa206d5b207d8c3b412a3382cbcd3b464f1e04c73340f4813",
     "scripts/gate-status.mjs": "d9c79391086129ca8a9fb512fcc13be5083db1bc73d79b26525c51ae84777754",
     "scripts/hooks-commit-msg.mjs": "2cd9ebbd0054e1dfc9a9b2b39bca25de6d3dc188fd5d7793808ee48f209aaf20",
     "scripts/hooks-post-edit.mjs": "9b51573b157c1841f5fc275ea9f7b4a2b0167f664860a65d00f8c6a1503a89e0",
     "scripts/hooks-pre-commit.mjs": "8ab9935d45c8ee3e5219c7703e5af953eb8c671752e6981482518adcae886209",
-    "scripts/lib/factory-config.mjs": "b01f6c55d32603cbc5be5bfd29a4a45a42bd6229f077be1c0f9caf32865c5c2c",
+    "scripts/lib/factory-config.mjs": "f69c6eef6b623229e4d11d9c53dacf85db8b26310e741ab6f0f7dc0b4530e8d6",
     "scripts/qa-verify.mjs": "77e5c4a00ff226baeabb5a9adedd4546d11db758ce4c5692301138a07616906e"
   },
   "adaptations": [

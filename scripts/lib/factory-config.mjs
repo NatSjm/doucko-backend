@@ -338,3 +338,32 @@ export function readCoverage(root = process.cwd()) {
     metrics: Object.fromEntries(["lines", "statements", "functions", "branches"].map((m) => [m, total[m].pct])),
   };
 }
+
+/**
+ * PD-15: the review bar. A slice's `review-findings.json` (written by the review-gate workflow) is
+ * clean when the review confirmed nothing, or when every finding it lists is dispositioned:
+ *   - critical / major: `status: "fixed"` with a `fixCommit` that exists (`commitExists(sha)`);
+ *   - minor: `status: "fixed"` with a `fixCommit` that exists, or `status: "waived"` with a `reason`.
+ * A major can never be waived here; that needs the human waiver path (docs/qa/waivers/).
+ * Returns { clean, open: [ "<id>: <why>" ] }.
+ */
+export function reviewDisposition(evidence, commitExists = () => true) {
+  if (!evidence || typeof evidence !== "object") return { clean: false, open: ["not a JSON object"] };
+  const findings = Array.isArray(evidence.findings) ? evidence.findings : null;
+  if (!findings) return evidence.clean === true ? { clean: true, open: [] } : { clean: false, open: ["no findings list to disposition"] };
+  const open = [];
+  for (const f of findings) {
+    const id = f.id ?? f.title ?? "(unnamed)";
+    const minor = f.severity === "minor";
+    if (f.status === "fixed") {
+      if (!f.fixCommit) open.push(`${id}: fixed without a fixCommit`);
+      else if (!commitExists(f.fixCommit)) open.push(`${id}: fixCommit ${f.fixCommit} is not a commit here`);
+    } else if (f.status === "waived") {
+      if (!minor) open.push(`${id}: a ${f.severity ?? "unrated"} finding cannot be waived in review evidence — fix it`);
+      else if (!String(f.reason ?? "").trim()) open.push(`${id}: waived without a reason`);
+    } else {
+      open.push(`${id}: ${f.severity ?? "unrated"} finding is open`);
+    }
+  }
+  return { clean: open.length === 0, open };
+}

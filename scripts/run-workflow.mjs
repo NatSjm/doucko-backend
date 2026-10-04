@@ -18,6 +18,10 @@
 //   pipeline(items, stage1, stage2, ..) -> each item flows through the stages
 //       concurrently; stage n>1 receives (previousResult, item, index)
 //   phase(title), log(message), args (from --args / --args-file)
+//   persist(relPath, data) -> writes a file deterministically (PD-14): an object is written as
+//       pretty JSON, a string as is; every "WORKFLOW_FILL_ISO_UTC" / "WRITER_FILL_ISO_UTC" becomes
+//       the current UTC time. The path must stay inside the repo. Agent steps run with read-only
+//       tools by default and cannot write files, so evidence is persisted here, never by an agent.
 //
 // Every run writes a record (each step: label, phase, agent, duration, cost,
 // session, outcome, result) to trace/workflow-runs/<stamp>-<name>.json and a
@@ -42,7 +46,7 @@
 // Each agent() step is a billed Claude run — mind --max-total-usd.
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 const root = process.cwd();
 const argv = process.argv.slice(2);
@@ -279,6 +283,25 @@ function phase(title) {
   currentPhase = title;
   console.log(`\n== ${title}`);
 }
+const persisted = [];
+async function persist(relPath, data) {
+  const base = resolve(root);
+  const target = resolve(base, String(relPath));
+  const rel = relative(base, target);
+  if (!rel || rel.startsWith("..") || isAbsolute(rel)) throw new Error(`persist: ${relPath} is outside the repository`);
+  const now = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  const text = (typeof data === "string" ? data : `${JSON.stringify(data, null, 2)}\n`).replace(/WORKFLOW_FILL_ISO_UTC|WRITER_FILL_ISO_UTC/g, now);
+  const shown = rel.replaceAll("\\", "/");
+  persisted.push(shown);
+  if (DRY) {
+    console.log(`  · persist ${shown} (${text.length} chars, dry run — not written)`);
+    return shown;
+  }
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, text);
+  console.log(`  ✓ persist ${shown}`);
+  return shown;
+}
 function log(message) {
   logs.push({ phase: currentPhase, message: String(message) });
   console.log(`  [log] ${message}`);
@@ -297,8 +320,8 @@ let returned;
 let thrown = null;
 console.log(`workflow ${wfName}${DRY ? " (dry run — no API calls)" : ""} — concurrency ${CONCURRENCY}, max total $${MAX_TOTAL}`);
 try {
-  const fn = new AsyncFunction("__ctx", "agent", "parallel", "pipeline", "phase", "log", "args", body);
-  returned = await fn(__ctx, agent, parallel, pipeline, phase, log, args);
+  const fn = new AsyncFunction("__ctx", "agent", "parallel", "pipeline", "phase", "log", "args", "persist", body);
+  returned = await fn(__ctx, agent, parallel, pipeline, phase, log, args, persist);
 } catch (e) {
   thrown = e;
   console.error(`\nworkflow threw: ${e?.stack ?? e}`);
@@ -323,6 +346,7 @@ const record = {
   totalCostUsd: Number(totalCost.toFixed(4)),
   steps,
   logs,
+  persisted,
   returned: returned ?? null,
 };
 mkdirSync(recordDir, { recursive: true });

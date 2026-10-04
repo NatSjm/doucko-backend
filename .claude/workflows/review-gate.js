@@ -122,9 +122,12 @@ const rejected = verified.filter(Boolean).filter((f) => f.verdict === 'rejected'
 log(`confirmed: ${confirmed.length}, contested: ${contested.length}, rejected: ${rejected.length}`)
 
 // Persist per-slice review evidence so check-trajectory can PROVE review ran
-// before archive (workflows can't touch fs — a writer agent persists it, same
-// pattern as eval-suite). Only for a slice review (scope/args.change names a
-// change folder); skipped for global / working-tree reviews.
+// before archive. The runner's persist() writes it deterministically (PD-14: a
+// writer agent has read-only tools and silently wrote nothing). Every confirmed
+// or contested finding is listed with status "open"; the maker dispositions each
+// (PD-15: majors fixed with a fixCommit, minors fixed or waived with a reason)
+// and check-trajectory decides clean. Only for a slice review (args.change
+// names a change folder); skipped for global / working-tree reviews.
 const change = args?.change ?? (typeof scope === 'string' && scope.startsWith('add-') ? scope : null)
 if (change) {
   phase('Persist')
@@ -138,14 +141,20 @@ if (change) {
     baseRef: baseRef ?? null,
     headRef,
     dimensions: dims,
-    confirmedTitles: confirmed.map((f) => f.title),
-    clean: confirmed.length === 0,
-    generatedAt: 'WRITER_FILL_ISO_UTC',
+    findings: [...confirmed, ...contested].map((f, i) => ({
+      id: `F${String(i + 1).padStart(2, '0')}`,
+      severity: f.severity,
+      dimension: f.dimension,
+      verdict: f.verdict,
+      title: f.title,
+      file: f.file,
+      line: f.line ?? null,
+      status: 'open',
+    })),
+    clean: confirmed.length + contested.length === 0,
+    generatedAt: 'WORKFLOW_FILL_ISO_UTC',
   }
-  await agent(
-    `Persist review evidence. Stamp the real current UTC time (ISO 8601, e.g. \`date -u +%Y-%m-%dT%H:%M:%SZ\`) where you see \`WRITER_FILL_ISO_UTC\`. Create parent dirs. Write EXACTLY this to \`openspec/changes/${change}/review-findings.json\` (byte-for-byte except the timestamp substitution):\n\n\`\`\`json\n${JSON.stringify(evidence, null, 2)}\n\`\`\`\n\nThis is committed as the slice's review evidence (check-trajectory requires \`clean:true\` before archive). Confirm the path written.`,
-    { label: `persist:${change}`, phase: 'Persist' },
-  )
+  await persist(`openspec/changes/${change}/review-findings.json`, evidence)
 }
 
 return {

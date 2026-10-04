@@ -43,7 +43,7 @@
 // Node >= 18 stdlib only — no dependencies.
 import { readdirSync, readFileSync, statSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { hasProductCode as cfgHasProductCode, testFiles } from "./lib/factory-config.mjs";
+import { hasProductCode as cfgHasProductCode, testFiles, reviewDisposition } from "./lib/factory-config.mjs";
 
 const root = process.cwd();
 const flags = new Set(process.argv.slice(2));
@@ -280,17 +280,9 @@ if (flags.has("--release")) {
     reviewFiles += 1;
     const data = readJson(file, "open-findings");
     if (!data) continue;
-    if (data.clean === true) continue;
-    const list = Array.isArray(data.findings) ? data.findings : null;
-    if (!list) {
-      fail("open-findings", `${file}: review evidence is not clean and lists no dispositioned findings — fix or waive (${PATHS.waiversDir}/) before release`);
-      continue;
-    }
-    for (const f of list) {
-      const dispositioned = Boolean(f.fixCommit || f.waiver) || ["fixed", "waived"].includes(f.status);
-      if (!dispositioned)
-        fail("open-findings", `${file}: open review finding "${f.id ?? "(unnamed)"}" has no fix-commit or waiver at --release — fix it or waive under ${PATHS.waiversDir}/`);
-    }
+    // PD-15: the same bar as check-trajectory (majors fixed, minors fixed or waived with a reason).
+    for (const why of reviewDisposition(data).open)
+      fail("open-findings", `${file}: ${why} at --release — fix it, or for a minor waive it with a reason (a major needs a human waiver under ${PATHS.waiversDir}/)`);
   }
   if (reviewFiles > 0) guardsRun += 1;
   else if (postPhase) notEarned.push(`--release with no review-findings.json under ${PATHS.changesDir}/ — open-findings guard cannot attest`);
