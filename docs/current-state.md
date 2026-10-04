@@ -8,7 +8,7 @@
 - **Date and time:** 2026-10-04 (Europe/Prague)
 - **Current phase:** Phase 4
 - **Last completed gate:** G3
-- **Active change:** `implement-answer-checking-api` (slice 3, branch `slice3-answer-checking`, not pushed or merged). Slice 2 `implement-admin-access-api` archived 2026-10-04.
+- **Active change:** none. Slice 3 `implement-answer-checking-api` archived 2026-10-04 (branch `slice3-answer-checking`, not pushed or merged).
 - **Contract pin:** `contract/` submodule (`url = ../docs`) at docs `4c87d67`, API 0.5.1
 - **Progress:** Spring Boot 4.1.1 / Kotlin 2.3 / JVM 21 scaffold (ADR-0003) plus slice 1 platform
   foundation: Compose stack (db, backend, frontend; only the frontend's 8081 published, on
@@ -19,10 +19,11 @@
   its own chain for `/api/admin/**` (sign-in, session check, sign-out, CSRF, 401 before 403, 8 h idle
   expiry on an injectable `Clock`, startup password policy). Slice 3: pure module `cz.doucko.checking`
   (`AnswerChecker.check`, no Spring or DB) for all seven answer types, exact rational arithmetic, tolerance,
-  alternatives and Czech format tips from `messages.properties`; 212-case golden table.
-- **Next task:** slice 3 review gate, finding dispositions and archive; then slice 4 (child-profile) or 5 per the capability plan.
+  alternatives and Czech format tips from `messages.properties`; 217-case golden table.
+- **Next task:** slice 4 (child-profile) or 5 (authoring-tasks) per the capability plan; the merge order of the slice branches is the owner's call.
 - **Claims:**
-  - Slice 3 QA battery passes (335 unit, 25 integration tests; 212 golden cases, checker p95 36–51 µs) — evidence: `docs/qa/automated-verification-latest.md`, `docs/qa/evidence/slice3-checker-run.md` (2026-10-04)
+  - Slice 3 QA battery passes (347 unit, 25 integration tests; 217 golden cases, checker p95 37–73 µs; review gate 14 findings dispositioned) — evidence: `docs/qa/automated-verification-latest.md`, `docs/qa/evidence/slice3-checker-run.md` (2026-10-04)
+  - Slice 3 review gate clean (14 findings: 8 fixed in `f26150d` and `6343ca7`, 6 waived with reasons) — evidence: `openspec/changes/archive/2026-10-04-implement-answer-checking-api/review-findings.json`
   - Slice 3 RED run — evidence: `docs/qa/evidence/slice3-red-run.md`
   - Slice 2 QA battery passes (108 unit, 25 integration tests incl. `AdminSessionIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
   - Slice 2 RED run — evidence: `docs/qa/evidence/slice2-red-run.md`; real-stack smoke — evidence: `docs/qa/evidence/slice2-compose-smoke.md`

@@ -36,7 +36,7 @@
       "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
       "line": 55,
       "status": "fixed",
-      "fixCommit": "f26150d"
+      "fixCommit": "6343ca7"
     },
     {
       "id": "F02",
@@ -69,7 +69,7 @@
       "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
       "line": 264,
       "status": "fixed",
-      "fixCommit": "f26150d"
+      "fixCommit": "6343ca7"
     },
     {
       "id": "F05",
@@ -102,7 +102,7 @@
       "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
       "line": 257,
       "status": "fixed",
-      "fixCommit": "f26150d"
+      "fixCommit": "6343ca7"
     },
     {
       "id": "F08",

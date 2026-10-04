@@ -7,10 +7,11 @@
 
 | Check | Result |
 |---|---|
-| Golden table (`GoldenTableTest`) | 212 cases from `src/test/resources/checking/golden-table.jsonl`, all pass; ≥ 5 per each of the 12 verdict-producing requirements; plus 3 table-shape tests |
+| Golden table (`GoldenTableTest`) | 217 cases from `src/test/resources/checking/golden-table.jsonl`, all pass; ≥ 5 per each of the 12 verdict-producing requirements; plus 3 table-shape tests |
 | Property tests (`AnswerCheckerPropertyTest`) | 6 properties, fixed seed 20261004, all pass |
-| Timing (`CheckerTimingTest`) | 21 200 checks (212 cases × 100), p95 36–51 µs, max 8–14 ms (first-call JIT outliers), budget p95 < 5 ms (NFR-5 300 ms round trip) |
+| Timing (`CheckerTimingTest`) | 21 700 checks (217 cases × 100), p95 37–73 µs, max 9–15 ms (first-call JIT outliers), budget p95 < 5 ms (NFR-5 300 ms round trip) |
 | Purity (`CheckingPurityTest`, ArchUnit) | pass: `cz.doucko.checking` depends only on `java.lang/math/text/util`, `kotlin`, itself |
 | Modules (`ModularityTest`, Spring Modulith) | pass with the new `checking` module |
+| Scenario inputs (`GoldenScenarioCoverageTest`) | pass: every WHEN-line input of the 12 requirements in the pinned store spec is a golden case |
 | Contract enums (`CheckingContractAlignmentTest`) | pass: `AnswerType`, `Verdict` equal `contract/api/openapi.yaml` |
-| Whole suite | 335 unit tests, 25 integration tests, 0 failures |
+| Whole suite | 347 unit tests, 25 integration tests (after the review fixes), 0 failures |

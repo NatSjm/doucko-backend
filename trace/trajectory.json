@@ -12,6 +12,15 @@
       "processComplete": true
     },
     {
+      "slice": "2026-10-04-implement-answer-checking-api",
+      "reviewEvidence": "clean",
+      "trailerCommits": 3,
+      "libDomains": [
+        "checking"
+      ],
+      "processComplete": true
+    },
+    {
       "slice": "2026-10-04-implement-platform-foundation-api",
       "reviewEvidence": "clean",
       "trailerCommits": 8,

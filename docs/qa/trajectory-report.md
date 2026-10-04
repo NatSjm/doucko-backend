@@ -5,12 +5,13 @@ archived slice took: review evidence, `Slice:` trailers, and module scope.
 It does NOT verify test-first ordering or test integrity (not derivable from
 one-commit-per-slice history) — those are graded by the trajectory-eval workflow.
 
-Scope: 2 archived slice(s).
+Scope: 3 archived slice(s).
 Result: PASS
 
 | Slice | Review evidence | Trailer commits | design+tasks | lib domains touched |
 |---|---|---|---|---|
 | 2026-10-04-implement-admin-access-api | clean | 4 | yes | admin, shared |
+| 2026-10-04-implement-answer-checking-api | clean | 3 | yes | checking |
 | 2026-10-04-implement-platform-foundation-api | clean | 8 | yes | shared |
 
 ## Cross-slice module overlap

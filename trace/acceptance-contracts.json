@@ -127,7 +127,7 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": "src/test/kotlin/cz/doucko/checking/GoldenTableTest.kt",
+        "artifact": "src/test/kotlin/cz/doucko/checking/CheckerEdgeCasesTest.kt",
         "status": "artifact-ok"
       }
     ],

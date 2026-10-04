@@ -320,7 +320,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/answer-checking/spec.md",
-        "openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md"
+        "openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -442,7 +442,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/answer-checking/spec.md",
-        "openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md"
+        "openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -473,7 +473,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/answer-checking/spec.md",
-        "openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md"
+        "openspec/specs/answer-checking/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -1245,10 +1245,6 @@
     {
       "check": "test-trace",
       "msg": "FR-44 (owned by backend) has no test annotated \"@trace FR-44\""
-    },
-    {
-      "check": "active-changes",
-      "msg": "active change \"implement-answer-checking-api\" is not archived"
     }
   ]
 }
