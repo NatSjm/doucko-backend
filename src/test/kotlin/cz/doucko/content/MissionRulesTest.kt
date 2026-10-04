@@ -202,10 +202,10 @@ class MissionRulesTest {
         val t = task()
         val a = mission(listOf(t))
         val b = mission(listOf(t), PublishStatus.PUBLISHED)
-        MissionRules.taskStatus(t, PublishStatus.DRAFT, listOf(a, b)) shouldBe Refusal.TaskDraftInPublished(listOf(b))
-        MissionRules.taskStatus(t, PublishStatus.DRAFT, listOf(a)) shouldBe null
-        MissionRules.taskStatus(t, PublishStatus.PUBLISHED, listOf(a, b)) shouldBe null
-        MissionRules.taskStatus(t, PublishStatus.DRAFT, emptyList()) shouldBe null
+        MissionRules.taskStatus(PublishStatus.DRAFT, listOf(a, b)) shouldBe Refusal.TaskDraftInPublished(listOf(b))
+        MissionRules.taskStatus(PublishStatus.DRAFT, listOf(a)) shouldBe null
+        MissionRules.taskStatus(PublishStatus.PUBLISHED, listOf(a, b)) shouldBe null
+        MissionRules.taskStatus(PublishStatus.DRAFT, emptyList()) shouldBe null
     }
 
     // @trace FR-57

@@ -25,9 +25,11 @@ class Conflicts(
 
             is Refusal.Unpublishable -> {
                 val b = refusal.blockers
+                // A task that is both a draft and graphic is named once, as a draft.
+                val graphicOnly = b.graphic.filter { g -> b.drafts.none { it.id == g.id } }
                 when {
-                    b.drafts.isNotEmpty() && b.graphic.isNotEmpty() -> {
-                        ContentConflict("mission-drafts-graphic", listOf(tasks(b.drafts), tasks(b.graphic)), b.tasks().map { it.id })
+                    b.drafts.isNotEmpty() && graphicOnly.isNotEmpty() -> {
+                        ContentConflict("mission-drafts-graphic", listOf(tasks(b.drafts), tasks(graphicOnly)), b.tasks().map { it.id })
                     }
 
                     b.drafts.isNotEmpty() -> {
@@ -51,7 +53,8 @@ class Conflicts(
             }
 
             Refusal.TopicLocked -> {
-                ContentConflict("mission-topic-locked", emptyList(), listOfNotNull(mission?.id))
+                // The tasks block the topic change (CA-D10): removing them unlocks it.
+                ContentConflict("mission-topic-locked", emptyList(), mission?.content?.taskIds.orEmpty())
             }
 
             is Refusal.TaskDraftInPublished -> {

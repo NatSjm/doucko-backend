@@ -1,0 +1,839 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-04T19:59:30.487Z",
+  "finishedAt": "2026-10-04T20:05:54.762Z",
+  "args": {
+    "scope": "slice 6 authoring-missions backend (implement-authoring-missions-api)",
+    "baseRef": "d1d68df",
+    "headRef": "HEAD",
+    "change": "implement-authoring-missions-api"
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": null,
+    "budgetPerAgentUsd": 2,
+    "maxTotalUsd": 25,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 6.6404,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 453,
+      "durationMs": 137474,
+      "sessionId": "0b482fcc-9ee9-487e-88a3-538b426dd652",
+      "costUsd": 0.8243858000000002,
+      "numTurns": 10,
+      "result": {
+        "findings": [
+          {
+            "title": "updateMission checks the topic-change rule before field validation, so an invalid request can get 409 instead of 400",
+            "file": "src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+            "line": 666,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`if (topicId != null && topics.find(topicId) != null) { MissionRules.topicChange(stored, topicId)?.let { throw conflicts.of(it, stored) } }` runs before `validate(draft, stored)`. If a save changes the topic of a non-empty mission and also has a bad position or malformed task ids, the admin gets the 409 'remove its tasks first' and none of the field errors. TaskService.update does it the other way round (`validate(draft)` first, then `MissionRules.taskEdit`), so the two endpoints rank refusals differently.",
+            "suggestion": "Call `validate(draft, stored)` first, then `topicChange` on the validated `content.topicId`, then `edit`. Field errors (400) then always come before state conflicts (409), as they do for tasks."
+          },
+          {
+            "title": "Mission reads are not transactional, so mission row and task list come from separate snapshots",
+            "file": "src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+            "line": 647,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`fun list()` and `fun get(id)` have no `@Transactional`. `JdbcMissionStore.find/list` reads `mission` in one statement and `mission_task` in a second one (`withTasks`), and each runs in autocommit. If an update or task delete commits between them, the response can pair the old topic and position with the new task list. `view()` then makes two more separate `usage` calls.",
+            "suggestion": "Mark `list`/`get` `@Transactional(readOnly = true)` (as ServedContentService already is) so all of these reads use one transaction. Under READ COMMITTED that is still not a single snapshot; if exact consistency matters, use REPEATABLE READ or read the mission and its tasks in one query."
+          },
+          {
+            "title": "Unpublishable conflict lists a task that is both draft and graphic twice in the detail",
+            "file": "src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+            "line": 534,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`MissionRules.blockers` fills `drafts` and `graphic` independently, so a DRAFT GRAPHIC task is in both lists. The `mission-drafts-graphic` branch builds `listOf(tasks(b.drafts), tasks(b.graphic))`, so the detail names that task under 'Still drafts' and again under 'Graphic'. Only the `conflicts` ids are de-duplicated (`b.tasks()`).",
+            "suggestion": "Either accept this as intended (both statements are true) or exclude graphic tasks from the drafts list (or the reverse) when building the message, and add a test for a draft+graphic task."
+          },
+          {
+            "title": "Conflict entity names are hard-coded English fragments outside the message catalog",
+            "file": "src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+            "line": 585,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`return \"$topic, mission ${mission.content.position}\"` and `\"task ${ref.taskNo}${ref.subPart.orEmpty()}, page ${ref.page}\"` are built in code and passed as `{0}`/`{1}` into catalog messages. All other user-visible text is in `messages.properties`, so these words will not follow a future locale catalog. The `\"?\"` fallback for a missing topic also reaches the admin.",
+            "suggestion": "Move the name patterns to catalog keys (e.g. `content.name.mission={0}, mission {1}`, `content.name.task=task {0}, page {1}`) and format them with the request locale through ContentProblems."
+          },
+          {
+            "title": "MissionRules.taskStatus takes a `task` parameter it never reads",
+            "file": "src/main/kotlin/cz/doucko/content/domain/Missions.kt",
+            "line": 1200,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "`fun taskStatus(task: Task, status: PublishStatus, missions: List<Mission>): Refusal?` only looks at `status` and `missions`. The signature suggests the current task state matters when it does not. Note that a DRAFT task already in a published mission, which the invariant should prevent, would also be refused.",
+            "suggestion": "Remove the unused parameter, or use it explicitly (e.g. skip the check when `task.status == status`) so the code says what it means."
+          },
+          {
+            "title": "Mission list calls the usage port twice per mission (N+1 once practice implements ContentUsage)",
+            "file": "src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+            "line": 723,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`list()` maps every mission through `view()`, which calls `usage.attemptCounts(ids)` and `usage.usedTasks(ids)` separately. With `ContentUsage.NONE` this costs nothing. With the slice-7 implementation, listing M missions runs 2·M usage queries. `TaskService.facts` likewise calls `usedTasks` and `attemptCounts` separately for one task.",
+            "suggestion": "In `list()`, collect every task id once, call `attemptCounts` and `usedTasks` once each, then build the views from the two results. Consider one port method that returns both facts."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 481,
+      "durationMs": 51803,
+      "sessionId": "eb880024-a602-4a11-9cb8-78f6bc09d76d",
+      "costUsd": 0.5662536,
+      "numTurns": 10,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 424,
+      "durationMs": 230967,
+      "sessionId": "6b2df7f0-9afb-4812-b317-82c5e69a5488",
+      "costUsd": 1.5552279999999998,
+      "numTurns": 33,
+      "result": {
+        "findings": [
+          {
+            "title": "FR-12 child-facing scenarios are unverified, yet the plan closes FR-12 in slice 6 and its acceptance contract is artifact-ok",
+            "file": "trace/acceptance-contracts.json",
+            "line": 46,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "Coverage: 40 scenarios: 35 implemented, 5 partial, 0 missing, 0 contradicted. The 5 partial scenarios are all here. Store spec 'Draft and published status' has two scenarios. 'Draft mission is not served': '...WHEN the child opens HQ THEN the mission is not listed and its tasks cannot be requested'. 'Published task outside any published mission': '...refused as not found'. 'Graphic tasks are never served in MVP' has two more: 'Published graphic task requested by id' → 'HTTP 404 ... application/problem+json', and 'Graphic task inside a draft mission' → 'both requests are answered with HTTP 404, and HQ lists neither M nor G'. 'Publish a valid mission' ends with '...and the child sees it on HQ'. In code, only the module query `ServedContentService` (src/main/kotlin/cz/doucko/content/application/ServedContentService.kt:175-190) exists, and no child endpoint consumes it. design.md:14-17 and :24-25 defer the 404 and HQ behaviour to slice 7. Yet contract/docs/mvp-capability-plan.md:259 assigns `| FR-12 | authoring-missions | backend |` to slice 6 only, and acceptance-contracts.json marks FR-12 `artifact-ok` on MissionApiTest.kt, which tests only the query (MissionApiTest.kt:684).",
+            "suggestion": "Amend the capability plan so FR-12 (and FR-5 serving) also travel with slice 7 (practice-flow), or add an explicit carry-over item to the slice-7 change. Keep the FR-12 acceptance status out of a final 'done' until the child 404/HQ scenarios have an executable test. Note the deferral in docs/current-state.md 'Scope NOT delivered' when task 5.5 is done."
+          },
+          {
+            "title": "FR-56 usage guard is inert in the running app (ContentUsage.NONE), but FR-56 is planned and marked artifact-ok as fully delivered in slice 6",
+            "file": "src/main/kotlin/cz/doucko/content/ContentUsage.kt",
+            "line": 22,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "The spec delta says: '`deleteTask` SHALL be 409 ... while any attempt, problem report or opened hint references it (FR-56, CA-D22) ... `AdminTask.attemptCount` ... `AdminMission.hasAttempts` ... SHALL report the same facts.' In code, `MissionService`/`TaskService` resolve `usageProvider.getIfAvailable { ContentUsage.NONE }` (MissionService.kt:39, TaskService.kt:90). No production bean exists, so in the app `usedTasks` is always empty, `attemptCount` is always 0, `hasAttempts` is always false, and the usage branch never fires. The guard logic is tested only with a fake (MissionApiTest.kt:575-659, MissionsIT.kt:190). design.md:26-29 documents this as a non-goal, but plan row `| FR-56 | authoring-missions | backend |` (mvp-capability-plan.md:293) has no slice-7 follow-up, and the acceptance contract is `artifact-ok`.",
+            "suggestion": "Record the real ContentUsage adapter as a slice-7 obligation tied to FR-56: add it to the plan row or to the slice-7 change tasks. Add an IT there that seeds a real attempt, report or opened hint and expects 409 on deleteTask/deleteMission."
+          },
+          {
+            "title": "409 `conflicts` for mission-topic-locked and last-task holds the mission's own id, which the contract defines as the blocking entities",
+            "file": "src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+            "line": 48,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "openapi.yaml:1144-1146 defines `conflicts`: 'Ids of the entities that block the action (e.g. the draft task blocking a mission publish)'. In code, `Refusal.LastTask -> ContentConflict(\"mission-last-task\", ..., listOf(m.id))` and `Refusal.TopicLocked -> ContentConflict(\"mission-topic-locked\", emptyList(), listOfNotNull(mission?.id))` (Conflicts.kt:48-55). The id returned is the mission being edited, not the tasks that block the topic change. This is documented only in design.md:105,109, not in the spec delta or the OpenAPI.",
+            "suggestion": "Either return the mission's task ids for TopicLocked (they are what blocks CA-D10), or amend the OpenAPI `conflicts` description and the spec delta to say that for a self-blocking rule it holds the edited mission id. The frontend relies on these shapes."
+          },
+          {
+            "title": "Mission topic-lock message does not name the mission, unlike the other publishing-rule refusals",
+            "file": "src/main/resources/messages.properties",
+            "line": 138,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "The store spec 'Mission publishing rules' (spec.md:822-834) says: 'The edit rules that keep it, each refused with a message naming the mission to unpublish first, are these: ... A mission's topic SHALL change only while the mission has no tasks...' In code, `content.conflict.mission-topic-locked=The topic can only change while the mission is empty. Remove its tasks first.` takes no argument, and `Conflicts.of(TopicLocked)` passes `emptyList()` as args (Conflicts.kt:53-54). The scenario 'Changing the topic of a non-empty mission' only requires 'a message that the topic can only change while the mission is empty', so this is borderline.",
+            "suggestion": "Pass `name(mission)` and include it in the message (e.g. 'Desetinná čísla, mission 1'). Alternatively, amend the rule-list sentence in the store spec so the 'naming the mission' wording does not apply to the CA-D10 mission-topic rule."
+          },
+          {
+            "title": "Topic-change refusal is checked before field validation, so a request with field errors can get 409 instead of 400",
+            "file": "src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+            "line": 60,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The spec delta says: 'A refusal SHALL be 400 with `errors[].field` (`topicId`, `position`, `taskIds`, `taskIds[i]`)'. In code, `update` runs `MissionRules.topicChange(stored, topicId)?.let { throw conflicts.of(it, stored) }` before `validate(draft, stored)` (MissionService.kt:60-64). A PUT that changes the topic of a non-empty mission and also has, say, position `0` or 51 tasks gets 409 'mission-topic-locked' and no field errors. design.md decision 4 ('checked before the per-task topic rule') explains the intent, but no spec or OpenAPI text states the precedence over unrelated field errors.",
+            "suggestion": "Either validate the non-topic fields first, or document the precedence ('409 topic-lock takes precedence over field rules') in the spec delta or the updateMission OpenAPI description, and add a test that pins it."
+          },
+          {
+            "title": "Grade-only change guard (CA-D10) has no test of its own",
+            "file": "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+            "line": 223,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The spec delta says: 'An `updateTask` that changes the topic or the grade SHALL be 409 while the task is in any mission'. In code, `MissionRules.taskEdit` checks `updated.topicId != current.topicId || updated.grade != current.grade` (Missions.kt:234). The only test changes both together: `taskEdit(c, c.copy(grade = 7, topicId = Topics.GRADE7), listOf(a))` (MissionRulesTest.kt:223). The `|| grade` branch alone is never tested, and the web test at MissionApiTest.kt:540 covers only the topic change.",
+            "suggestion": "Add a MissionRulesTest case with `c.copy(grade = 7)` and the same topic, expecting `TaskTopicInMissions`. This keeps the grade half of the CA-D10 guard tested."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 693,
+      "durationMs": 16478,
+      "sessionId": "e0e39101-c72a-48da-bc87-1cecef717773",
+      "costUsd": 0.1583876,
+      "numTurns": 4,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1397,
+      "durationMs": 37457,
+      "sessionId": "6c8b393e-919f-4e3e-ac51-20339d2ea290",
+      "costUsd": 0.22768239999999998,
+      "numTurns": 9,
+      "result": {
+        "refuted": true,
+        "reasoning": "The order the finding describes is real: `MissionService.update` (lines 60–64) calls `MissionRules.topicChange` before `validate(draft, stored)`. So a request that changes the topic of a non-empty mission and also has a bad position gets only the 409. But this order is deliberate and needed. It is not a correctness bug.\n\nWhy the order matters: `MissionRules.validate` → `tasks()` (Missions.kt:171) adds a 400 field error `task-topic` for every task id whose topic differs from the requested topic. The usual way to try a topic change is to re-save the mission with a new topicId and its current taskIds. Those tasks all belong to the old topic. With the suggested fix (validate first), that request would always fail validation with N `taskIds[i]: task-topic` 400 errors. It would never reach `topicChange`, so the CA-D10 refusal `mission-topic-locked` ('The topic can only change while the mission is empty. Remove its tasks first.') would be unreachable in the main scenario it exists for. The guard `topics.find(topicId) != null` exists so the early check runs only when the topic is valid and known. An unknown or malformed topic still goes to validation and gets a 400. That shows the order was designed on purpose.\n\nThe comparison with TaskService doesn't hold. When a task changes topic, the task's own field rules don't fail. When a mission changes topic, the kept taskIds fail FR-9 field validation, so the state conflict has to come first. The remaining effect is minor: in a request that is already refused, a bad position is reported after the 409 instead of with it. That only changes which error the admin sees first; nothing wrong is stored. The suggested fix would make things worse. Refuted.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1430,
+      "durationMs": 33560,
+      "sessionId": "24b91177-7ad8-43e5-abea-bd9426f191db",
+      "costUsd": 0.267642,
+      "numTurns": 8,
+      "result": {
+        "refuted": true,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The finding describes the code correctly but gets the consequence wrong. In MissionService.update (lines 58-65, not 666), topicChange runs before validate(draft, stored). So a topic change on a non-empty mission that also has a bad position returns 409 instead of 400. That part is reproducible.\n\nThe ordering is deliberate, though, and the suggested fix would break the CA-D10 refusal. MissionRules.validate (Missions.kt:171) adds a `task-topic` 400 error for every listed task whose topic differs from the requested topic. The normal case for CA-D10 is an admin changing the topic while sending back the mission's existing task ids. Those tasks all belong to the old topic, so with validate run first every such request would get a 400 list of `task-topic` errors for each task. The 409 TopicLocked (\"remove its tasks first\") would then almost never be reached. It would only fire if the admin also swapped in tasks from the new topic, and those would be rejected anyway because the stored tasks are still in the mission. The current order puts the one actionable message first and only when the target topic exists (`topics.find(topicId) != null`); field errors still come back once the topic issue is fixed.\n\nTaskService ranks refusals differently because a task has no matching cascade of field errors. That difference is not an inconsistency defect. No user or attacker gets anything from this: it is an admin-only endpoint, nothing is stored on either path, and the admin only sees the problems one round at a time. At most this is a stylistic note, and the proposed change would make things worse."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1328,
+      "durationMs": 25153,
+      "sessionId": "4383d7cd-83db-4c31-9d62-4ef71d63af03",
+      "costUsd": 0.23476120000000003,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the finding. The mechanism is real; only the cited line number is wrong. MissionService.kt is about 130 lines long, so line 647 does not exist; the relevant code is lines 41–43 and 117–122.\n\n- **No transaction on the reads.** `MissionService` has no class-level `@Transactional`. Only the write methods are annotated (lines 45, 53, 71, 86). `list()` and `get()` (lines 41/43) are not.\n- **Two separate statements.** `JdbcMissionStore.list`/`find` (lines 22–31) run the `mission` SELECT through `JdbcClient`. `withTasks` (lines 121–131) then runs a second SELECT on `mission_task`. With no surrounding transaction, each statement runs in autocommit.\n- **The writes can land in between.** `update()` rewrites the mission row and its whole task list in one transaction. `removeTask` deletes and renumbers `mission_task` rows. If either commits between the two reads, the response can combine the old topic/position with the new task list.\n- **More reads in `view()`.** `view()` (lines 121–122) makes two more separate `usage` calls (`attemptCounts`, `usedTasks`). These can also disagree with the task list, so `hasAttempts` and `deletable` could be inconsistent.\n\nNothing else covers this. There is no class-level transaction, no read lock, and no single-query join. `ServedContentService` does have `@Transactional(readOnly = true)`, which shows the codebase uses that pattern where it wants it.\n\nThe impact is small. These are admin-only authoring reads, the window is a few milliseconds, and the wrong result lasts only for that one response; nothing wrong is stored. The finding itself correctly says the suggested fix is partial: under Postgres's default READ COMMITTED isolation, each statement still gets its own snapshot. Minor severity is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1361,
+      "durationMs": 31297,
+      "sessionId": "84ab4249-75e7-4f2e-988a-b663fdac4680",
+      "costUsd": 0.21742819999999996,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The code does what the finding says, but it's hard to reproduce and does no lasting harm. The cited line is wrong: MissionService.kt is about 130 lines long, and the code is at lines 41–43 (`list()` / `get()`), not 647.\n\nConfirmed in code:\n- `list()` and `get()` have no `@Transactional`, and there is no class-level annotation on `MissionService` (lines 30–43).\n- `JdbcMissionStore.list/find` reads `mission` in one statement, then `withTasks` (JdbcMissionStore.kt:121–131) runs a separate `SELECT … FROM mission_task`. Each statement auto-commits on its own.\n- `view()` (lines 117–122) then makes two more separate `usage` calls (`attemptCounts`, `usedTasks`).\n- A write that commits between those statements could therefore produce a mixed response. The writes (`update` / `delete`) do commit atomically, in a transaction after `lock.exclusive()`.\n\nWhy it is hardly reachable in practice:\n- These are admin-only endpoints (MissionController), and the app has a single admin (the parent).\n- To see the problem, that admin would need two clients, such as two browser tabs: one saving a mission at the exact moment the other's list/get falls into the microsecond gap between two SELECTs.\n- The outcome is only a stale or mixed read model in one HTTP response. Nothing is stored and no decision depends on it. Every write path takes the exclusive content lock and reads again inside its own transaction (lines 45–90), so a mixed GET cannot cause a bad write. The next read is correct.\n- There is no security angle: no answer key leaks, and no child endpoint is involved.\n\nThe suggested fix is also weak, as the finding itself admits. `@Transactional(readOnly = true)` under Postgres's default READ COMMITTED still takes a fresh snapshot for each statement, so it would not close the gap. Only REPEATABLE READ or a single query would.\n\nThe mechanism is real, so this is not refuted. But the trigger is a near-impossible race, the effect is a one-off stale display that fixes itself, and the fix as proposed doesn't fix it. It belongs at nit/informational level, not minor."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1179,
+      "durationMs": 29506,
+      "sessionId": "e1c9a0ac-a688-469e-b03a-184f45536c36",
+      "costUsd": 0.10637339999999999,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real, but the line number in the finding is wrong. The code is at Conflicts.kt:30, not line 534.\n\n- `MissionRules.blockers` (Missions.kt:183-184) builds the two lists separately: `drafts` is every task whose status is not PUBLISHED, and `graphic` is every task whose modality is not TEXT. Nothing stops a task from landing in both.\n- No domain rule rules out a DRAFT GRAPHIC task. The only modality guard (Missions.kt:238) stops a task in a published mission from becoming GRAPHIC. Publishing a draft graphic task is never blocked.\n- So in the `mission-drafts-graphic` branch, `listOf(tasks(b.drafts), tasks(b.graphic))` fills the template `Still drafts: {0}. Graphic: {1}.` (messages.properties:137). That task is named under both labels.\n- Only the conflict ids go through `b.tasks()` and its `distinctBy`.\n\nBoth statements in the message are true, so this is a wording/UX nit, not a broken rule. Minor severity fits.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1212,
+      "durationMs": 27648,
+      "sessionId": "ec0e2b80-3423-4529-a62a-6745e0ed4e50",
+      "costUsd": 0.11740880000000001,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed. `MissionRules.blockers` (Missions.kt:183-184) builds `drafts` as tasks whose status is not PUBLISHED and `graphic` as tasks whose modality is not TEXT, with nothing excluding one list from the other. Nothing stops a task from being both a draft and GRAPHIC. Modality is a free authoring field (enum TEXT/GRAPHIC), and the only modality guard (Missions.kt:238) is about published missions. So an admin who publishes a mission holding a single draft graphic task gets drafts=[t] and graphic=[t]. That hits the first branch at Conflicts.kt:29-30, which passes `tasks(b.drafts)` and `tasks(b.graphic)` as separate arguments. The catalog message (messages.properties:137, \"Still drafts: {0}. Graphic: {1}.\") then names the same task in both places. Only the conflict ids are de-duplicated (`b.tasks()` uses distinctBy). Any admin can reproduce this with normal use. Impact is cosmetic and admin-only: both statements are true, nothing leaks and nothing is corrupted. Severity minor is right.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1213,
+      "durationMs": 24696,
+      "sessionId": "4d6e9425-fc92-4409-a9c2-5bdd83eb23eb",
+      "costUsd": 0.09180680000000001,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The strings exist, but the cited location is wrong: Conflicts.kt is about 96 lines long, not 585. The code is at lines 79–95: `name(mission)` builds \"$topic, mission N\" and `name(task)` builds \"task 4b, page 57\".\n\nIt is not a correctness defect:\n- There is only one message catalog, `src/main/resources/messages.properties`, and it is English.\n- Every catalog message these fragments go into, such as `content.conflict.mission-drafts` and `content.conflict.task-delete-in-published`, is also English.\n- So the rendered text is consistent and correct today. Nothing behaves wrongly.\n- The catalog comment at line 126 documents this naming scheme on purpose (\"Missions are named by topic and position, tasks by task number and page\").\n\nThe concern about a future locale catalog is about i18n and maintainability for a feature that doesn't exist yet. It is not a correctness issue. The \"?\" fallback only applies if a mission's topic is missing from `topics.find`. That would be a dangling topic reference. The finding gives no path where that happens, so it is speculative.\n\nThe finding's own confidence is low and the line number is wrong. Under the correctness lens there is no wrong behavior to confirm.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1246,
+      "durationMs": 23652,
+      "sessionId": "c2afea00-3c46-4cee-b25f-bb0792ebec9f",
+      "costUsd": 0.108433,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code exists, but at Conflicts.kt:79-95, not line 585. It builds \"$topic, mission N\" and \"task Xy, page P\" in code. The finding's own premise is about a future locale, though, and no user can hit a problem today. The only catalog is src/main/resources/messages.properties; there are no messages_*.properties variants. So every request locale resolves to the same English catalog, and the hard-coded English fragments always match the surrounding message text. No mixed-language output can happen now; it only could if someone later adds a second catalog, which makes this a maintainability note rather than a correctness defect. The \"?\" fallback is defensive: a mission's topicId comes from seeded reference topics, and I found nothing that lets a referenced topic disappear. And even if it did fire, it would only show \"?\" to the admin, which is harmless. Nothing here is exploitable or reproducible in the current build, so the finding is refuted.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/domain/Missions.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1071,
+      "durationMs": 29318,
+      "sessionId": "6f2065ba-0bbc-4026-9aa6-c6647838c742",
+      "costUsd": 0.1077782,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The unused parameter is real, but the finding does not show a correctness defect. The cited line is also wrong: the function is at Missions.kt:218 (the file is about 250 lines), not line 1200.\n\nWhat the code does: `taskStatus(task, status, missions)` returns null unless `status == DRAFT`. When it is DRAFT, it returns `TaskDraftInPublished` if any of the given missions are published. `task` is never read. The only production caller is `TaskService.setStatus` (TaskService.kt:162). It takes the exclusive lock, loads `current`, runs the rule, and writes only if `current.status != status`.\n\nWhy this is not a correctness bug:\n1. **The FR-57 rule works without `task`.** The rule is: a task in a published mission cannot become DRAFT. That depends only on the target status and the missions containing the task. Nothing about the current task changes the answer.\n2. **The suggested short-circuit would weaken the guard.** Skipping the check when `task.status == status` matters only for a DRAFT→DRAFT request on a task that is already in a published mission. The finding admits the invariant prevents that state: publishing a mission or adding a task to one requires published tasks (`blockers`/`CannotJoin`). If the state appeared anyway through corruption or a race, refusing the no-op is the safer, consistent behaviour, and accepting it would hide the broken invariant.\n3. **Tests pin the behaviour.** `MissionRulesTest:205-208` and `MissionApiTest:415/422` check the refuse and allow cases, and they match the spec.\n\nSo the claimed mechanism, \"the signature suggests the current state matters when it does not\", is a readability point (an unused parameter that may trigger a compiler warning), not wrong behaviour. Under the correctness lens there is nothing to fix. At most it is a style or cleanup nit, so if it is kept at all it should go under maintainability, not correctness.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/domain/Missions.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1104,
+      "durationMs": 23813,
+      "sessionId": "ae38632d-0f07-4dd3-9a32-8f468f76be2e",
+      "costUsd": 0.1106904,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding is correct, though the line number is wrong. The function is at Missions.kt:218, not line 1200. `fun taskStatus(task: Task, status: PublishStatus, missions: List<Mission>)` never reads `task`. Its body only checks `status != DRAFT` and `missions.published()`. The only production caller passes `current` (TaskService.kt:162). The unit tests in MissionRulesTest.kt:205-208 pass `t`, but the result never depends on it.\n\nThere is no user-visible failure. The finding's side note does describe real behaviour: a DRAFT→DRAFT request for a task in a published mission would be refused, because `task.status` is never checked. But that can only happen if a published mission contains a draft task, which the publishing invariant is meant to prevent. And refusing the request would be harmless anyway.\n\nSo this is a real but cosmetic issue: a misleading signature with no reachable bug. It stays at minor severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1189,
+      "durationMs": 24234,
+      "sessionId": "857efa07-4c4f-4f68-8a44-aab271d4e10e",
+      "costUsd": 0.08646039999999999,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The call pattern the finding describes is real: in MissionService.kt, list() at line 41 does missions.list().map(::view), and view() at lines 117–124 calls usage.attemptCounts(ids) and usage.usedTasks(ids) separately for each mission. But this is not a correctness defect, and the finding has other problems:\n1. The location is wrong. The file is about 125 lines long, so line 723 does not exist. The code is at lines 41 and 117–124.\n2. The output is right. Each MissionView gets the correct hasAttempts and deletable values, and nothing is returned wrong, lost or inconsistent.\n3. The cost is hypothetical. Nothing in src/main implements ContentUsage today. Both services fall back to ContentUsage.NONE through ObjectProvider.getIfAvailable (MissionService.kt:39, TaskService.kt:90), so these calls do no I/O now. The '2·M queries' depends on a slice-7 implementation that does not exist and whose query shape is unknown; it could cache or batch.\n4. It is a performance and design suggestion: batch the ids in list() or merge the two port methods. It is not a wrong mechanism. Under the correctness lens there is no mistake to confirm, so I'm treating it as refuted. It may still be worth noting as a minor performance item for slice 7.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1222,
+      "durationMs": 25961,
+      "sessionId": "bfec2976-335a-4ee5-bff2-d6f20352917a",
+      "costUsd": 0.0953316,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding describes, but nothing in production can trigger it today. `MissionService.list()` (line 41, not 723; the file is about 125 lines) maps each mission through `view()` (lines 117–122). `view()` calls `usage.attemptCounts(ids)` and `usage.usedTasks(ids)` separately, and `TaskService.facts` (lines 108/111) does the same.\n\nHowever, the only production `ContentUsage` is `ContentUsage.NONE`. A search of `src/` finds no other implementation besides the test-only `FakeContentUsage`. Both services resolve the port with `usageProvider.getIfAvailable { ContentUsage.NONE }`, so every call is an in-memory no-op. No user or attacker can cause even one extra query now. The finding admits this (\"With `ContentUsage.NONE` this costs nothing\") and depends on a slice-7 implementation that does not exist.\n\nEven after slice 7, the cost would be an admin-only endpoint (`listMissions`) running 2·M small queries in a single-family tutoring app with a small mission count. That is a possible future performance improvement, not a correctness defect. The dimension label is wrong too: it is performance, not correctness. The line reference is also wrong. The clean fix is to batch the calls when the slice-7 practice adapter is written, not to treat it as a current problem.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:trace/acceptance-contracts.json",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2215,
+      "durationMs": 21969,
+      "sessionId": "647d6869-2eaa-4e20-a1d8-7597311f7d54",
+      "costUsd": 0.13878000000000001,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "I confirmed the mechanism by reading the code and docs. trace/acceptance-contracts.json:46-52 marks FR-12 as \"artifact-ok\", and its only artifact is MissionApiTest.kt. ServedContent / ServedContentService is the only FR-12 production code. Nothing in src/main uses it: grep finds only the interface, the service, ContentModule's KDoc and tests, and no child web adapter. The capability plan assigns FR-12 to slice 6 only (contract/docs/mvp-capability-plan.md:49 and :259). The slice-7 practice-flow row (:50) lists FR-22..FR-31, FR-42 and FR-44 but not FR-12 or FR-5, so nothing in the plan carries the child-facing FR-12 scenarios forward. Those scenarios are: draft mission not on HQ, 404 for a draft or graphic task, and \"child sees it on HQ\". design.md:14-17 and :24-25 explicitly push them to slice 7. So once slice 6 closes, FR-12 shows as satisfied by a test of a module query, while its observable scenarios have no executable test and no owner slice. This is the declared-method-needs-mechanism / done-claims risk the AGENTS.md lessons warn about. I could not refute it: no child endpoint exists elsewhere, and no slice-7 carry-over is recorded in the plan. Mitigation, and why I downgrade: the deferral is written down openly in design.md, proposal.md and the spec delta (\"Slice 7 serves the child from this query\"). Slice 7 depends on slice 6 and must consume ServedContent. It is also a traceability and process gap, not a runtime defect in shipped code. Minor rather than major."
+      }
+    },
+    {
+      "label": "verify:trace/acceptance-contracts.json",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2248,
+      "durationMs": 17016,
+      "sessionId": "48737284-3660-4780-916b-2ab7c1c35620",
+      "costUsd": 0.1134974,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The facts check out. contract/docs/mvp-capability-plan.md:49 and :259 give FR-12 to slice 6 only. The slice 7 row (line 50, practice-flow) lists FR-22..FR-31, FR-42 and FR-44, but not FR-12 or FR-5, so nothing in the plan carries the child-facing FR-12 scenarios (404 for draft or graphic tasks, HQ listing) into the slice that builds child endpoints. design.md:16 and the change spec (line 83) say \"Child endpoints are slice 7\", and slice 5's archived design marked FR-12 as \"6/7\". Even so, trace/acceptance-contracts.json:46-52 marks FR-12 \"artifact-ok\" on MissionApiTest.kt, which only tests the ServedContent query. The traceability and coverage gap the finding describes is therefore real: unless someone carries these scenarios forward by hand, FR-12 looks closed while scenarios like \"child opens HQ, the mission is not listed\" have no test that runs them.\n\nFrom the exploitability angle, though, no real user or attacker can trigger anything. No child endpoint exists yet, so no draft mission, graphic task or answer key can be served to a child. Today the problem cannot occur at runtime. What exists is a process and traceability gap, a risk that the scenarios get dropped in slice 7, not a defect anyone can reach. It is not refuted because the documented claim is accurate, but \"major\" overstates it for something with no runtime path. Downgrade to minor."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/ContentUsage.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1771,
+      "durationMs": 20244,
+      "sessionId": "36f294ff-0181-487a-a33f-a56653b97827",
+      "costUsd": 0.16754960000000002,
+      "numTurns": 8,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding says: MissionService.kt:39 and TaskService.kt:90 fall back to `ContentUsage.NONE`, and no production bean exists. But that isn't a correctness defect, and the finding's central claim (no slice-7 follow-up) is false.\n\n1. **The slice-7 obligation is already recorded.**\n   - The capability plan's slice-6 Definition of Done (contract/docs/mvp-capability-plan.md:194-196) says the guard \"goes through a content-module port (`ContentUsage`) that slice 7 implements, and is tested here with a fake.\"\n   - The slice-7 `practice-flow` scope-in list (line 204) names \"`ContentUsage` port\".\n   - So the plan explicitly carries the real adapter to slice 7. The FR-56 row at line 293 doesn't need to say it again.\n   - design.md:26-29 and decision 2 (lines 43-49) say the same thing.\n\n2. **NONE matches the running app today.** There is no `practice` module: `src/main/kotlin/cz/doucko/practice/**` matches no files. Attempts, problem reports and opened hints can't exist yet, so \"every task is unused\" is true. `attemptCount = 0` and `hasAttempts = false` are correct values, and the guard correctly never fires because nothing can reference a task. No content can be deleted wrongly.\n\n3. **The fallback is deliberate.** The `ObjectProvider` fallback is a planned seam, so slice 7 only adds its bean and nothing in content changes. Content can't depend on practice (Modulith).\n\nAt most this is a reminder about the slice-7 work, and the plan already tracks it. The mechanism isn't wrong, and the \"no follow-up\" premise is factually incorrect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/ContentUsage.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1804,
+      "durationMs": 17774,
+      "sessionId": "b6fbabc9-9798-4d26-8ec0-cc4f277ae85e",
+      "costUsd": 0.20925159999999998,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The mechanism the finding describes is real: there's no production ContentUsage bean, and MissionService.kt:39 and TaskService.kt:90 fall back to ContentUsage.NONE. But no real user can hit a wrong result from this. The app has no table or code that can hold an attempt, a problem report or an opened hint:\n- The migrations V1–V3 have no attempt, problem-report or opened-hint tables. The only match is the authored `hints` jsonb column on tasks in V2.\n- There is no practice module under src/main.\n- There are no child practice endpoints.\n\nSo every task really is unused, NONE gives the correct answer, and deleteTask/deleteMission can never wrongly succeed over existing usage. The guard can't fire in the running app because nothing can be in use yet. It isn't broken.\n\ndesign.md:26-29 openly states this as a non-goal. Design decision 2 (design.md:43-49) gives slice 7 (practice) the job of supplying the bean, and nothing in content has to change when it does.\n\nWhat remains is a traceability/process concern: the plan row has no explicit slice-7 follow-up, so the adapter could be forgotten later. That is a future risk, not a defect anyone can reproduce now. The point about the plan row is a fair note, but the \"major\" severity claim of an inert guard in the running app does not hold up through the exploitability lens.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1494,
+      "durationMs": 21089,
+      "sessionId": "edbde5e7-aa88-4bd9-b9da-13381154bd7e",
+      "costUsd": 0.1472272,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding describes the code accurately: Conflicts.kt:48-55 returns `listOf(m.id)` for LastTask and `listOfNotNull(mission?.id)` for TopicLocked. What doesn't hold up is the claim that this contradicts the contract.\n\n1. The contract wording is loose. openapi.yaml:1146 says `conflicts` holds \"Ids of the entities that block the action\". The draft-task example is introduced with \"e.g.\", so it illustrates the field rather than limiting it. updateMission (openapi.yaml:804-807) only says these 409s come \"with `conflicts`\". It never says which ids go in.\n\n2. LastTask: the action is emptying a published mission (CA-D7). What blocks it is the mission's own PUBLISHED state, so the mission really is the blocking entity. Returning its id fits even the literal wording, and unpublishing that mission is what clears the block. That half of the finding is wrong.\n\n3. TopicLocked (CA-D10): the rule is \"topic can change only while the mission is empty\". You could argue the tasks are the blockers. You could equally argue it is the mission's non-emptiness. Both readings fit \"entities that block\". The implementation picks one consistently, and design.md:105 and :109 record that choice explicitly (`conflicts` = the mission). The detail text and catalog key carry the human explanation either way.\n\n4. The mission id the response returns is in the stored state, not taken from the request. So clients get no wrong data, no crash, and no breach of an invariant (FR-27, NFR-1 and NFR-3 are unaffected).\n\nWhat's left is a documentation and design preference: whether the spec delta should also spell out this choice, or whether TopicLocked should list task ids. It is not a correctness defect in how the code works.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1527,
+      "durationMs": 18922,
+      "sessionId": "56151e0c-c93c-4fdf-8e54-21ad90f621b0",
+      "costUsd": 0.1680426,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The finding's description of the code is accurate. Conflicts.kt:48-55 returns `listOf(m.id)` for `Refusal.LastTask` and `listOfNotNull(mission?.id)` for `Refusal.TopicLocked`. Any admin `updateMission` that changes the topic of a non-empty mission, or empties a published mission, gets a 409 whose `conflicts` holds the mission's own id. The behaviour is deterministic, so it does happen.\n\nWhether this breaks the contract is a matter of interpretation:\n- openapi.yaml:1146 says \"Ids of the entities that block the action\", with an \"e.g.\" example. It is loose prose, not a rule.\n- For CA-D10, you can fairly say the mission's non-emptiness is what blocks the change. For CA-D7, the mission's published state blocks it. Returning the mission id is a defensible reading.\n- design.md:105 and design.md:109 record this choice on purpose (\"`conflicts` = the mission\"), so it is not an accident.\n- The spec delta does not pin the `conflicts` contents for these two cases. Nothing in the spec is violated outright.\n\nThe finding is confirmed only as an underspecified, documentation-level inconsistency:\n- It cannot be exploited: the endpoint is admin-only, and no data leaks or state goes wrong.\n- No frontend breakage is shown. The \"frontend relies on these shapes\" claim is not backed by any evidence.\n\nIt is valid as a nit to align the OpenAPI wording or the spec delta, but it should be downgraded below minor."
+      }
+    },
+    {
+      "label": "verify:src/main/resources/messages.properties",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1524,
+      "durationMs": 25827,
+      "sessionId": "2801f3a2-41ea-4828-84bc-3cd1988fd44e",
+      "costUsd": 0.11171020000000001,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "I read the actual message: it is at messages.properties:140, not :138 (138 is `mission-join`, which already names the mission). It says `content.conflict.mission-topic-locked=The topic can only change while the mission is empty. Remove its tasks first.` and takes no argument. The finding describes that correctly, but the claimed spec violation does not hold.\n\n1. **The general wording cannot apply to this rule.** The spec's rule list (spec.md:821-834) promises \"a message naming the mission to unpublish first\". That only makes sense for rules that unpublishing would fix. CA-D10's mission-topic rule says the topic changes \"only while the mission has no tasks\". It applies to draft missions too, and unpublishing never unlocks it; only removing the tasks does. Naming \"the mission to unpublish first\" would give the admin the wrong fix. The code's \"Remove its tasks first\" is the correct one.\n\n2. **The specific scenario defines this message, and the code matches it.** Scenario \"Changing the topic of a non-empty mission\" requires only \"a message that the topic can only change while the mission is empty\". The finding admits this.\n\n3. **The edit is on the mission itself.** The admin is editing that mission's topic, so there is no other mission to point to. The rules that do name a mission (task back to draft, task becoming graphic, last-task removal, join) are all edits made from somewhere else, and their messages do name it (`{0}`/`{1}`).\n\nSo the code follows the controlling scenario and the only sensible reading of the rule. At most there is a small wording ambiguity in the spec's summary sentence, not a correctness defect in this code.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/messages.properties",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1557,
+      "durationMs": 15288,
+      "sessionId": "038b41d2-ee4e-42a8-99bb-f392cae8d8d5",
+      "costUsd": 0.1172574,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The mechanism is real: `content.conflict.mission-topic-locked` is at messages.properties:140 (not 138), it takes no argument, and Conflicts.kt:53-54 passes `emptyList()`. But there is no real-world problem here, and the code meets the normative part of the spec.\n\n1. The specific scenario 'Changing the topic of a non-empty mission' (spec.md:911-915) only requires \"a message that the topic can only change while the mission is empty\". The message says exactly that, and the mission id is still returned in the conflict's ids (`listOfNotNull(mission?.id)`).\n2. The general sentence \"naming the mission to unpublish first\" (spec.md:823) does not fit this rule. The topic lock applies to DRAFT missions too (scenario: \"a DRAFT or PUBLISHED mission\"), and the fix is to remove tasks, not to unpublish. For a draft there is nothing to unpublish, so following that wording literally would give a wrong instruction. The second half of CA-D10 (task topic/grade while in missions) does name the missions (`task-topic-in-missions` with {0}), so the parts where naming is meaningful are already done.\n3. The refusal happens while the admin is editing that same mission, so they already know which mission it is. Naming it adds no information, and no user is misled or blocked.\n\nWhat remains is a wording mismatch in the spec's summary sentence, not a defect a user can reproduce.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1503,
+      "durationMs": 26905,
+      "sessionId": "e2f838dd-92c9-4405-873a-6d84fa89642d",
+      "costUsd": 0.1704716,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. At MissionService.kt:58-64, `update` takes the lock, loads the stored mission, and then, if the submitted topicId exists and differs from the stored one, it throws a 409 when the stored mission has tasks. This uses `MissionRules.topicChange` (Missions.kt:198: `topicId != stored.content.topicId && stored.content.taskIds.isNotEmpty()`). That happens before `validate(draft, stored)` builds any field errors. So a PUT on a non-empty mission that sends a different, existing topic plus position 0 or 51 task ids gets a 409 `mission-topic-locked` and no `errors[].field` for position or taskIds. No other code catches this first: the web adapter just calls the service, and an unknown topic skips this check and goes on to the 400 path.\n\nCalling it a correctness bug is a stretch, though:\n- The spec delta has two rules that both apply to this request: field refusals SHALL be 400, and \"A topic change of a non-empty mission SHALL be 409 (CA-D10)\". It never says which wins, so either order breaks one rule for the mixed case.\n- The order is deliberate. design.md decision 4 says the topic-lock check runs before the per-task topic rule so the admin sees the CA-D10 message.\n- Either way the request is refused and nothing is stored, and the admin still has to fix the topic first.\n\nThe real gap is that neither the spec nor OpenAPI states the precedence over other field errors, and no test pins it. That is a documentation and spec-ambiguity issue, not wrong behaviour. Confirmed, but it should be downgraded to a doc/test nit.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1536,
+      "durationMs": 19768,
+      "sessionId": "659d2174-8ad6-4451-b457-53d8152b221a",
+      "costUsd": 0.1313002,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real, and an admin can trigger it. In `MissionService.update` (MissionService.kt:58-64), the topic-lock check runs before `validate(draft, stored)`. The check fires when `topicId` is present and points to an existing topic, and `MissionRules.topicChange` refuses non-empty missions (MissionRulesTest:171-174 confirms this). So a PUT that switches a mission with tasks to another valid topic and also carries a bad position (0, a taken position) or bad taskIds gets 409 `mission-topic-locked` with no `errors[]`. No other guard, framework validation or earlier check stops this path. Bean validation on generated DTOs could catch some shape errors (e.g. min/max) before the service, but not semantic ones like a taken position or unknown task ids.\n\nThe ordering is deliberate. design.md decision 4 (lines 55-59) says the topic check runs before the per-task topic rule. But neither the store spec (content-authoring spec.md:911-917, CA-D10) nor the OpenAPI `updateMission` summary (openapi.yaml:803) says the 409 also beats unrelated field errors. The contract repo already handles similar ordering questions by documenting them (401-before-403, 400-before-422), so the gap is real.\n\nImpact is minor UX only. The admin gets an accurate refusal, sees field errors on the next save, and nothing is stored or leaked. So the finding holds as a documentation and test gap at its current minor severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1286,
+      "durationMs": 24146,
+      "sessionId": "17f4fbe1-eb5a-4605-b63f-c8e45bdfe21f",
+      "costUsd": 0.14732220000000001,
+      "numTurns": 8,
+      "result": {
+        "refuted": true,
+        "reasoning": "The test gap exists: `MissionRulesTest.kt:223` changes grade and topic together, and no test changes the grade alone. It doesn't matter in practice, though, because a grade-only change can never reach `MissionRules.taskEdit` in production.\n\n`TaskService.update` (`TaskService.kt:132-142`) calls `validate(draft)` (`TaskRules.validate`) before `MissionRules.taskEdit`. `TaskRules.topic` (`TaskRules.kt:89`) rejects any draft whose topic's grade differs from the draft's grade, with a `topic-grade` error (an `InvalidContent` validation failure), not a 409. Each topic has exactly one grade (`topic.grade`). So any valid `updated` whose grade differs from `current.grade` must also have a different `topicId`, and the `updated.topicId != current.topicId` branch already covers that case. The `|| updated.grade != current.grade` part of `Missions.kt:234` is redundant defence that is never the deciding condition.\n\nThe suggested test, `c.copy(grade = 7)` with an unchanged grade-6 topic, would build a `TaskContent` the system cannot produce, so it would test an unreachable path. The CA-D10 rule (\"changing topic or grade → 409 while in a mission\") is fully exercised by the topic-change tests and the combined case on line 223. The claimed hole in correctness or spec compliance does not exist.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1319,
+      "durationMs": 21877,
+      "sessionId": "bceccb45-5976-44d0-87b7-4a83ebc33cc9",
+      "costUsd": 0.1419612,
+      "numTurns": 8,
+      "result": {
+        "refuted": true,
+        "reasoning": "The test gap is real only at the unit level; no user can reach a grade-only change. `TaskService.update` (TaskService.kt:136-139) runs `validate(draft)` → `TaskRules.validate` before `MissionRules.taskEdit` gets the content. `TaskRules.topic` (TaskRules.kt:85-91) rejects any draft whose topic's grade differs from its grade (\"topic-grade\" → 422 InvalidContent). Each topic has exactly one grade (Model.kt:12: \"read-only, one grade each\"). So a valid update with the same topicId must have the same grade. Every grade change that passes validation also changes topicId, and the `topicId !=` half of the guard catches it. That half is tested at MissionRulesTest.kt:221-223 and MissionApiTest.kt:540. The `|| updated.grade != current.grade` branch is unreachable defense-in-depth. The suggested test (`c.copy(grade = 7)` with the same topic) builds a TaskContent that production validation would never produce. Adding it is harmless cleanup, but no real user or attacker can trigger a mission task changing grade without the guard firing. The finding describes no reproducible defect.",
+        "severityAdjustment": "downgrade"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "12 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 4, contested: 2, rejected: 6"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/implement-authoring-missions-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "slice 6 authoring-missions backend (implement-authoring-missions-api)",
+    "summary": "Review gate for slice 6 authoring-missions backend (implement-authoring-missions-api): 4 confirmed, 2 contested (treat as confirmed unless trivially wrong), 6 rejected.",
+    "confirmed": [
+      {
+        "title": "Mission reads are not transactional, so mission row and task list come from separate snapshots",
+        "file": "src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+        "line": 647,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`fun list()` and `fun get(id)` have no `@Transactional`. `JdbcMissionStore.find/list` reads `mission` in one statement and `mission_task` in a second one (`withTasks`), and each runs in autocommit. If an update or task delete commits between them, the response can pair the old topic and position with the new task list. `view()` then makes two more separate `usage` calls.",
+        "suggestion": "Mark `list`/`get` `@Transactional(readOnly = true)` (as ServedContentService already is) so all of these reads use one transaction. Under READ COMMITTED that is still not a single snapshot; if exact consistency matters, use REPEATABLE READ or read the mission and its tasks in one query.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute the finding. The mechanism is real; only the cited line number is wrong. MissionService.kt is about 130 lines long, so line 647 does not exist; the relevant code is lines 41–43 and 117–122.\n\n- **No transaction on the reads.** `MissionService` has no class-level `@Transactional`. Only the write methods are annotated (lines 45, 53, 71, 86). `list()` and `get()` (lines 41/43) are not.\n- **Two separate statements.** `JdbcMissionStore.list`/`find` (lines 22–31) run the `mission` SELECT through `JdbcClient`. `withTasks` (lines 121–131) then runs a second SELECT on `mission_task`. With no surrounding transaction, each statement runs in autocommit.\n- **The writes can land in between.** `update()` rewrites the mission row and its whole task list in one transaction. `removeTask` deletes and renumbers `mission_task` rows. If either commits between the two reads, the response can combine the old topic/position with the new task list.\n- **More reads in `view()`.** `view()` (lines 121–122) makes two more separate `usage` calls (`attemptCounts`, `usedTasks`). These can also disagree with the task list, so `hasAttempts` and `deletable` could be inconsistent.\n\nNothing else covers this. There is no class-level transaction, no read lock, and no single-query join. `ServedContentService` does have `@Transactional(readOnly = true)`, which shows the codebase uses that pattern where it wants it.\n\nThe impact is small. These are admin-only authoring reads, the window is a few milliseconds, and the wrong result lasts only for that one response; nothing wrong is stored. The finding itself correctly says the suggested fix is partial: under Postgres's default READ COMMITTED isolation, each statement still gets its own snapshot. Minor severity is appropriate.",
+          "The code does what the finding says, but it's hard to reproduce and does no lasting harm. The cited line is wrong: MissionService.kt is about 130 lines long, and the code is at lines 41–43 (`list()` / `get()`), not 647.\n\nConfirmed in code:\n- `list()` and `get()` have no `@Transactional`, and there is no class-level annotation on `MissionService` (lines 30–43).\n- `JdbcMissionStore.list/find` reads `mission` in one statement, then `withTasks` (JdbcMissionStore.kt:121–131) runs a separate `SELECT … FROM mission_task`. Each statement auto-commits on its own.\n- `view()` (lines 117–122) then makes two more separate `usage` calls (`attemptCounts`, `usedTasks`).\n- A write that commits between those statements could therefore produce a mixed response. The writes (`update` / `delete`) do commit atomically, in a transaction after `lock.exclusive()`.\n\nWhy it is hardly reachable in practice:\n- These are admin-only endpoints (MissionController), and the app has a single admin (the parent).\n- To see the problem, that admin would need two clients, such as two browser tabs: one saving a mission at the exact moment the other's list/get falls into the microsecond gap between two SELECTs.\n- The outcome is only a stale or mixed read model in one HTTP response. Nothing is stored and no decision depends on it. Every write path takes the exclusive content lock and reads again inside its own transaction (lines 45–90), so a mixed GET cannot cause a bad write. The next read is correct.\n- There is no security angle: no answer key leaks, and no child endpoint is involved.\n\nThe suggested fix is also weak, as the finding itself admits. `@Transactional(readOnly = true)` under Postgres's default READ COMMITTED still takes a fresh snapshot for each statement, so it would not close the gap. Only REPEATABLE READ or a single query would.\n\nThe mechanism is real, so this is not refuted. But the trigger is a near-impossible race, the effect is a one-off stale display that fixes itself, and the fix as proposed doesn't fix it. It belongs at nit/informational level, not minor."
+        ]
+      },
+      {
+        "title": "Unpublishable conflict lists a task that is both draft and graphic twice in the detail",
+        "file": "src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+        "line": 534,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`MissionRules.blockers` fills `drafts` and `graphic` independently, so a DRAFT GRAPHIC task is in both lists. The `mission-drafts-graphic` branch builds `listOf(tasks(b.drafts), tasks(b.graphic))`, so the detail names that task under 'Still drafts' and again under 'Graphic'. Only the `conflicts` ids are de-duplicated (`b.tasks()`).",
+        "suggestion": "Either accept this as intended (both statements are true) or exclude graphic tasks from the drafts list (or the reverse) when building the message, and add a test for a draft+graphic task.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is real, but the line number in the finding is wrong. The code is at Conflicts.kt:30, not line 534.\n\n- `MissionRules.blockers` (Missions.kt:183-184) builds the two lists separately: `drafts` is every task whose status is not PUBLISHED, and `graphic` is every task whose modality is not TEXT. Nothing stops a task from landing in both.\n- No domain rule rules out a DRAFT GRAPHIC task. The only modality guard (Missions.kt:238) stops a task in a published mission from becoming GRAPHIC. Publishing a draft graphic task is never blocked.\n- So in the `mission-drafts-graphic` branch, `listOf(tasks(b.drafts), tasks(b.graphic))` fills the template `Still drafts: {0}. Graphic: {1}.` (messages.properties:137). That task is named under both labels.\n- Only the conflict ids go through `b.tasks()` and its `distinctBy`.\n\nBoth statements in the message are true, so this is a wording/UX nit, not a broken rule. Minor severity fits.",
+          "Confirmed. `MissionRules.blockers` (Missions.kt:183-184) builds `drafts` as tasks whose status is not PUBLISHED and `graphic` as tasks whose modality is not TEXT, with nothing excluding one list from the other. Nothing stops a task from being both a draft and GRAPHIC. Modality is a free authoring field (enum TEXT/GRAPHIC), and the only modality guard (Missions.kt:238) is about published missions. So an admin who publishes a mission holding a single draft graphic task gets drafts=[t] and graphic=[t]. That hits the first branch at Conflicts.kt:29-30, which passes `tasks(b.drafts)` and `tasks(b.graphic)` as separate arguments. The catalog message (messages.properties:137, \"Still drafts: {0}. Graphic: {1}.\") then names the same task in both places. Only the conflict ids are de-duplicated (`b.tasks()` uses distinctBy). Any admin can reproduce this with normal use. Impact is cosmetic and admin-only: both statements are true, nothing leaks and nothing is corrupted. Severity minor is right."
+        ]
+      },
+      {
+        "title": "FR-12 child-facing scenarios are unverified, yet the plan closes FR-12 in slice 6 and its acceptance contract is artifact-ok",
+        "file": "trace/acceptance-contracts.json",
+        "line": 46,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "Coverage: 40 scenarios: 35 implemented, 5 partial, 0 missing, 0 contradicted. The 5 partial scenarios are all here. Store spec 'Draft and published status' has two scenarios. 'Draft mission is not served': '...WHEN the child opens HQ THEN the mission is not listed and its tasks cannot be requested'. 'Published task outside any published mission': '...refused as not found'. 'Graphic tasks are never served in MVP' has two more: 'Published graphic task requested by id' → 'HTTP 404 ... application/problem+json', and 'Graphic task inside a draft mission' → 'both requests are answered with HTTP 404, and HQ lists neither M nor G'. 'Publish a valid mission' ends with '...and the child sees it on HQ'. In code, only the module query `ServedContentService` (src/main/kotlin/cz/doucko/content/application/ServedContentService.kt:175-190) exists, and no child endpoint consumes it. design.md:14-17 and :24-25 defer the 404 and HQ behaviour to slice 7. Yet contract/docs/mvp-capability-plan.md:259 assigns `| FR-12 | authoring-missions | backend |` to slice 6 only, and acceptance-contracts.json marks FR-12 `artifact-ok` on MissionApiTest.kt, which tests only the query (MissionApiTest.kt:684).",
+        "suggestion": "Amend the capability plan so FR-12 (and FR-5 serving) also travel with slice 7 (practice-flow), or add an explicit carry-over item to the slice-7 change. Keep the FR-12 acceptance status out of a final 'done' until the child 404/HQ scenarios have an executable test. Note the deferral in docs/current-state.md 'Scope NOT delivered' when task 5.5 is done.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the mechanism by reading the code and docs. trace/acceptance-contracts.json:46-52 marks FR-12 as \"artifact-ok\", and its only artifact is MissionApiTest.kt. ServedContent / ServedContentService is the only FR-12 production code. Nothing in src/main uses it: grep finds only the interface, the service, ContentModule's KDoc and tests, and no child web adapter. The capability plan assigns FR-12 to slice 6 only (contract/docs/mvp-capability-plan.md:49 and :259). The slice-7 practice-flow row (:50) lists FR-22..FR-31, FR-42 and FR-44 but not FR-12 or FR-5, so nothing in the plan carries the child-facing FR-12 scenarios forward. Those scenarios are: draft mission not on HQ, 404 for a draft or graphic task, and \"child sees it on HQ\". design.md:14-17 and :24-25 explicitly push them to slice 7. So once slice 6 closes, FR-12 shows as satisfied by a test of a module query, while its observable scenarios have no executable test and no owner slice. This is the declared-method-needs-mechanism / done-claims risk the AGENTS.md lessons warn about. I could not refute it: no child endpoint exists elsewhere, and no slice-7 carry-over is recorded in the plan. Mitigation, and why I downgrade: the deferral is written down openly in design.md, proposal.md and the spec delta (\"Slice 7 serves the child from this query\"). Slice 7 depends on slice 6 and must consume ServedContent. It is also a traceability and process gap, not a runtime defect in shipped code. Minor rather than major.",
+          "The facts check out. contract/docs/mvp-capability-plan.md:49 and :259 give FR-12 to slice 6 only. The slice 7 row (line 50, practice-flow) lists FR-22..FR-31, FR-42 and FR-44, but not FR-12 or FR-5, so nothing in the plan carries the child-facing FR-12 scenarios (404 for draft or graphic tasks, HQ listing) into the slice that builds child endpoints. design.md:16 and the change spec (line 83) say \"Child endpoints are slice 7\", and slice 5's archived design marked FR-12 as \"6/7\". Even so, trace/acceptance-contracts.json:46-52 marks FR-12 \"artifact-ok\" on MissionApiTest.kt, which only tests the ServedContent query. The traceability and coverage gap the finding describes is therefore real: unless someone carries these scenarios forward by hand, FR-12 looks closed while scenarios like \"child opens HQ, the mission is not listed\" have no test that runs them.\n\nFrom the exploitability angle, though, no real user or attacker can trigger anything. No child endpoint exists yet, so no draft mission, graphic task or answer key can be served to a child. Today the problem cannot occur at runtime. What exists is a process and traceability gap, a risk that the scenarios get dropped in slice 7, not a defect anyone can reach. It is not refuted because the documented claim is accurate, but \"major\" overstates it for something with no runtime path. Downgrade to minor."
+        ]
+      },
+      {
+        "title": "Topic-change refusal is checked before field validation, so a request with field errors can get 409 instead of 400",
+        "file": "src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+        "line": 60,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The spec delta says: 'A refusal SHALL be 400 with `errors[].field` (`topicId`, `position`, `taskIds`, `taskIds[i]`)'. In code, `update` runs `MissionRules.topicChange(stored, topicId)?.let { throw conflicts.of(it, stored) }` before `validate(draft, stored)` (MissionService.kt:60-64). A PUT that changes the topic of a non-empty mission and also has, say, position `0` or 51 tasks gets 409 'mission-topic-locked' and no field errors. design.md decision 4 ('checked before the per-task topic rule') explains the intent, but no spec or OpenAPI text states the precedence over unrelated field errors.",
+        "suggestion": "Either validate the non-topic fields first, or document the precedence ('409 topic-lock takes precedence over field rules') in the spec delta or the updateMission OpenAPI description, and add a test that pins it.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is real. At MissionService.kt:58-64, `update` takes the lock, loads the stored mission, and then, if the submitted topicId exists and differs from the stored one, it throws a 409 when the stored mission has tasks. This uses `MissionRules.topicChange` (Missions.kt:198: `topicId != stored.content.topicId && stored.content.taskIds.isNotEmpty()`). That happens before `validate(draft, stored)` builds any field errors. So a PUT on a non-empty mission that sends a different, existing topic plus position 0 or 51 task ids gets a 409 `mission-topic-locked` and no `errors[].field` for position or taskIds. No other code catches this first: the web adapter just calls the service, and an unknown topic skips this check and goes on to the 400 path.\n\nCalling it a correctness bug is a stretch, though:\n- The spec delta has two rules that both apply to this request: field refusals SHALL be 400, and \"A topic change of a non-empty mission SHALL be 409 (CA-D10)\". It never says which wins, so either order breaks one rule for the mixed case.\n- The order is deliberate. design.md decision 4 says the topic-lock check runs before the per-task topic rule so the admin sees the CA-D10 message.\n- Either way the request is refused and nothing is stored, and the admin still has to fix the topic first.\n\nThe real gap is that neither the spec nor OpenAPI states the precedence over other field errors, and no test pins it. That is a documentation and spec-ambiguity issue, not wrong behaviour. Confirmed, but it should be downgraded to a doc/test nit.",
+          "The mechanism is real, and an admin can trigger it. In `MissionService.update` (MissionService.kt:58-64), the topic-lock check runs before `validate(draft, stored)`. The check fires when `topicId` is present and points to an existing topic, and `MissionRules.topicChange` refuses non-empty missions (MissionRulesTest:171-174 confirms this). So a PUT that switches a mission with tasks to another valid topic and also carries a bad position (0, a taken position) or bad taskIds gets 409 `mission-topic-locked` with no `errors[]`. No other guard, framework validation or earlier check stops this path. Bean validation on generated DTOs could catch some shape errors (e.g. min/max) before the service, but not semantic ones like a taken position or unknown task ids.\n\nThe ordering is deliberate. design.md decision 4 (lines 55-59) says the topic check runs before the per-task topic rule. But neither the store spec (content-authoring spec.md:911-917, CA-D10) nor the OpenAPI `updateMission` summary (openapi.yaml:803) says the 409 also beats unrelated field errors. The contract repo already handles similar ordering questions by documenting them (401-before-403, 400-before-422), so the gap is real.\n\nImpact is minor UX only. The admin gets an accurate refusal, sees field errors on the next save, and nothing is stored or leaked. So the finding holds as a documentation and test gap at its current minor severity."
+        ]
+      }
+    ],
+    "contested": [
+      {
+        "title": "MissionRules.taskStatus takes a `task` parameter it never reads",
+        "file": "src/main/kotlin/cz/doucko/content/domain/Missions.kt",
+        "line": 1200,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "`fun taskStatus(task: Task, status: PublishStatus, missions: List<Mission>): Refusal?` only looks at `status` and `missions`. The signature suggests the current task state matters when it does not. Note that a DRAFT task already in a published mission, which the invariant should prevent, would also be refused.",
+        "suggestion": "Remove the unused parameter, or use it explicitly (e.g. skip the check when `task.status == status`) so the code says what it means.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The unused parameter is real, but the finding does not show a correctness defect. The cited line is also wrong: the function is at Missions.kt:218 (the file is about 250 lines), not line 1200.\n\nWhat the code does: `taskStatus(task, status, missions)` returns null unless `status == DRAFT`. When it is DRAFT, it returns `TaskDraftInPublished` if any of the given missions are published. `task` is never read. The only production caller is `TaskService.setStatus` (TaskService.kt:162). It takes the exclusive lock, loads `current`, runs the rule, and writes only if `current.status != status`.\n\nWhy this is not a correctness bug:\n1. **The FR-57 rule works without `task`.** The rule is: a task in a published mission cannot become DRAFT. That depends only on the target status and the missions containing the task. Nothing about the current task changes the answer.\n2. **The suggested short-circuit would weaken the guard.** Skipping the check when `task.status == status` matters only for a DRAFT→DRAFT request on a task that is already in a published mission. The finding admits the invariant prevents that state: publishing a mission or adding a task to one requires published tasks (`blockers`/`CannotJoin`). If the state appeared anyway through corruption or a race, refusing the no-op is the safer, consistent behaviour, and accepting it would hide the broken invariant.\n3. **Tests pin the behaviour.** `MissionRulesTest:205-208` and `MissionApiTest:415/422` check the refuse and allow cases, and they match the spec.\n\nSo the claimed mechanism, \"the signature suggests the current state matters when it does not\", is a readability point (an unused parameter that may trigger a compiler warning), not wrong behaviour. Under the correctness lens there is nothing to fix. At most it is a style or cleanup nit, so if it is kept at all it should go under maintainability, not correctness.",
+          "The finding is correct, though the line number is wrong. The function is at Missions.kt:218, not line 1200. `fun taskStatus(task: Task, status: PublishStatus, missions: List<Mission>)` never reads `task`. Its body only checks `status != DRAFT` and `missions.published()`. The only production caller passes `current` (TaskService.kt:162). The unit tests in MissionRulesTest.kt:205-208 pass `t`, but the result never depends on it.\n\nThere is no user-visible failure. The finding's side note does describe real behaviour: a DRAFT→DRAFT request for a task in a published mission would be refused, because `task.status` is never checked. But that can only happen if a published mission contains a draft task, which the publishing invariant is meant to prevent. And refusing the request would be harmless anyway.\n\nSo this is a real but cosmetic issue: a misleading signature with no reachable bug. It stays at minor severity."
+        ]
+      },
+      {
+        "title": "409 `conflicts` for mission-topic-locked and last-task holds the mission's own id, which the contract defines as the blocking entities",
+        "file": "src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+        "line": 48,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "openapi.yaml:1144-1146 defines `conflicts`: 'Ids of the entities that block the action (e.g. the draft task blocking a mission publish)'. In code, `Refusal.LastTask -> ContentConflict(\"mission-last-task\", ..., listOf(m.id))` and `Refusal.TopicLocked -> ContentConflict(\"mission-topic-locked\", emptyList(), listOfNotNull(mission?.id))` (Conflicts.kt:48-55). The id returned is the mission being edited, not the tasks that block the topic change. This is documented only in design.md:105,109, not in the spec delta or the OpenAPI.",
+        "suggestion": "Either return the mission's task ids for TopicLocked (they are what blocks CA-D10), or amend the OpenAPI `conflicts` description and the spec delta to say that for a self-blocking rule it holds the edited mission id. The frontend relies on these shapes.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The finding describes the code accurately: Conflicts.kt:48-55 returns `listOf(m.id)` for LastTask and `listOfNotNull(mission?.id)` for TopicLocked. What doesn't hold up is the claim that this contradicts the contract.\n\n1. The contract wording is loose. openapi.yaml:1146 says `conflicts` holds \"Ids of the entities that block the action\". The draft-task example is introduced with \"e.g.\", so it illustrates the field rather than limiting it. updateMission (openapi.yaml:804-807) only says these 409s come \"with `conflicts`\". It never says which ids go in.\n\n2. LastTask: the action is emptying a published mission (CA-D7). What blocks it is the mission's own PUBLISHED state, so the mission really is the blocking entity. Returning its id fits even the literal wording, and unpublishing that mission is what clears the block. That half of the finding is wrong.\n\n3. TopicLocked (CA-D10): the rule is \"topic can change only while the mission is empty\". You could argue the tasks are the blockers. You could equally argue it is the mission's non-emptiness. Both readings fit \"entities that block\". The implementation picks one consistently, and design.md:105 and :109 record that choice explicitly (`conflicts` = the mission). The detail text and catalog key carry the human explanation either way.\n\n4. The mission id the response returns is in the stored state, not taken from the request. So clients get no wrong data, no crash, and no breach of an invariant (FR-27, NFR-1 and NFR-3 are unaffected).\n\nWhat's left is a documentation and design preference: whether the spec delta should also spell out this choice, or whether TopicLocked should list task ids. It is not a correctness defect in how the code works.",
+          "The finding's description of the code is accurate. Conflicts.kt:48-55 returns `listOf(m.id)` for `Refusal.LastTask` and `listOfNotNull(mission?.id)` for `Refusal.TopicLocked`. Any admin `updateMission` that changes the topic of a non-empty mission, or empties a published mission, gets a 409 whose `conflicts` holds the mission's own id. The behaviour is deterministic, so it does happen.\n\nWhether this breaks the contract is a matter of interpretation:\n- openapi.yaml:1146 says \"Ids of the entities that block the action\", with an \"e.g.\" example. It is loose prose, not a rule.\n- For CA-D10, you can fairly say the mission's non-emptiness is what blocks the change. For CA-D7, the mission's published state blocks it. Returning the mission id is a defensible reading.\n- design.md:105 and design.md:109 record this choice on purpose (\"`conflicts` = the mission\"), so it is not an accident.\n- The spec delta does not pin the `conflicts` contents for these two cases. Nothing in the spec is violated outright.\n\nThe finding is confirmed only as an underspecified, documentation-level inconsistency:\n- It cannot be exploited: the endpoint is admin-only, and no data leaks or state goes wrong.\n- No frontend breakage is shown. The \"frontend relies on these shapes\" claim is not backed by any evidence.\n\nIt is valid as a nit to align the OpenAPI wording or the spec delta, but it should be downgraded below minor."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "updateMission checks the topic-change rule before field validation, so an invalid request can get 409 instead of 400",
+        "file": "src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+        "line": 666,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`if (topicId != null && topics.find(topicId) != null) { MissionRules.topicChange(stored, topicId)?.let { throw conflicts.of(it, stored) } }` runs before `validate(draft, stored)`. If a save changes the topic of a non-empty mission and also has a bad position or malformed task ids, the admin gets the 409 'remove its tasks first' and none of the field errors. TaskService.update does it the other way round (`validate(draft)` first, then `MissionRules.taskEdit`), so the two endpoints rank refusals differently.",
+        "suggestion": "Call `validate(draft, stored)` first, then `topicChange` on the validated `content.topicId`, then `edit`. Field errors (400) then always come before state conflicts (409), as they do for tasks.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The order the finding describes is real: `MissionService.update` (lines 60–64) calls `MissionRules.topicChange` before `validate(draft, stored)`. So a request that changes the topic of a non-empty mission and also has a bad position gets only the 409. But this order is deliberate and needed. It is not a correctness bug.\n\nWhy the order matters: `MissionRules.validate` → `tasks()` (Missions.kt:171) adds a 400 field error `task-topic` for every task id whose topic differs from the requested topic. The usual way to try a topic change is to re-save the mission with a new topicId and its current taskIds. Those tasks all belong to the old topic. With the suggested fix (validate first), that request would always fail validation with N `taskIds[i]: task-topic` 400 errors. It would never reach `topicChange`, so the CA-D10 refusal `mission-topic-locked` ('The topic can only change while the mission is empty. Remove its tasks first.') would be unreachable in the main scenario it exists for. The guard `topics.find(topicId) != null` exists so the early check runs only when the topic is valid and known. An unknown or malformed topic still goes to validation and gets a 400. That shows the order was designed on purpose.\n\nThe comparison with TaskService doesn't hold. When a task changes topic, the task's own field rules don't fail. When a mission changes topic, the kept taskIds fail FR-9 field validation, so the state conflict has to come first. The remaining effect is minor: in a request that is already refused, a bad position is reported after the 409 instead of with it. That only changes which error the admin sees first; nothing wrong is stored. The suggested fix would make things worse. Refuted.",
+          "The finding describes the code correctly but gets the consequence wrong. In MissionService.update (lines 58-65, not 666), topicChange runs before validate(draft, stored). So a topic change on a non-empty mission that also has a bad position returns 409 instead of 400. That part is reproducible.\n\nThe ordering is deliberate, though, and the suggested fix would break the CA-D10 refusal. MissionRules.validate (Missions.kt:171) adds a `task-topic` 400 error for every listed task whose topic differs from the requested topic. The normal case for CA-D10 is an admin changing the topic while sending back the mission's existing task ids. Those tasks all belong to the old topic, so with validate run first every such request would get a 400 list of `task-topic` errors for each task. The 409 TopicLocked (\"remove its tasks first\") would then almost never be reached. It would only fire if the admin also swapped in tasks from the new topic, and those would be rejected anyway because the stored tasks are still in the mission. The current order puts the one actionable message first and only when the target topic exists (`topics.find(topicId) != null`); field errors still come back once the topic issue is fixed.\n\nTaskService ranks refusals differently because a task has no matching cascade of field errors. That difference is not an inconsistency defect. No user or attacker gets anything from this: it is an admin-only endpoint, nothing is stored on either path, and the admin only sees the problems one round at a time. At most this is a stylistic note, and the proposed change would make things worse."
+        ]
+      },
+      {
+        "title": "Conflict entity names are hard-coded English fragments outside the message catalog",
+        "file": "src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+        "line": 585,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`return \"$topic, mission ${mission.content.position}\"` and `\"task ${ref.taskNo}${ref.subPart.orEmpty()}, page ${ref.page}\"` are built in code and passed as `{0}`/`{1}` into catalog messages. All other user-visible text is in `messages.properties`, so these words will not follow a future locale catalog. The `\"?\"` fallback for a missing topic also reaches the admin.",
+        "suggestion": "Move the name patterns to catalog keys (e.g. `content.name.mission={0}, mission {1}`, `content.name.task=task {0}, page {1}`) and format them with the request locale through ContentProblems.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The strings exist, but the cited location is wrong: Conflicts.kt is about 96 lines long, not 585. The code is at lines 79–95: `name(mission)` builds \"$topic, mission N\" and `name(task)` builds \"task 4b, page 57\".\n\nIt is not a correctness defect:\n- There is only one message catalog, `src/main/resources/messages.properties`, and it is English.\n- Every catalog message these fragments go into, such as `content.conflict.mission-drafts` and `content.conflict.task-delete-in-published`, is also English.\n- So the rendered text is consistent and correct today. Nothing behaves wrongly.\n- The catalog comment at line 126 documents this naming scheme on purpose (\"Missions are named by topic and position, tasks by task number and page\").\n\nThe concern about a future locale catalog is about i18n and maintainability for a feature that doesn't exist yet. It is not a correctness issue. The \"?\" fallback only applies if a mission's topic is missing from `topics.find`. That would be a dangling topic reference. The finding gives no path where that happens, so it is speculative.\n\nThe finding's own confidence is low and the line number is wrong. Under the correctness lens there is no wrong behavior to confirm.",
+          "The code exists, but at Conflicts.kt:79-95, not line 585. It builds \"$topic, mission N\" and \"task Xy, page P\" in code. The finding's own premise is about a future locale, though, and no user can hit a problem today. The only catalog is src/main/resources/messages.properties; there are no messages_*.properties variants. So every request locale resolves to the same English catalog, and the hard-coded English fragments always match the surrounding message text. No mixed-language output can happen now; it only could if someone later adds a second catalog, which makes this a maintainability note rather than a correctness defect. The \"?\" fallback is defensive: a mission's topicId comes from seeded reference topics, and I found nothing that lets a referenced topic disappear. And even if it did fire, it would only show \"?\" to the admin, which is harmless. Nothing here is exploitable or reproducible in the current build, so the finding is refuted."
+        ]
+      },
+      {
+        "title": "Mission list calls the usage port twice per mission (N+1 once practice implements ContentUsage)",
+        "file": "src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+        "line": 723,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`list()` maps every mission through `view()`, which calls `usage.attemptCounts(ids)` and `usage.usedTasks(ids)` separately. With `ContentUsage.NONE` this costs nothing. With the slice-7 implementation, listing M missions runs 2·M usage queries. `TaskService.facts` likewise calls `usedTasks` and `attemptCounts` separately for one task.",
+        "suggestion": "In `list()`, collect every task id once, call `attemptCounts` and `usedTasks` once each, then build the views from the two results. Consider one port method that returns both facts.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The call pattern the finding describes is real: in MissionService.kt, list() at line 41 does missions.list().map(::view), and view() at lines 117–124 calls usage.attemptCounts(ids) and usage.usedTasks(ids) separately for each mission. But this is not a correctness defect, and the finding has other problems:\n1. The location is wrong. The file is about 125 lines long, so line 723 does not exist. The code is at lines 41 and 117–124.\n2. The output is right. Each MissionView gets the correct hasAttempts and deletable values, and nothing is returned wrong, lost or inconsistent.\n3. The cost is hypothetical. Nothing in src/main implements ContentUsage today. Both services fall back to ContentUsage.NONE through ObjectProvider.getIfAvailable (MissionService.kt:39, TaskService.kt:90), so these calls do no I/O now. The '2·M queries' depends on a slice-7 implementation that does not exist and whose query shape is unknown; it could cache or batch.\n4. It is a performance and design suggestion: batch the ids in list() or merge the two port methods. It is not a wrong mechanism. Under the correctness lens there is no mistake to confirm, so I'm treating it as refuted. It may still be worth noting as a minor performance item for slice 7.",
+          "The code does what the finding describes, but nothing in production can trigger it today. `MissionService.list()` (line 41, not 723; the file is about 125 lines) maps each mission through `view()` (lines 117–122). `view()` calls `usage.attemptCounts(ids)` and `usage.usedTasks(ids)` separately, and `TaskService.facts` (lines 108/111) does the same.\n\nHowever, the only production `ContentUsage` is `ContentUsage.NONE`. A search of `src/` finds no other implementation besides the test-only `FakeContentUsage`. Both services resolve the port with `usageProvider.getIfAvailable { ContentUsage.NONE }`, so every call is an in-memory no-op. No user or attacker can cause even one extra query now. The finding admits this (\"With `ContentUsage.NONE` this costs nothing\") and depends on a slice-7 implementation that does not exist.\n\nEven after slice 7, the cost would be an admin-only endpoint (`listMissions`) running 2·M small queries in a single-family tutoring app with a small mission count. That is a possible future performance improvement, not a correctness defect. The dimension label is wrong too: it is performance, not correctness. The line reference is also wrong. The clean fix is to batch the calls when the slice-7 practice adapter is written, not to treat it as a current problem."
+        ]
+      },
+      {
+        "title": "FR-56 usage guard is inert in the running app (ContentUsage.NONE), but FR-56 is planned and marked artifact-ok as fully delivered in slice 6",
+        "file": "src/main/kotlin/cz/doucko/content/ContentUsage.kt",
+        "line": 22,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "The spec delta says: '`deleteTask` SHALL be 409 ... while any attempt, problem report or opened hint references it (FR-56, CA-D22) ... `AdminTask.attemptCount` ... `AdminMission.hasAttempts` ... SHALL report the same facts.' In code, `MissionService`/`TaskService` resolve `usageProvider.getIfAvailable { ContentUsage.NONE }` (MissionService.kt:39, TaskService.kt:90). No production bean exists, so in the app `usedTasks` is always empty, `attemptCount` is always 0, `hasAttempts` is always false, and the usage branch never fires. The guard logic is tested only with a fake (MissionApiTest.kt:575-659, MissionsIT.kt:190). design.md:26-29 documents this as a non-goal, but plan row `| FR-56 | authoring-missions | backend |` (mvp-capability-plan.md:293) has no slice-7 follow-up, and the acceptance contract is `artifact-ok`.",
+        "suggestion": "Record the real ContentUsage adapter as a slice-7 obligation tied to FR-56: add it to the plan row or to the slice-7 change tasks. Add an IT there that seeds a real attempt, report or opened hint and expects 409 on deleteTask/deleteMission.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The code does what the finding says: MissionService.kt:39 and TaskService.kt:90 fall back to `ContentUsage.NONE`, and no production bean exists. But that isn't a correctness defect, and the finding's central claim (no slice-7 follow-up) is false.\n\n1. **The slice-7 obligation is already recorded.**\n   - The capability plan's slice-6 Definition of Done (contract/docs/mvp-capability-plan.md:194-196) says the guard \"goes through a content-module port (`ContentUsage`) that slice 7 implements, and is tested here with a fake.\"\n   - The slice-7 `practice-flow` scope-in list (line 204) names \"`ContentUsage` port\".\n   - So the plan explicitly carries the real adapter to slice 7. The FR-56 row at line 293 doesn't need to say it again.\n   - design.md:26-29 and decision 2 (lines 43-49) say the same thing.\n\n2. **NONE matches the running app today.** There is no `practice` module: `src/main/kotlin/cz/doucko/practice/**` matches no files. Attempts, problem reports and opened hints can't exist yet, so \"every task is unused\" is true. `attemptCount = 0` and `hasAttempts = false` are correct values, and the guard correctly never fires because nothing can reference a task. No content can be deleted wrongly.\n\n3. **The fallback is deliberate.** The `ObjectProvider` fallback is a planned seam, so slice 7 only adds its bean and nothing in content changes. Content can't depend on practice (Modulith).\n\nAt most this is a reminder about the slice-7 work, and the plan already tracks it. The mechanism isn't wrong, and the \"no follow-up\" premise is factually incorrect.",
+          "The mechanism the finding describes is real: there's no production ContentUsage bean, and MissionService.kt:39 and TaskService.kt:90 fall back to ContentUsage.NONE. But no real user can hit a wrong result from this. The app has no table or code that can hold an attempt, a problem report or an opened hint:\n- The migrations V1–V3 have no attempt, problem-report or opened-hint tables. The only match is the authored `hints` jsonb column on tasks in V2.\n- There is no practice module under src/main.\n- There are no child practice endpoints.\n\nSo every task really is unused, NONE gives the correct answer, and deleteTask/deleteMission can never wrongly succeed over existing usage. The guard can't fire in the running app because nothing can be in use yet. It isn't broken.\n\ndesign.md:26-29 openly states this as a non-goal. Design decision 2 (design.md:43-49) gives slice 7 (practice) the job of supplying the bean, and nothing in content has to change when it does.\n\nWhat remains is a traceability/process concern: the plan row has no explicit slice-7 follow-up, so the adapter could be forgotten later. That is a future risk, not a defect anyone can reproduce now. The point about the plan row is a fair note, but the \"major\" severity claim of an inert guard in the running app does not hold up through the exploitability lens."
+        ]
+      },
+      {
+        "title": "Mission topic-lock message does not name the mission, unlike the other publishing-rule refusals",
+        "file": "src/main/resources/messages.properties",
+        "line": 138,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "The store spec 'Mission publishing rules' (spec.md:822-834) says: 'The edit rules that keep it, each refused with a message naming the mission to unpublish first, are these: ... A mission's topic SHALL change only while the mission has no tasks...' In code, `content.conflict.mission-topic-locked=The topic can only change while the mission is empty. Remove its tasks first.` takes no argument, and `Conflicts.of(TopicLocked)` passes `emptyList()` as args (Conflicts.kt:53-54). The scenario 'Changing the topic of a non-empty mission' only requires 'a message that the topic can only change while the mission is empty', so this is borderline.",
+        "suggestion": "Pass `name(mission)` and include it in the message (e.g. 'Desetinná čísla, mission 1'). Alternatively, amend the rule-list sentence in the store spec so the 'naming the mission' wording does not apply to the CA-D10 mission-topic rule.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "I read the actual message: it is at messages.properties:140, not :138 (138 is `mission-join`, which already names the mission). It says `content.conflict.mission-topic-locked=The topic can only change while the mission is empty. Remove its tasks first.` and takes no argument. The finding describes that correctly, but the claimed spec violation does not hold.\n\n1. **The general wording cannot apply to this rule.** The spec's rule list (spec.md:821-834) promises \"a message naming the mission to unpublish first\". That only makes sense for rules that unpublishing would fix. CA-D10's mission-topic rule says the topic changes \"only while the mission has no tasks\". It applies to draft missions too, and unpublishing never unlocks it; only removing the tasks does. Naming \"the mission to unpublish first\" would give the admin the wrong fix. The code's \"Remove its tasks first\" is the correct one.\n\n2. **The specific scenario defines this message, and the code matches it.** Scenario \"Changing the topic of a non-empty mission\" requires only \"a message that the topic can only change while the mission is empty\". The finding admits this.\n\n3. **The edit is on the mission itself.** The admin is editing that mission's topic, so there is no other mission to point to. The rules that do name a mission (task back to draft, task becoming graphic, last-task removal, join) are all edits made from somewhere else, and their messages do name it (`{0}`/`{1}`).\n\nSo the code follows the controlling scenario and the only sensible reading of the rule. At most there is a small wording ambiguity in the spec's summary sentence, not a correctness defect in this code.",
+          "The mechanism is real: `content.conflict.mission-topic-locked` is at messages.properties:140 (not 138), it takes no argument, and Conflicts.kt:53-54 passes `emptyList()`. But there is no real-world problem here, and the code meets the normative part of the spec.\n\n1. The specific scenario 'Changing the topic of a non-empty mission' (spec.md:911-915) only requires \"a message that the topic can only change while the mission is empty\". The message says exactly that, and the mission id is still returned in the conflict's ids (`listOfNotNull(mission?.id)`).\n2. The general sentence \"naming the mission to unpublish first\" (spec.md:823) does not fit this rule. The topic lock applies to DRAFT missions too (scenario: \"a DRAFT or PUBLISHED mission\"), and the fix is to remove tasks, not to unpublish. For a draft there is nothing to unpublish, so following that wording literally would give a wrong instruction. The second half of CA-D10 (task topic/grade while in missions) does name the missions (`task-topic-in-missions` with {0}), so the parts where naming is meaningful are already done.\n3. The refusal happens while the admin is editing that same mission, so they already know which mission it is. Naming it adds no information, and no user is misled or blocked.\n\nWhat remains is a wording mismatch in the spec's summary sentence, not a defect a user can reproduce."
+        ]
+      },
+      {
+        "title": "Grade-only change guard (CA-D10) has no test of its own",
+        "file": "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "line": 223,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The spec delta says: 'An `updateTask` that changes the topic or the grade SHALL be 409 while the task is in any mission'. In code, `MissionRules.taskEdit` checks `updated.topicId != current.topicId || updated.grade != current.grade` (Missions.kt:234). The only test changes both together: `taskEdit(c, c.copy(grade = 7, topicId = Topics.GRADE7), listOf(a))` (MissionRulesTest.kt:223). The `|| grade` branch alone is never tested, and the web test at MissionApiTest.kt:540 covers only the topic change.",
+        "suggestion": "Add a MissionRulesTest case with `c.copy(grade = 7)` and the same topic, expecting `TaskTopicInMissions`. This keeps the grade half of the CA-D10 guard tested.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The test gap exists: `MissionRulesTest.kt:223` changes grade and topic together, and no test changes the grade alone. It doesn't matter in practice, though, because a grade-only change can never reach `MissionRules.taskEdit` in production.\n\n`TaskService.update` (`TaskService.kt:132-142`) calls `validate(draft)` (`TaskRules.validate`) before `MissionRules.taskEdit`. `TaskRules.topic` (`TaskRules.kt:89`) rejects any draft whose topic's grade differs from the draft's grade, with a `topic-grade` error (an `InvalidContent` validation failure), not a 409. Each topic has exactly one grade (`topic.grade`). So any valid `updated` whose grade differs from `current.grade` must also have a different `topicId`, and the `updated.topicId != current.topicId` branch already covers that case. The `|| updated.grade != current.grade` part of `Missions.kt:234` is redundant defence that is never the deciding condition.\n\nThe suggested test, `c.copy(grade = 7)` with an unchanged grade-6 topic, would build a `TaskContent` the system cannot produce, so it would test an unreachable path. The CA-D10 rule (\"changing topic or grade → 409 while in a mission\") is fully exercised by the topic-change tests and the combined case on line 223. The claimed hole in correctness or spec compliance does not exist.",
+          "The test gap is real only at the unit level; no user can reach a grade-only change. `TaskService.update` (TaskService.kt:136-139) runs `validate(draft)` → `TaskRules.validate` before `MissionRules.taskEdit` gets the content. `TaskRules.topic` (TaskRules.kt:85-91) rejects any draft whose topic's grade differs from its grade (\"topic-grade\" → 422 InvalidContent). Each topic has exactly one grade (Model.kt:12: \"read-only, one grade each\"). So a valid update with the same topicId must have the same grade. Every grade change that passes validation also changes topicId, and the `topicId !=` half of the guard catches it. That half is tested at MissionRulesTest.kt:221-223 and MissionApiTest.kt:540. The `|| updated.grade != current.grade` branch is unreachable defense-in-depth. The suggested test (`c.copy(grade = 7)` with the same topic) builds a TaskContent that production validation would never produce. Adding it is harmless cleanup, but no real user or attacker can trigger a mission task changing grade without the guard firing. The finding describes no reproducible defect."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/implement-authoring-missions-api/review-findings.json"
+  }
+}

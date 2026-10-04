@@ -29,6 +29,20 @@ Non-goals (not delivered in this change):
   the running app. The guard itself is tested here with a fake.
 - The real-stack smoke (done by the owner after the merge, as for slice 5).
 
+### Carry-over to slice 7 (review F03)
+
+The capability plan assigns FR-12 to this slice only, but its child-facing
+store-spec scenarios ("Draft mission is not served", "Published task outside
+any published mission", "Published graphic task requested by id", "Graphic
+task inside a draft mission", and "the child sees it on HQ" in "Publish a
+valid mission") need child endpoints that do not exist before slice 7. This
+slice delivers and tests the backend rule as the `ServedContent` query. The
+slice 7 change must serve HQ, mission briefing and task-by-id only through
+`ServedContent` and must add the HTTP 404 / HQ tests for those scenarios
+(`// @trace FR-12`). Until then FR-12 is not claimed as delivered end to end
+(`docs/current-state.md`, "Scope NOT delivered"). The plan row itself is a
+docs-store change for the owner.
+
 ## Key decisions
 
 1. **One advisory lock for structural content writes.** Every write whose
@@ -55,8 +69,9 @@ Non-goals (not delivered in this change):
 4. **Status codes follow the contract split.** Field rules are 400 with
    `errors[].field` (`position`, `topicId`, `taskIds`, `taskIds[i]`); state
    rules are 409 with `detail` and `conflicts`. A topic change of a non-empty
-   mission is checked before the per-task topic rule, so the admin gets the
-   CA-D10 message rather than one "other topic" error per task.
+   mission is checked before the field rules (review F04), so the admin gets the
+   CA-D10 message rather than one "other topic" error per task, even when the
+   same request has other field errors.
 5. **Rules are pure domain functions.** `MissionRules.validate` (field rules,
    given the topic, the positions taken in that topic and the referenced
    tasks) and `MissionRules.blockers` (tasks that may not be in a published
@@ -102,7 +117,7 @@ Non-goals (not delivered in this change):
 | `position` missing, not an integer, outside 1–999, taken in the topic | 400 | `position` |
 | `taskIds` missing / over 50 | 400 | `taskIds` |
 | `taskIds[i]` not a UUID, unknown, repeated, of another topic (message names both topics) | 400 | `taskIds[i]` |
-| topic change of a non-empty mission (CA-D10) | 409 | `conflicts` = the mission |
+| topic change of a non-empty mission (CA-D10), checked before the field rules | 409 | `conflicts` = the mission's task ids |
 | publish: empty mission (CA-D7) | 409 | `conflicts` = [] |
 | publish: draft and/or graphic tasks (FR-57) | 409 | `conflicts` = those task ids, detail names them |
 | update of a published mission: added task not `PUBLISHED` `TEXT` (CA-D9) | 409 | `conflicts` = those task ids |

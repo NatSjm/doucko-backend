@@ -24,7 +24,7 @@ Result: PASS, 22 warning(s)
 | FR-13 | yes | yes | backend, frontend | 3 | - |
 | FR-55 | yes | yes | backend, frontend | 3 | - |
 | FR-56 | yes | yes | backend | 12 | - |
-| FR-57 | yes | yes | backend | 21 | - |
+| FR-57 | yes | yes | backend | 22 | - |
 | FR-14 | yes | yes | backend | 9 | - |
 | FR-15 | yes | yes | backend | 3 | - |
 | FR-16 | yes | yes | backend | 2 | - |

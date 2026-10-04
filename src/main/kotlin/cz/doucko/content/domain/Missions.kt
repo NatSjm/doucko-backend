@@ -214,9 +214,8 @@ object MissionRules {
         return if (blockers.isEmpty()) null else Refusal.CannotJoin(blockers)
     }
 
-    /** Setting [task] to [status] while it is in [missions] (FR-57). */
+    /** Setting a task to [status] while it is in [missions] (FR-57). */
     fun taskStatus(
-        task: Task,
         status: PublishStatus,
         missions: List<Mission>,
     ): Refusal? {

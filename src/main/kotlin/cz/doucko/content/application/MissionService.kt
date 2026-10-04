@@ -38,8 +38,10 @@ class MissionService(
 ) {
     private val usage: ContentUsage get() = usageProvider.getIfAvailable { ContentUsage.NONE }
 
+    @Transactional(readOnly = true)
     fun list(): List<MissionView> = missions.list().map(::view)
 
+    @Transactional(readOnly = true)
     fun get(id: UUID): MissionView = view(find(id))
 
     @Transactional

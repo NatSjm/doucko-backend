@@ -29,8 +29,11 @@ task ids in `conflicts` and a `detail` naming them (FR-57, CA-D7). While a
 mission is published, `updateMission` SHALL refuse with 409 an empty task
 list (CA-D7) and any added task that is not `PUBLISHED` `TEXT` (CA-D9), and
 SHALL allow reordering and removing tasks while one remains. A topic change
-of a non-empty mission SHALL be 409 (CA-D10). Unpublishing SHALL always be
-allowed.
+of a non-empty mission SHALL be 409 with the mission's task ids in
+`conflicts` (CA-D10); it is checked before the field rules, so such a
+request gets this 409 even when other fields are also invalid. For an empty
+task list on a published mission, `conflicts` holds the mission's id.
+Unpublishing SHALL always be allowed.
 
 #### Scenario: Publish refusals and success
 

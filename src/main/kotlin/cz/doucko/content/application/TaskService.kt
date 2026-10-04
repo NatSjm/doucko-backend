@@ -159,7 +159,7 @@ class TaskService(
     ): Task {
         lock.exclusive()
         val current = get(id)
-        MissionRules.taskStatus(current, status, missions.containing(id))?.let { throw conflicts.of(it) }
+        MissionRules.taskStatus(status, missions.containing(id))?.let { throw conflicts.of(it) }
         if (current.status != status) tasks.setStatus(id, status)
         return current.copy(status = status)
     }

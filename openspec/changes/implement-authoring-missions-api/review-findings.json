@@ -1,0 +1,93 @@
+{
+  "generatedBy": "review-gate",
+  "scope": "slice 6 authoring-missions backend (implement-authoring-missions-api)",
+  "change": "implement-authoring-missions-api",
+  "baseRef": "d1d68df",
+  "headRef": "HEAD",
+  "dimensions": {
+    "correctness": {
+      "confirmed": 2,
+      "contested": 1,
+      "rejected": 3
+    },
+    "security": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    },
+    "spec-compliance": {
+      "confirmed": 2,
+      "contested": 1,
+      "rejected": 3
+    },
+    "visual": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Mission reads are not transactional, so mission row and task list come from separate snapshots",
+      "file": "src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+      "line": 647,
+      "status": "open"
+    },
+    {
+      "id": "F02",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Unpublishable conflict lists a task that is both draft and graphic twice in the detail",
+      "file": "src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+      "line": 534,
+      "status": "open"
+    },
+    {
+      "id": "F03",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "FR-12 child-facing scenarios are unverified, yet the plan closes FR-12 in slice 6 and its acceptance contract is artifact-ok",
+      "file": "trace/acceptance-contracts.json",
+      "line": 46,
+      "status": "open"
+    },
+    {
+      "id": "F04",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Topic-change refusal is checked before field validation, so a request with field errors can get 409 instead of 400",
+      "file": "src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+      "line": 60,
+      "status": "open"
+    },
+    {
+      "id": "F05",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "MissionRules.taskStatus takes a `task` parameter it never reads",
+      "file": "src/main/kotlin/cz/doucko/content/domain/Missions.kt",
+      "line": 1200,
+      "status": "open"
+    },
+    {
+      "id": "F06",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "409 `conflicts` for mission-topic-locked and last-task holds the mission's own id, which the contract defines as the blocking entities",
+      "file": "src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+      "line": 48,
+      "status": "open"
+    }
+  ],
+  "clean": false,
+  "generatedAt": "2026-10-04T20:05:54Z"
+}

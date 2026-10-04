@@ -380,6 +380,33 @@ class MissionApiTest {
 
     // @trace FR-57
     @Test
+    fun `a task that is both draft and graphic is named once`() {
+        val draftGraphic = task(draft = true, graphic = true, taskNo = "91")
+        val alone = createId(listOf(draftGraphic))
+        missionStatus(alone, "PUBLISHED").andExpect {
+            status { isConflict() }
+            jsonPath("$.conflicts") { value(contains(draftGraphic)) }
+            jsonPath("$.detail") { value(containsString("Still drafts: task 91b, page 57.")) }
+        }
+        val draftText = task(draft = true, taskNo = "92")
+        val graphic = task(graphic = true, taskNo = "93")
+        val mixed = createId(listOf(draftText, graphic, draftGraphic), "2")
+        val detail =
+            JsonPath.read<String>(
+                missionStatus(mixed, "PUBLISHED")
+                    .andExpect {
+                        status { isConflict() }
+                        jsonPath("$.conflicts") { value(containsInAnyOrder(draftText, graphic, draftGraphic)) }
+                    }.andReturn()
+                    .response.contentAsString,
+                "$.detail",
+            )
+        detail.split("task 91b").size shouldBe 2
+        detail.substringAfter("Graphic:") shouldBe " task 93b, page 57."
+    }
+
+    // @trace FR-57
+    @Test
     fun `an empty mission cannot be published`() {
         val missionId = createId(emptyList())
         missionStatus(missionId, "PUBLISHED").andExpect {
@@ -527,6 +554,11 @@ class MissionApiTest {
             missions.missions
                 .getValue(UUID.fromString(missionId))
                 .content.topicId shouldBe Topics.DECIMALS
+        }
+        // The mission's tasks block the topic change, and the topic rule answers before the field rules.
+        update(draft, storedIds(draft), "0", Topics.ANGLES).andExpect {
+            status { isConflict() }
+            jsonPath("$.conflicts") { value(contains(*list.toTypedArray())) }
         }
         val empty = createId(emptyList(), "3")
         update(empty, emptyList(), "3", Topics.ANGLES).andExpect {
