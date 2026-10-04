@@ -157,6 +157,9 @@ class InMemorySourceStore(
 class InMemoryTaskStore : TaskStore {
     val tasks = linkedMapOf<UUID, Task>()
 
+    /** Fault injection: the next insert fails as a concurrent database rule violation would. */
+    var failNextInsert = false
+
     override fun list(filter: TaskFilter) =
         tasks.values.filter { t ->
             val c = t.content
@@ -171,7 +174,13 @@ class InMemoryTaskStore : TaskStore {
 
     override fun find(id: UUID) = tasks[id]
 
+    override fun lock(id: UUID) = Unit
+
     override fun insert(task: Task) {
+        if (failNextInsert) {
+            failNextInsert = false
+            throw org.springframework.dao.DataIntegrityViolationException("fk")
+        }
         tasks[task.id] = task
     }
 

@@ -59,6 +59,9 @@ interface TaskStore {
 
     fun find(id: UUID): Task?
 
+    /** Locks the task row until the transaction ends, so image edits of one task run one at a time. */
+    fun lock(id: UUID)
+
     fun insert(task: Task)
 
     fun update(task: Task)

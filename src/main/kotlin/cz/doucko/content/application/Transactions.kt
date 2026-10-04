@@ -1,5 +1,6 @@
 package cz.doucko.content.application
 
+import org.slf4j.LoggerFactory
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 
@@ -8,7 +9,12 @@ internal fun afterCommit(action: () -> Unit) {
     if (!TransactionSynchronizationManager.isSynchronizationActive()) return action()
     TransactionSynchronizationManager.registerSynchronization(
         object : TransactionSynchronization {
-            override fun afterCommit() = action()
+            override fun afterCommit() {
+                // The delete is committed; a file left behind must not turn it into an error response.
+                runCatching(action).onFailure {
+                    LoggerFactory.getLogger("cz.doucko.content.storage").warn("stored file not removed: {}", it.javaClass.simpleName)
+                }
+            }
         },
     )
 }
@@ -24,3 +30,6 @@ internal fun onRollback(action: () -> Unit) {
         },
     )
 }
+
+/** Test hook for [afterCommit] (internal to the module). */
+fun afterCommitForTest(action: () -> Unit) = afterCommit(action)

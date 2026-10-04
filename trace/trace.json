@@ -133,7 +133,8 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -156,6 +157,7 @@
       "tests": [
         "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
         "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
         "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
         "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
         "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
@@ -1219,6 +1221,7 @@
         "src/test/kotlin/cz/doucko/content/StorageAndPdfTest.kt",
         "src/test/kotlin/cz/doucko/content/StorageAndPdfTest.kt",
         "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/TransactionHooksTest.kt",
         "src/test/kotlin/cz/doucko/content/UploadLimitsIT.kt",
         "src/test/kotlin/cz/doucko/content/UploadLimitsIT.kt",
         "src/test/kotlin/cz/doucko/content/UploadLimitsIT.kt",

@@ -51,6 +51,16 @@ Nothing SHALL be stored on any refusal.
 - **WHEN** an encrypted PDF, the first half of a PDF, or a PDF with an unreadable page tree is uploaded
 - **THEN** the answer is 400 with `errors[0].field = file` and the damaged-PDF message, and no source and no file exist
 
+### Requirement: The PDF is served for the viewer
+
+`getSourceFile` SHALL return the stored PDF bytes unchanged as `application/pdf`, and `getSource` SHALL give the page count that bounds page navigation (FR-2). An unknown source SHALL be 404.
+
+#### Scenario: Open a source in the viewer
+
+- **GIVEN** an uploaded 120-page source
+- **WHEN** the admin requests its file and its metadata
+- **THEN** the file is byte-identical to the stored PDF with content type `application/pdf`, the page count is 120, and an unknown source id is 404
+
 ### Requirement: Uploaded files live outside every repository
 
 The storage root SHALL come from `DOUCKO_STORAGE_DIR` and SHALL NOT lie inside
@@ -157,3 +167,5 @@ and otherwise remove the row and the file (CA-D5).
 - **GIVEN** a source referenced by one task
 - **WHEN** the admin changes its grade to 7 (with grade 7 configured) or deletes it
 - **THEN** both are 409 naming 1 task, and the source and its file are unchanged
+
+

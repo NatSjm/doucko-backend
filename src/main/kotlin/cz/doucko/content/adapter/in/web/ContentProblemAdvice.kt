@@ -14,6 +14,7 @@ import jakarta.validation.ConstraintViolationException
 import org.springframework.context.MessageSource
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ProblemDetail
@@ -52,6 +53,10 @@ class ContentProblemAdvice(
         detail = problems.text(request, "content.conflict.${exception.code}", exception.args)
         setProperty("conflicts", exception.conflicts)
     }
+
+    /** A concurrent edit broke a database rule between the check and the write (e.g. a task saved for a source being deleted). */
+    @ExceptionHandler(DataIntegrityViolationException::class)
+    fun integrity(request: HttpServletRequest) = problems.respond(request, HttpStatus.CONFLICT, "content-conflict")
 
     @ExceptionHandler(UnsupportedUpload::class)
     fun unsupported(

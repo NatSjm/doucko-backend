@@ -106,7 +106,7 @@ Non-goals (not delivered in this change):
   `ReferenceController`, `ContentBodyAdvice`, `TaskInputReader`,
   `ContentProblemAdvice`, `UploadLimitAdvice`.
 - `adapter/out/persistence`: `JdbcSourceStore`, `JdbcTaskStore`,
-  `JdbcTopicStore`. `adapter/out/storage`: `FilesystemFileStorage`.
+  `JdbcTopicStore`. `adapter/out/files`: `FilesystemFileStorage`.
   `adapter/out/pdf`: `PdfBoxInspector`.
 
 ## Data model (`V2__content_authoring.sql`)

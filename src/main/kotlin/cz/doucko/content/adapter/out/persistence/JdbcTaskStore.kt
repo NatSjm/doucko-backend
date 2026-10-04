@@ -70,6 +70,14 @@ class JdbcTaskStore(
         return task.copy(images = images(listOf(id))[id].orEmpty())
     }
 
+    override fun lock(id: UUID) {
+        jdbc
+            .sql("SELECT id FROM task WHERE id = ? FOR UPDATE")
+            .param(id)
+            .query(UUID::class.java)
+            .list()
+    }
+
     override fun insert(task: Task) {
         val c = task.content
         jdbc

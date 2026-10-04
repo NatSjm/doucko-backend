@@ -32,8 +32,9 @@ spring:
 
 server:
   tomcat:
-    # NFR-17: read (and drop) the rest of an oversized upload, so the client receives the 413 instead of a reset.
-    max-swallow-size: -1
+    # NFR-17: read (and drop) the rest of a slightly oversized upload (up to 64 MB), so the client receives the
+    # 413 instead of a reset. Bounded, so no client can hold a request thread with an endless body.
+    max-swallow-size: 64MB
   servlet:
     session:
       # admin-access (NFR-15): the admin session. AdminIdleTimeoutFilter enforces the 8 h idle expiry on

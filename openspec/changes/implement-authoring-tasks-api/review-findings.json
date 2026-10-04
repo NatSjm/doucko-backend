@@ -1,0 +1,173 @@
+{
+  "generatedBy": "review-gate",
+  "scope": "slice 5 authoring-tasks backend (implement-authoring-tasks-api)",
+  "change": "implement-authoring-tasks-api",
+  "baseRef": "main",
+  "headRef": "HEAD",
+  "dimensions": {
+    "correctness": {
+      "confirmed": 3,
+      "contested": 2,
+      "rejected": 1
+    },
+    "security": {
+      "confirmed": 2,
+      "contested": 0,
+      "rejected": 0
+    },
+    "spec-compliance": {
+      "confirmed": 5,
+      "contested": 2,
+      "rejected": 2
+    },
+    "visual": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "critical",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "FileStoragePort's only implementation (FilesystemFileStorage) is gitignored and missing from the commit",
+      "file": ".gitignore",
+      "line": 17,
+      "status": "open"
+    },
+    {
+      "id": "F02",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Concurrent image uploads collide on the deferred (task_id, position) unique constraint and return a raw 500",
+      "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+      "line": 154,
+      "status": "open"
+    },
+    {
+      "id": "F03",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Check-then-act source delete / task save can hit FK violations that surface as 500",
+      "file": "src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+      "line": 89,
+      "status": "open"
+    },
+    {
+      "id": "F04",
+      "severity": "major",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "The file storage adapter, which holds the path-traversal guard, is gitignored and missing from the commit, so a clean checkout cannot start",
+      "file": ".gitignore",
+      "line": 17,
+      "status": "open"
+    },
+    {
+      "id": "F05",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "`server.tomcat.max-swallow-size: -1` lets any LAN client hold request threads with endless bodies, without signing in",
+      "file": "src/main/resources/application.yaml",
+      "line": 36,
+      "status": "open"
+    },
+    {
+      "id": "F06",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Coverage summary — 17 scenarios: 15 implemented, 2 partial, 0 missing, 0 contradicted (the storage adapter is not in the commit, so HEAD does not build as committed)",
+      "file": "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md",
+      "line": 1,
+      "status": "open"
+    },
+    {
+      "id": "F07",
+      "severity": "critical",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "FilesystemFileStorage / StorageRoot (the only FileStoragePort implementation) is not committed: `.gitignore` rule `storage/` hides the adapter package",
+      "file": "src/main/kotlin/cz/doucko/content/adapter/out/files/FilesystemFileStorage.kt",
+      "line": 18,
+      "status": "open"
+    },
+    {
+      "id": "F08",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Task 5.1 is ticked 'qa:verify green' but the committed tree cannot reproduce it",
+      "file": "openspec/changes/implement-authoring-tasks-api/tasks.md",
+      "line": 26,
+      "status": "open"
+    },
+    {
+      "id": "F09",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Task 5.4 real-stack smoke is ticked although it was not run",
+      "file": "openspec/changes/implement-authoring-tasks-api/tasks.md",
+      "line": 29,
+      "status": "open"
+    },
+    {
+      "id": "F10",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "FR-2 (PDF viewer / getSourceFile) is backend-owned but has no requirement or scenario in the change delta",
+      "file": "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md",
+      "line": 15,
+      "status": "open"
+    },
+    {
+      "id": "F11",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "File cleanup in afterCommit can turn a committed delete into a 500",
+      "file": "src/main/kotlin/cz/doucko/content/application/Transactions.kt",
+      "line": 11,
+      "status": "open"
+    },
+    {
+      "id": "F12",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "Malformed topicId / sourceRef.sourceId reported as 'unknown' instead of 'not a UUID'",
+      "file": "src/main/kotlin/cz/doucko/content/domain/TaskRules.kt",
+      "line": 81,
+      "status": "open"
+    },
+    {
+      "id": "F13",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "deleteTask and setTaskStatus are implemented without the contract's 409 guards and without a delta requirement",
+      "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+      "line": 114,
+      "status": "open"
+    },
+    {
+      "id": "F14",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "Malformed path ids return 400, which getSourceFile and getSource do not declare in the contract",
+      "file": "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+      "line": 227,
+      "status": "open"
+    }
+  ],
+  "clean": false,
+  "generatedAt": "2026-10-04T18:19:31Z"
+}

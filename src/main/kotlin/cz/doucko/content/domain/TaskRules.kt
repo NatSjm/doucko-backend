@@ -78,6 +78,10 @@ object TaskRules {
                 null.also { errors += FieldError("topicId", "required") }
             }
 
+            value is In.Invalid -> {
+                null.also { errors += FieldError("topicId", "not-uuid") }
+            }
+
             topic == null -> {
                 null.also { errors += FieldError("topicId", "topic-unknown") }
             }
@@ -107,6 +111,10 @@ object TaskRules {
             when {
                 draft.sourceId is In.Missing -> {
                     null.also { errors += FieldError("sourceRef.sourceId", "required") }
+                }
+
+                draft.sourceId is In.Invalid -> {
+                    null.also { errors += FieldError("sourceRef.sourceId", "not-uuid") }
                 }
 
                 source == null || draft.sourceId.orNull() != source.id -> {

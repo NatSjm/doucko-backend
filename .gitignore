@@ -13,8 +13,8 @@ node_modules/
 .env.*
 !.env.example
 # NFR-3 / NFR-4: runtime data and workbook content never enter a repository
-uploads/
-storage/
-pgdata/
-backups/
+/uploads/
+/storage/
+/pgdata/
+/backups/
 *.dump

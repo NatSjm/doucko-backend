@@ -17,7 +17,7 @@
 
 ## 4. Adapters (green)
 
-- [x] 4.1 `adapter/out/persistence` (JDBC + JSONB), `adapter/out/storage` (filesystem, repo guard), `adapter/out/pdf` (PDFBox).
+- [x] 4.1 `adapter/out/persistence` (JDBC + JSONB), `adapter/out/files` (filesystem, repo guard), `adapter/out/pdf` (PDFBox).
 - [x] 4.2 `adapter/in/web`: controllers, `ContentBodyAdvice`, readers, problem advice, upload-limit advice; messages.
 - [x] 4.3 `application.yaml` (content config, multipart limits), `compose.yaml` volume `doucko-storage`, `Dockerfile`, `.env.example`.
 
@@ -26,6 +26,6 @@
 - [x] 5.1 `npm run qa:verify` green (546 unit, 44 integration); coverage ratchet updated to lines 98.97, statements 97, functions 96.88, branches 88.77. Evidence: `docs/qa/automated-verification-latest.md`. `compose.yaml`: the db healthcheck now uses TCP (`pg_isready -h 127.0.0.1`), which removed the `BackupRestoreIT` "database system is shutting down" race that failed two runs in a row here.
 - [x] 5.2 `npx openspec validate implement-authoring-tasks-api --strict`.
 - [ ] 5.3 review-gate workflow; disposition the findings in `review-findings.json`; re-run 5.1.
-- [x] 5.4 Real-stack smoke: NOT RUN (the owner's stack from the main checkout uses Compose project `doucko` and port 8081). Click path recorded in `docs/qa/evidence/slice5-compose-smoke.md` for after the merge.
+- [ ] 5.4 Real-stack smoke: NOT RUN (left unticked on purpose) (the owner's stack from the main checkout uses Compose project `doucko` and port 8081). Click path recorded in `docs/qa/evidence/slice5-compose-smoke.md` for after the merge.
 - [ ] 5.5 Update `docs/current-state.md`.
 - [ ] 5.6 Archive; commit with `Slice: implement-authoring-tasks-api` + `Refs: FR-1, FR-2, FR-3, FR-4, FR-5, FR-6, FR-7, FR-8, FR-10, FR-11, FR-13, NFR-17`.

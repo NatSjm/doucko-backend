@@ -1,0 +1,1140 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-04T18:12:07.071Z",
+  "finishedAt": "2026-10-04T18:19:31.438Z",
+  "args": {
+    "scope": "slice 5 authoring-tasks backend (implement-authoring-tasks-api)",
+    "baseRef": "main",
+    "headRef": "HEAD",
+    "change": "implement-authoring-tasks-api"
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": null,
+    "budgetPerAgentUsd": 2,
+    "maxTotalUsd": 25,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 8.6058,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 444,
+      "durationMs": 207896,
+      "sessionId": "19fb222b-8a42-46ac-8c7b-0e7c7f7bff5d",
+      "costUsd": 1.3331378000000005,
+      "numTurns": 37,
+      "result": {
+        "findings": [
+          {
+            "title": "FileStoragePort's only implementation (FilesystemFileStorage) is gitignored and missing from the commit",
+            "file": ".gitignore",
+            "line": 17,
+            "severity": "critical",
+            "confidence": "high",
+            "evidence": "`.gitignore:17` has `storage/`, which matches `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. `git ls-files src/main/kotlin/cz/doucko/content/adapter/out/storage` returns nothing, and `git grep FilesystemFileStorage HEAD` finds it only in the design doc and `src/test/.../StorageAndPdfTest.kt:4` (`import cz.doucko.content.adapter.out.storage.FilesystemFileStorage`). The file exists only in this working tree. A clean clone or CI build of 499b23c will fail test compilation, and the application context will have no `FileStoragePort` bean for `SourceService`/`TaskService`. The local `qa:verify` evidence in docs/qa was produced against an untracked file, so it does not describe the committed tree.",
+            "suggestion": "Anchor the ignore rule to the repo root (`/storage/`) or add a negation for `src/main/**/storage/`. Then commit `FilesystemFileStorage.kt` (including `StorageRoot`) and re-run `npm run qa:verify` from a clean clone before claiming the gate."
+          },
+          {
+            "title": "Concurrent image uploads collide on the deferred (task_id, position) unique constraint and return a raw 500",
+            "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+            "line": 154,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`addImage` reads `task.images` without a lock, sets the position to `task.images.size + 1`, and checks the limit with `task.images.size >= Limits.IMAGES`. Two quick uploads to the same task (a double-click, or a multi-file drop sent in parallel) both pick the same position. The constraint `task_image_position_uq ... DEFERRABLE INITIALLY DEFERRED` then fails only at commit. No advice handles `DataIntegrityViolationException`/`TransactionSystemException` (ContentProblemAdvice has no such handler), so the client gets a generic 500. The same race lets a task go past 10 images.",
+            "suggestion": "Lock the task row (`SELECT ... FROM task WHERE id = ? FOR UPDATE`) at the start of addImage/reorder/deleteImage, or compute the position in SQL under that lock. Map a remaining constraint violation to a 409 problem response."
+          },
+          {
+            "title": "Check-then-act source delete / task save can hit FK violations that surface as 500",
+            "file": "src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+            "line": 89,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`delete` calls `sources.referencingTasks(id)` and then `sources.delete(id)`. `TaskService.validate` loads the source with `sources.find` and then inserts with `source_id REFERENCES source (id) ON DELETE RESTRICT`. If one request saves a task while another deletes its source, either the DELETE fails with an FK error or the INSERT references a row that no longer exists. Neither `DataIntegrityViolationException` is mapped, so the user gets a raw 500 instead of the 409/400 the spec defines.",
+            "suggestion": "Lock the source row (`FOR SHARE` on task save, `FOR UPDATE` on delete or grade change), or catch `DataIntegrityViolationException` in the content advice and map it to the matching `ContentConflict` / `sourceRef.sourceId` field error."
+          },
+          {
+            "title": "File cleanup in afterCommit can turn a committed delete into a 500",
+            "file": "src/main/kotlin/cz/doucko/content/application/Transactions.kt",
+            "line": 11,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`override fun afterCommit() = action()` runs `storage.delete(...)` (`Files.deleteIfExists`), which can throw an IOException, for example on Windows when the PDF is still open in `getSourceFile`'s stream. Spring propagates exceptions from `afterCommit` to the caller even though the row is already gone. `deleteSource`/`deleteTask`/`deleteTaskImage` then answer 500 for a delete that succeeded, a retry returns 404, and the file is orphaned with no record.",
+            "suggestion": "Wrap the after-commit action in try/catch and log the storage key (no content) instead of rethrowing. Optionally queue orphaned keys for a later sweep, so the HTTP result reflects the committed state."
+          },
+          {
+            "title": "Malformed topicId / sourceRef.sourceId reported as 'unknown' instead of 'not a UUID'",
+            "file": "src/main/kotlin/cz/doucko/content/domain/TaskRules.kt",
+            "line": 81,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`JsonReaders.uuid()` returns `In.Invalid` for a non-canonical UUID string. `TaskRules.topic` handles only `In.Missing` explicitly and otherwise falls through to `topic == null -> FieldError(\"topicId\", \"topic-unknown\")`. `sourceRef` likewise gives `source-unknown` for an `In.Invalid` sourceId. Path and query parameters use `not-uuid` (ContentProblems.parameterError), so the same mistake gets two different messages depending on where it appears.",
+            "suggestion": "Add an `is In.Invalid -> FieldError(path, \"not-uuid\")` branch for topicId and sourceRef.sourceId."
+          },
+          {
+            "title": "Field paths echo client-supplied map keys into problem responses",
+            "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+            "line": 213,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`FieldError(\"answers.$key\", \"answer-unknown-part\")`, `FieldError(\"translations.$locale\", ...)` and `FieldError(\"$path.$key\", \"translation-key\")` (TaskRules.texts) build the `field` from arbitrary submitted object keys of any length. The design says 'Submitted values are never quoted in messages or logs' (NFR-3). The keys reach the response verbatim, and through any logging of problem bodies.",
+            "suggestion": "Validate the key shape first (part key regex `[a-z0-9]{1,20}`, locale `[a-z]{2}`). For keys that fail, report the error on the parent path (`answers`, `translations`, `...partLabels`) without echoing the key."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 472,
+      "durationMs": 126739,
+      "sessionId": "a2a89bfd-66a1-40ba-a899-b44b82af3c3e",
+      "costUsd": 0.861186,
+      "numTurns": 20,
+      "result": {
+        "findings": [
+          {
+            "title": "The file storage adapter, which holds the path-traversal guard, is gitignored and missing from the commit, so a clean checkout cannot start",
+            "file": ".gitignore",
+            "line": 17,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "The `.gitignore` rule `storage/` (meant for runtime upload data) also matches the source package `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. `git ls-files` on that directory returns nothing, and 499b23c does not contain `FilesystemFileStorage.kt`. That file is the only `FileStoragePort` implementation. It also holds the only path-containment check (`locate()`: `normalize()` + `startsWith(root)`) and the `StorageRoot` check that keeps uploads out of any git working tree (NFR-17/NFR-4). On CI, a fresh clone or a Docker build from a clean tree, `SourceService` and `TaskService` have no bean to inject and the app fails to start. The local tests and the compose smoke pass only because the untracked file exists in this worktree, so the evidence in `docs/qa/` does not match what was committed. If someone later 'fixes' the startup by writing a quick replacement adapter, the containment and outside-the-repo guards are silently lost.",
+            "suggestion": "Anchor the ignore rules to the repo root (`/storage/`, `/uploads/`) or add `!src/main/**/storage/`. Then commit `FilesystemFileStorage.kt`. Add a CI step, or extend the pre-commit hook, that fails when any `src/main` file is git-ignored (`git ls-files -oi --exclude-standard src/main` must be empty)."
+          },
+          {
+            "title": "`server.tomcat.max-swallow-size: -1` lets any LAN client hold request threads with endless bodies, without signing in",
+            "file": "src/main/resources/application.yaml",
+            "line": 36,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "With swallow size unlimited, Tomcat reads and discards the whole remaining body of any request it has already answered, whatever its size, to keep the connection alive. Endpoints that refuse early include the 401 from the admin chain, 413s and the 404 problem path. Any device on the home LAN can POST a never-ending chunked body to, for example, `/api/admin/sources` with no session. Tomcat answers 401 but keeps reading forever. A handful of such connections fill the worker pool, so the child surface and the admin surface stop responding. Tomcat's default (2 MB) caps this. The setting was added only so oversized uploads get a clean 413 instead of a reset.",
+            "suggestion": "Use a bounded value just above the largest legitimate body, e.g. `max-swallow-size: 52MB` (above `max-request-size` 51MB). That still turns any legal-size oversized upload into a clean 413 without making the swallow unbounded."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 415,
+      "durationMs": 162571,
+      "sessionId": "fc5f3621-22db-4c46-8feb-e6c4c42247bf",
+      "costUsd": 1.1340839999999999,
+      "numTurns": 45,
+      "result": {
+        "findings": [
+          {
+            "title": "Coverage summary — 17 scenarios: 15 implemented, 2 partial, 0 missing, 0 contradicted (the storage adapter is not in the commit, so HEAD does not build as committed)",
+            "file": "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md",
+            "line": 1,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "I mapped each of the 17 delta scenarios to its code and test. Source and task scenarios: SourceApiTest.kt:111-337 and TaskApiTest.kt:99-664. Upload limits: UploadLimitsIT.kt:100-126. Storage: ContentAuthoringIT.kt:208-229 and StorageAndPdfTest.kt:40. The two storage scenarios ('Stored files are outside the repositories', 'Storage root inside a working tree is refused') are implemented only in an untracked file. Every source and image scenario also depends on that file at runtime.",
+            "suggestion": "Commit the storage adapter (next finding). After that, all 17 scenarios are implemented and tested."
+          },
+          {
+            "title": "FilesystemFileStorage / StorageRoot (the only FileStoragePort implementation) is not committed: `.gitignore` rule `storage/` hides the adapter package",
+            "file": "src/main/kotlin/cz/doucko/content/adapter/out/storage/FilesystemFileStorage.kt",
+            "line": 18,
+            "severity": "critical",
+            "confidence": "high",
+            "evidence": "Spec: 'The storage root SHALL come from DOUCKO_STORAGE_DIR and SHALL NOT lie inside a git working tree; the backend SHALL refuse to start otherwise.' The file exists on disk, but it is missing from `git diff main..HEAD --name-only` and from `git ls-files`, and it does not show as untracked in `git status`. `.gitignore:17` has `storage/`, which matches `adapter/out/storage/`. SourceService.kt:29 and TaskService.kt:72 inject `FileStoragePort`, and no committed class implements it. StorageAndPdfTest.kt:4-5 imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage` and `StorageRoot`. On a clean checkout of HEAD (CI or the merge), test compilation fails. Even if it compiled, the context would fail with no FileStoragePort bean. NFR-17 (storage outside repositories) has no committed enforcement point.",
+            "suggestion": "Anchor the ignore rule (`/storage/`) or add `!src/**/storage/`, commit FilesystemFileStorage.kt, then re-run `npm run qa:verify` on a clean clone or worktree."
+          },
+          {
+            "title": "Task 5.1 is ticked 'qa:verify green' but the committed tree cannot reproduce it",
+            "file": "openspec/changes/implement-authoring-tasks-api/tasks.md",
+            "line": 26,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "Task 5.1 says: '[x] 5.1 `npm run qa:verify` green (546 unit, 44 integration) … Evidence: docs/qa/automated-verification-latest.md'. That run used the local worktree, which contains the gitignored FilesystemFileStorage.kt. HEAD 499b23c does not contain the file. Task 4.1, '[x] … `adapter/out/storage` (filesystem, repo guard)', is also ticked while its artifact is missing from the commit.",
+            "suggestion": "Commit the adapter, re-run qa:verify from a clean checkout and refresh the evidence file. Until then, untick 4.1 and 5.1."
+          },
+          {
+            "title": "Task 5.4 real-stack smoke is ticked although it was not run",
+            "file": "openspec/changes/implement-authoring-tasks-api/tasks.md",
+            "line": 29,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "Task 5.4 says: '[x] 5.4 Real-stack smoke: NOT RUN (the owner's stack … uses Compose project `doucko` and port 8081). Click path recorded in docs/qa/evidence/slice5-compose-smoke.md for after the merge.' A ticked checkbox over a step that did not run is a done-claim with no evidence (AGENTS.md lessons on vacuous passes and done-claims).",
+            "suggestion": "Untick 5.4 or mark it SKIP-pending with an explicit waiver. Tick it only after the smoke has run and its output is recorded."
+          },
+          {
+            "title": "FR-2 (PDF viewer / getSourceFile) is backend-owned but has no requirement or scenario in the change delta",
+            "file": "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md",
+            "line": 15,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "The plan lists 'FR-2 | authoring-tasks | backend, frontend' (mvp-capability-plan.md:249), and proposal.md:10 lists FR-2 as backend-owned. The delta spec never mentions FR-2 or `getSourceFile`. The code serves the PDF at SourceController.kt:60-65, and it is tested at SourceApiTest.kt:227. FR-13's 'open the PDF at that page' also depends on this endpoint. The plan's FR coverage cannot be traced through the delta.",
+            "suggestion": "Add a delta requirement for serving the source PDF to the viewer (200 application/pdf, 404 for an unknown id or missing file) that cites FR-2 and FR-13, with a scenario backed by SourceApiTest:227."
+          },
+          {
+            "title": "deleteTask and setTaskStatus are implemented without the contract's 409 guards and without a delta requirement",
+            "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+            "line": 114,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "openapi.yaml:562 says deleteTask is 'refused (409) with attempts, problem reports or opened hints, or while in a published mission'. openapi.yaml:579 says setTaskStatus is '409 when a published mission holds it'. TaskService.delete (lines 114-119) and setStatus (lines 121-129) delete or change status with no guard. design.md:34-36,42 defers these guards to slice 6, but the delta spec has no requirement covering these endpoints or the interim behavior. Nothing creates attempts or missions yet, so there is no runtime harm today.",
+            "suggestion": "Add a delta requirement that records the interim behavior (unguarded delete/status, guards arrive with the slice-6 `ContentUsage` port), or add a TODO/ADR pointer at TaskService.delete/setStatus so slice 6 cannot miss it."
+          },
+          {
+            "title": "getReferenceData, getAdminImage and repeated-id rejection in bulk publish are implemented without a delta requirement",
+            "file": "src/main/kotlin/cz/doucko/content/adapter/in/web/ReferenceController.kt",
+            "line": 1,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The delta covers 'reference' operations only in the auth requirement. Its only bulk-publish rule comes from the delta itself: 'a repeated id is 400' (delta spec.md:146). The store spec 'Bulk publish from the task list' (store spec.md:810-813) refuses only an empty list or 101 ids. getReferenceData (seeded topics, grades, locales; TaskApiTest.kt:639) and getAdminImage (TaskController.kt:107-116) have no delta scenario.",
+            "suggestion": "Add the repeated-id rule to the store spec, or note it as a contract clarification. Add short delta scenarios for reference data (store requirement 'Topics come from configuration') and for image serving."
+          },
+          {
+            "title": "Malformed path ids return 400, which getSourceFile and getSource do not declare in the contract",
+            "file": "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+            "line": 227,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The test is named 'the PDF is served for the viewer, unknown ids are 404 and malformed ids 400'. In openapi.yaml, getSourceFile (lines 464-471) declares only 200, 401 and 404, and getSource (lines 405-412) declares only 200, 401 and 404.",
+            "suggestion": "Declare 400 (BadRequest) on the GET operations with UUID path parameters in openapi.yaml through a docs-store change, or accept this as a documented global convention."
+          },
+          {
+            "title": "The tester's 'database is unchanged' claim is asserted only against in-memory stores",
+            "file": "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+            "line": 431,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The scenario says: 'the results are CORRECT 0.5, WRONG 12400, and UNPARSEABLE with the checker's Czech tip, and the database is unchanged'. TaskApiTest runs over the in-memory stores from ContentTestSupport. ContentAuthoringIT has no testAnswers case against Postgres. TaskService.test (lines 206-241) does not write, so the behavior is correct, but the persistence half of the scenario is untested on the real database.",
+            "suggestion": "Add an IT assertion that runs testAnswers and then checks that the task row and row counts are unchanged, or reword the scenario to 'records nothing'."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 684,
+      "durationMs": 26428,
+      "sessionId": "cd802faa-e439-4e54-9c80-44d743c799c5",
+      "costUsd": 0.0697076,
+      "numTurns": 4,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "verify:.gitignore",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1577,
+      "durationMs": 26442,
+      "sessionId": "5c99d943-beb3-4793-b085-9aace0fa4f9f",
+      "costUsd": 0.1340812,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this finding. The ignore mechanism is real. Line 17 of `.gitignore` is `storage/`. It has no leading slash and no slash in the middle, so under gitignore rules it matches a directory named `storage` at any depth. That includes `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. Glob shows the only file under any `src/**/storage/` path is `FilesystemFileStorage.kt`, so the rule catches it.\n\nIt is the only production implementation of `FileStoragePort`. The interface is in `content/application/Ports.kt:18`, and `SourceService.kt:29` and `TaskService.kt:72` inject it. The other implementation, `InMemoryFileStorage`, is in test sources. `StorageAndPdfTest.kt:4` imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage` directly, so a tree without that file fails test compilation. In a non-test application context, nothing would supply the `FileStoragePort` bean.\n\nThe git status snapshot shows only `trace/ledger.jsonl` as modified and the file is not listed as untracked. That fits a file hidden by an ignore rule; a tracked file would not be listed either. I could not read the git index or object store (permission denied), so I could not run `git ls-files` myself to rule out a force-add (`git add -f`). Nothing suggests a force-add happened, and the reviewer reports `git ls-files` and `git grep HEAD` results that agree with the ignore rule.\n\nThe QA evidence in `docs/qa/automated-verification-latest.md` was built from this worktree's `target/classes`, which contains `FilesystemFileStorage.class`. A local build would pass even though the committed tree lacks the source, which is the gap the finding describes.\n\nCritical severity is justified: a clean clone or CI build of 499b23c cannot compile its tests.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:.gitignore",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1610,
+      "durationMs": 28132,
+      "sessionId": "81fd2b8a-199b-4bee-88ea-be20331735a2",
+      "costUsd": 0.151867,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "reasoning": "Mechanism confirmed. `.gitignore:17` is an unanchored `storage/`, which in gitignore semantics matches a directory named `storage` at any depth, including `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. The file `FilesystemFileStorage.kt` exists in the working tree. The session-start git status shows only `M trace/ledger.jsonl` and no `??` entry for it. That fits the file being ignored (ignored untracked files are hidden from status) and does not fit a normal untracked file. Callers: `SourceService.kt:29` and `TaskService.kt:72` inject `FileStoragePort`. The only production implementation lives in that ignored directory. The only other implementation is the test-only `InMemoryFileStorage` in `ContentTestSupport.kt:218`. `StorageAndPdfTest.kt:4-5` imports `adapter.out.storage.FilesystemFileStorage` and `StorageRoot` directly. On a clean clone, test compilation fails, and the production context has no `FileStoragePort` bean, so it would not start. The QA evidence (`docs/qa/automated-verification-latest.md:1376`) scanned `target/classes/.../FilesystemFileStorage.class` from this local working tree, so it does not describe the committed tree. One thing I could not check directly: the worktree git index (permission denied), so I can't rule out a `git add -f`. But the reviewer reports that `git ls-files` returned nothing, and the clean status supports that. CI and any fresh checkout are fully affected, so critical severity is warranted.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1484,
+      "durationMs": 29936,
+      "sessionId": "17065a6b-ac5f-4798-a2ec-b0753050a203",
+      "costUsd": 0.1728302,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the main mechanism; the code confirms it.\n\n- **No lock on the read.** `TaskService.addImage` (lines 145–157) loads the task through `JdbcTaskStore.find`, which runs a plain `SELECT ... WHERE id = ?` plus an images query. There is no `FOR UPDATE`. The only pessimistic lock in the codebase is in the profile module.\n- **Position comes from a stale count.** The position is `task.images.size + 1`, worked out in the application. The INSERT at `JdbcTaskStore.kt:152` passes it through unchanged.\n- **The duplicate fails only at commit.** `V2__content_authoring.sql:65` declares `task_image_position_uq UNIQUE (task_id, position) DEFERRABLE INITIALLY DEFERRED`. So two concurrent READ COMMITTED transactions both insert the same position, and the second one fails when it commits.\n- **Nothing turns that failure into a problem response.** The commit error surfaces as a `DataIntegrityViolationException` or `TransactionSystemException`, depending on the transaction manager. `ContentProblemAdvice` only handles `InvalidContent`, `ContentNotFound`, `ContentConflict`, upload, body, parameter and `ConstraintViolationException` (Bean Validation). No advice anywhere handles either exception or a generic `Exception`, so the client gets a raw 500. That breaks the AGENTS.md rule that no user input may produce a raw 500.\n- **The storage file is cleaned up.** `onRollback` deletes the stored file, so the remaining harm is the 500.\n\nOne part of the finding is overstated: \"the same race lets a task go past 10 images\" is mostly wrong. When the count is 9, both racers pick position 10, and the deferred unique constraint rejects the second at commit, so the limit can't be passed this way. That doesn't change the core claim.\n\nSeverity stays minor: this is a single-admin authoring flow and needs concurrent requests to trigger.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1517,
+      "durationMs": 24872,
+      "sessionId": "277d28e2-3bef-452b-a318-f802656aa39b",
+      "costUsd": 0.20004679999999997,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this finding; the mechanism holds up in the code. `TaskService.addImage` (lines 140–159) runs in a default @Transactional (READ COMMITTED). It reads the task through `JdbcTaskStore.find`, which is a plain SELECT with no FOR UPDATE, no @Lock and no version column. It then checks `task.images.size >= Limits.IMAGES` and picks position `task.images.size + 1`. `JdbcTaskStore.addImage` is a plain INSERT, so nothing serialises two uploads to the same task. In V2__content_authoring.sql:65 the constraint is declared `task_image_position_uq UNIQUE (task_id, position) DEFERRABLE INITIALLY DEFERRED`. Because it is deferred, the second INSERT doesn't block or fail straight away. The duplicate is caught when the transaction commits, and Spring surfaces it as a DataIntegrityViolationException (or TransactionSystemException) after the method returns. ContentProblemAdvice has no handler for those types (it handles InvalidContent, ContentNotFound, ContentConflict, upload errors, unreadable/type-mismatch/missing-param/ConstraintViolation). No other advice in src/main handles them either, so the client gets an unmapped 500, which breaks the repo's own 'no raw 500' rule. The image-limit race is also real: two requests that both see 9 images both pass the check. Only an authenticated admin can reach this path, and it needs overlapping requests to the same task. A double-click or a multi-file upload sent in parallel can trigger it, so a real user can hit it without any attacker. The storage blob is cleaned up by onRollback, so there's no data corruption beyond the failed request. 'Minor' is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1378,
+      "durationMs": 20429,
+      "sessionId": "7c47cdbe-9b3b-4a24-ad01-f789f936bdb3",
+      "costUsd": 0.17091079999999997,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. `SourceService.delete` (SourceService.kt:86-93) runs `referencingTasks(id)` and then `DELETE FROM source WHERE id = ?` (JdbcSourceStore.kt:43-53) inside a plain @Transactional, which uses Postgres's default READ COMMITTED. Neither step takes a lock (I found no FOR UPDATE or FOR SHARE in content persistence). `task.source_id` is declared `REFERENCES source (id) ON DELETE RESTRICT` (V2__content_authoring.sql:45). Under READ COMMITTED, a task insert can race a source delete in two ways:\n(a) The task insert is not yet committed when the delete's check runs, so the check sees no tasks. The DELETE then blocks on the KEY SHARE lock the FK check took, and once the insert commits, RESTRICT fails.\n(b) The delete runs first but has not committed when TaskService validates with `sources.find`, so the source still looks present. The INSERT's FK check then waits on the deleted row and fails after the delete commits.\nIn both cases Spring raises DataIntegrityViolationException. ContentProblemAdvice handles only InvalidContent, ContentNotFound, ContentConflict, the upload exceptions, unreadable bodies, type mismatch, missing params and parts, and ConstraintViolationException. No handler maps DataIntegrityViolationException or a generic Exception, so the response is a raw 500, which breaks the project's \"no raw 500\" rule. Getting it requires two concurrent admin requests, and this is a single-admin app, so the race is unlikely in practice. The finding's severity of minor and confidence of low fit that, but the claim itself is correct.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1411,
+      "durationMs": 24414,
+      "sessionId": "25e6f9f9-5188-49b8-a3e3-e8395a6c67d8",
+      "costUsd": 0.12389040000000001,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "keep",
+        "reasoning": "The code matches the finding's description. In SourceService.delete (lines 86-93), the method calls `referencingTasks(id)` and then `sources.delete(id)` without taking any row lock. A search for `FOR UPDATE` / `FOR SHARE` / isolation settings in src/main finds nothing, so the transaction uses Postgres's default READ COMMITTED. V2__content_authoring.sql:45 declares `source_id ... REFERENCES source (id) ON DELETE RESTRICT`. No `@ExceptionHandler` anywhere in src/main handles DataIntegrityViolationException. ContentProblemAdvice only covers the content exceptions plus ConstraintViolationException, which is the bean-validation exception, not the database one. Two races can therefore happen: (a) the delete check sees no tasks, a task insert commits, then the DELETE hits an FK RESTRICT error; or (b) the task save validates the source, the delete commits, then the INSERT fails its FK check. Either way the error reaches the client as an unmapped 500, which breaks the \"no raw 500\" rule. The same check-then-act gap exists in update when the grade changes: a task could be attached after the grade-lock check. That one gives inconsistent data rather than a 500. In practice the risk is small. Only the admin can reach these endpoints, and this app has one admin, so it would take the same person sending a delete and a task save for that source at nearly the same moment (for example from two tabs). No attacker or child request can trigger it. The mechanism is real and reproducible with concurrent requests, so the finding stands; given how narrow the window is, \"minor\" is the right severity."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/Transactions.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1295,
+      "durationMs": 49367,
+      "sessionId": "813adcb1-a1d2-4db0-8ffc-e165a12e0d5e",
+      "costUsd": 0.2965602,
+      "numTurns": 13,
+      "result": {
+        "refuted": false,
+        "reasoning": "The core mechanism holds, but the Windows example the finding gives is wrong.\n\nWhat the code does:\n- `Transactions.kt:11` registers `override fun afterCommit() = action()` with no try/catch.\n- `SourceService.delete` (`SourceService.kt:92`), `TaskService.delete` (`TaskService.kt:118`) and `TaskService.deleteImage` (`TaskService.kt:191`) are all `@Transactional`. Each deletes the row and then registers `afterCommit { storage.delete(key) }`.\n- The real port, `FilesystemFileStorage.delete` (`FilesystemFileStorage.kt:41-43`), calls `Files.deleteIfExists(locate(key))` and catches nothing. That call can throw an `IOException`, such as `AccessDeniedException`, a read-only volume or a broken mount.\n\nWhy it becomes a 500:\n- Spring documents that exceptions thrown from `TransactionSynchronization.afterCommit` are propagated to whoever called commit.\n- In `AbstractPlatformTransactionManager.processCommit`, `triggerAfterCommit` runs after the database commit. `invokeAfterCommit` does not swallow exceptions; only `afterCompletion` exceptions are caught and logged.\n- So the exception escapes the `@Transactional` proxy after the DELETE has already committed. The controller never returns its 204, and the client gets an error response, most likely a 500.\n- A retry then hits `get(id)` → `ContentNotFound` → 404, and the file is left orphaned. In `TaskService.delete`, one failing image also stops the `forEach` from deleting the task's remaining images.\n\nWhere the finding is weak:\n- Its example is a file held open by `getSourceFile` on Windows. Java's `Files.newInputStream` on Windows opens files with FILE_SHARE_DELETE by default, so deleting an open file normally succeeds and does not throw.\n- The failure therefore needs a less common filesystem error. The code path is real, the trigger is rare and the impact is limited to an admin-only endpoint, so \"minor\" is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/Transactions.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1328,
+      "durationMs": 50249,
+      "sessionId": "5eb90da9-9724-4c9b-8852-78bd584f3332",
+      "costUsd": 0.300878,
+      "numTurns": 13,
+      "result": {
+        "refuted": true,
+        "reasoning": "Only part of the mechanism is real, and the concrete trigger fails.\n\nWhat is real: `Transactions.kt:11` runs the action straight inside `TransactionSynchronization.afterCommit()`. Spring's `invokeAfterCommit` passes exceptions from `afterCommit` back to the caller, unlike `afterCompletion`, where they are only logged. So if `storage.delete` threw, `deleteSource`, `deleteTask` and `deleteTaskImage` would fail after the row was already committed.\n\nWhy the trigger fails: the storage adapter is `src/main/kotlin/cz/doucko/content/adapter/out/storage/FilesystemFileStorage.kt`. `open()` uses `Files.newInputStream` (NIO), not `java.io.FileInputStream`. On Windows, NIO's `WindowsChannelFactory` opens files with FILE_SHARE_READ, FILE_SHARE_WRITE and FILE_SHARE_DELETE all on by default. So `Files.deleteIfExists` on a PDF that `getSourceFile` is still streaming succeeds: Windows marks the file delete-pending and does not raise a sharing violation. On Linux/Docker, unlinking an open file always works. `deleteIfExists` also never throws when the file is already gone.\n\nWhat is left: generic environmental IO faults, such as the volume going read-only, permissions changing outside the app, or antivirus interference. These are operator or infrastructure failures, not something a user or attacker can trigger. All three delete endpoints are admin-only, so there is no attacker angle either.\n\nThe suggested hardening (log and swallow, or use `afterCompletion`) is a reasonable robustness tweak. But the specific scenario in the finding (a concurrent open stream on Windows causing a 500 and an orphaned file) cannot be reproduced with this adapter.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/domain/TaskRules.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1197,
+      "durationMs": 36407,
+      "sessionId": "2ef7cb36-b78a-478f-a9c7-886b6f3c3b40",
+      "costUsd": 0.1727522,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code path is real: in TaskRules.kt:74–83, if topicId is `In.Invalid`, `topic` ends up null and the code reports `topic-unknown`. The same happens for sourceRef.sourceId at lines 112–113, which reports `source-unknown`. But calling this a correctness defect doesn't hold up:\n\n1. It is deliberate and tested. TaskRulesTest.kt:139 asserts exactly this: `errors(draft(topicId = In.Invalid), context.copy(topic = null)) shouldContainExactly listOf(\"topicId\" to \"topic-unknown\")`. The author pinned this mapping on purpose.\n\n2. Nothing in the contract requires `not-uuid` here. contract/api/openapi.yaml only declares `format: uuid`. No spec scenario I found says a malformed body id must produce `not-uuid` rather than `topic-unknown`.\n\n3. The behaviour is still correct and safe. The request is still rejected through the field-error path as a validation problem, not a 500, and nothing leaks. The messages (\"Choose a topic from the list.\" / \"This source does not exist.\") are human-readable and true: a malformed id cannot name an existing topic or source. That meets the AGENTS.md rule that validation errors get human messages.\n\n4. What's left is a wording difference between body fields and path/query parameters (ContentProblemAdvice.kt:151). That's a UX/consistency nit, not a wrong mechanism. Fixing it would also mean changing an intentional test.\n\nThe described mechanism is accurate, but it is intended, tested behaviour with no spec or correctness violation. So I'm treating the finding as refuted as a correctness bug.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/domain/TaskRules.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1230,
+      "durationMs": 31859,
+      "sessionId": "72e265b9-1262-4a40-805c-c5b15777f775",
+      "costUsd": 0.1186306,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed this by reading the code. An admin can trigger it with one request, and the only effect is a misleading error message.\n\nHow it happens:\n- `JsonReaders.kt:33` and `JsonReaders.kt:39` read `topicId` and `sourceRef.sourceId` from the request body with `uuid()`.\n- `uuid()` (`JsonReaders.kt:184-189`) returns `In.Invalid` when the text does not match `UUID_FORM`. Nothing earlier in the request handling rejects a malformed value.\n- In `TaskRules.topic` (`TaskRules.kt:74-83`), the topic is only matched when `value is In.Ok`, so an `In.Invalid` value leaves `topic == null`. The code then reports `FieldError(\"topicId\", \"topic-unknown\")`.\n- `sourceRef` (`TaskRules.kt:112`) does the same: `In.Invalid.orNull()` is null, which does not equal `source.id`, so it reports `source-unknown`.\n\nThe inconsistency is real in two places:\n- Path and query parameters map these names to `not-uuid` (`ContentProblemAdvice.kt:151`).\n- The `uuids()` helper in the same `JsonReaders.kt` reports `not-uuid` for malformed array items (line 153).\n\nReproduction: send a task create or update request with `\"topicId\": \"abc\"` and the response says `topic-unknown`, not `not-uuid`.\n\nImpact: it is still a correct 4xx validation error, with no 500, no data leak and no security effect. It is only a UX/consistency problem, so minor severity fits.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1247,
+      "durationMs": 30584,
+      "sessionId": "7737dc20-1d43-4118-8778-4e8b68b5dd3f",
+      "costUsd": 0.22066560000000002,
+      "numTurns": 8,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding says: `TaskService.kt:213/215` builds `answers.$key`, `TaskRules.kt:221` builds `translations.$locale`, and `TaskRules.kt:287/290` builds `$path.$key` from map keys the client sent. The same happens earlier at `JsonReaders.kt:90` and for unknown property names at `JsonReaders.kt:72`. The keys really are echoed. But this is not a correctness defect:\n\n1. **The design asks for these paths.** `design.md:128` says 400 responses carry `errors[]` with \"contract field paths\". The contract's paths for map-shaped fields (`answers.<partKey>`, `translations.<locale>`, `...partLabels.<key>`) include the key by definition. Reporting the error on the parent path, as suggested, would weaken the field-level error the spec requires. The `unknown-field` handling makes the same deliberate choice, so the pattern is consistent.\n\n2. **NFR-3 and the \"never quoted\" rule cover submitted values, not structural keys.** `design.md:132-133` is about values; the request tree is kept out of the generated DTOs so values are never held (`design.md:61-64`). Part keys, locales and option keys are schema identifiers (part keys are checked against `PART_KEY`, locales against the configured list). They are not free text or child data.\n\n3. **\"Any length\" is overstated.** The body size is capped before parsing (413 in the request filter), so keys are bounded.\n\n4. **No logging path was found.** Nothing in `src/main` logs problem bodies, and `RequestContentLogGuard` caps the loggers that print request content. The claimed log leak is hypothetical.\n\n5. **Only the admin can trigger it.** These are admin-only authoring and tester endpoints, so the only person who can put text into a key gets it back in their own response. No one else's data is exposed.\n\nAt most this is an optional hardening idea (bound the key shape before echoing). As a correctness bug it does not hold up: the behaviour follows the contract's field-path design and leaks nothing protected.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1280,
+      "durationMs": 27030,
+      "sessionId": "f42f66ea-8f13-4b71-8355-147736869ff1",
+      "costUsd": 0.19071319999999997,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding says: `answers.$key` (TaskService.kt:213/215, plus JsonReaders.kt:90 before that), `translations.$locale` (TaskRules.kt:221) and `$path.$key` (TaskRules.kt:287) all put client-supplied object keys into `errors[].field`. JsonReaders.kt:72 does the same for unknown fields. But nobody can exploit or be harmed by this:\n1. Who can trigger it: these are admin authoring endpoints (task create/update, the tester, sources), and AGENTS.md says admin endpoints require the admin. The key goes back only to the same authenticated admin who sent it. Nothing crosses a trust boundary and no one else's data is exposed.\n2. The claim that it reaches logs through logging of problem bodies doesn't hold. Searching src/main/kotlin turns up no app code that logs problem bodies or requests. The only logging code is RequestContentLogGuard, which actively caps the request-content loggers at INFO/WARN to keep request content out of logs.\n3. NFR-3 and the advice's comment (ContentProblemAdvice.kt:30) say messages \"never quote a submitted value\". The messages here come from the catalog (`content.error.<code>`, line 125) and quote no values. The field path is a JSON pointer to the bad key, which is standard RFC 7807 practice. Object keys like part keys or locales are structural identifiers, not child PII.\n4. 'Any length' is bounded by the request body size limit, and the response goes back to the sender. There's no amplification and no injection sink (the body is serialized as JSON).\nAt most this is a style point about consistency. No real user or attacker can make the claimed NFR-3 leak happen.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:.gitignore",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1908,
+      "durationMs": 48428,
+      "sessionId": "7b3af29d-1602-4bca-854b-83c2b9866e1b",
+      "costUsd": 0.19413039999999998,
+      "numTurns": 11,
+      "result": {
+        "refuted": false,
+        "reasoning": "Checked: `.gitignore:17` is `storage/`, with no leading slash and no negation rule. In gitignore, a pattern with only a trailing slash and no other slash matches a directory of that name at any depth. So it matches `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. That directory exists on disk and holds `FilesystemFileStorage.kt`. The file defines the only `@Component` implementing `FileStoragePort`; outside tests the port appears only in Ports.kt (the interface), SourceService, TaskService and ContentModule (a KDoc mention). The same file holds `locate()` (`normalize()` + `startsWith(root)`) and `StorageRoot.check` (refuses a storage dir inside any git working tree). The git status snapshot shows only `M trace/ledger.jsonl`. That fits the file being ignored, since ignored files do not appear as `??`.\n\nNot checked: whether the file is in the index or in 499b23c. My read of the worktree's git index was denied and I had no git command available. The only way the finding is wrong is if someone force-added the file (`git add -f`). Nothing suggests that, and a normal `git add -A` skips ignored paths.\n\nImpact if the file is missing: worse than stated. A clean checkout fails before the app even starts. `src/test/kotlin/cz/doucko/content/StorageAndPdfTest.kt` imports `FilesystemFileStorage` and `StorageRoot`, so test compilation fails and `mvnw verify` breaks. Main code alone would still compile, but startup would fail with no `FileStoragePort` bean for SourceService and TaskService. `docs/qa/automated-verification-latest.md` shows classpath scanning of `target/classes/.../storage/FilesystemFileStorage.class` from this worktree, which supports the claim that the QA evidence depends on a local untracked file.\n\nThe cause is real and the impact holds. The suggested fix (anchor `/storage/` and `/uploads/`, commit the file, add a check that `git ls-files -oi --exclude-standard src/main` is empty) is correct. Severity major is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:.gitignore",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1941,
+      "durationMs": 36134,
+      "sessionId": "2d2126e0-2397-4a2e-bcab-346ad185e996",
+      "costUsd": 0.1566404,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The core mechanism is confirmed. In `.gitignore`, line 17 is the unanchored pattern `storage/`, which matches a directory named `storage` at any depth. That includes `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. The file `FilesystemFileStorage.kt` exists on disk in that directory. `git add -A` skips ignored files, so it stays out of commits unless someone force-adds it. The gitStatus snapshot can't help either way, because git status never lists ignored files.\n\n`FilesystemFileStorage` is the only `@Component` implementing `FileStoragePort` in `src/main`; the other implementation, `InMemoryFileStorage`, lives in the tests. `SourceService.kt:29` and `TaskService.kt:72` inject `FileStoragePort`. The file also holds the only `locate()` containment check (normalize + startsWith(root)) and the `StorageRoot` check that blocks storage inside a git working tree.\n\nA clean checkout actually fails earlier than the finding says. `src/test/.../StorageAndPdfTest.kt:4` imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage`, so `mvn verify` breaks at test compilation. A main-only or Docker build would compile, then fail at startup with no `FileStoragePort` bean.\n\nThe QA log at `docs/qa/automated-verification-latest.md:1376` shows the class compiled from this worktree, which fits the claim that local evidence depends on a file that isn't committed.\n\nOne limit: the tools available here couldn't read the git index (the read permission was denied), so I couldn't directly confirm that it is absent from 499b23c. Given the ignore rule, it can only be in the commit if someone force-added it, and nothing suggests that happened.\n\nThe problem reproduces for anyone who clones the repo, including CI. The security angle (a hasty replacement adapter dropping the guards) is a plausible later risk, not something an attacker can exploit today. Keeping the severity at major fits: it is a real, deterministic build/startup break, and it takes a security guard out of version control.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/application.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1549,
+      "durationMs": 35642,
+      "sessionId": "cc7959d7-054f-4628-9eef-90e4decc4b08",
+      "costUsd": 0.1365376,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "I couldn't refute the mechanism. The details are wrong in places, and the extra exposure is small.\n\n**What the code confirms**\n- `application.yaml:36` sets `server.tomcat.max-swallow-size: -1`.\n- Nothing else in `src/` touches this setting, virtual threads or the connector timeouts. So it runs on a normal Tomcat worker pool with default timeouts.\n\n**Why the mechanism holds**\n- After a response, Tomcat's `Http11InputBuffer.endRequest()` drains the unread body on the same worker thread, through `ChunkedInputFilter.end()` / `IdentityInputFilter.end()`.\n- Normally this stops with an IOException once more than `maxSwallowSize` bytes have been read. At -1 that check is off, so a chunked body with no end keeps being read for as long as the client keeps sending.\n- A 401 from Spring Security is a normal keep-alive response. Tomcat only turns off swallowing in special cases (an unmet `Expect: 100-continue`, aborted multipart uploads), so the unauthenticated 401 path does drain.\n\n**Where the finding overstates**\n1. **\"A handful\" of connections is not enough.** The default pool has 200 threads, so an attacker needs about 200 connections. On a LAN that is still easy.\n2. **The 2 MB default does not limit time.** It only limits bytes. Each read only has to arrive within the connection timeout (about 20–60 s), so a client sending 2 MB slowly can already hold a thread for a very long time. Any slowloris-style client can also stall threads by trickling headers or bodies to endpoints that read them.\n\nSo the -1 setting adds only a little to an availability risk that already exists. The attacker must be on the home LAN, and the suggested bounded value (e.g. 52MB) would not stop a slow-rate attack. Bounding the value is still sensible hygiene. The claimed mechanism is technically correct, but the real impact is lower than \"minor\" suggests."
+      }
+    },
+    {
+      "label": "verify:src/main/resources/application.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1582,
+      "durationMs": 38761,
+      "sessionId": "30a5a7e2-67f0-449e-b636-d035be19c1ff",
+      "costUsd": 0.150064,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "keep",
+        "reasoning": "The finding is accurate. `application.yaml:36` sets `server.tomcat.max-swallow-size: -1`, and nothing else in `src/` overrides it or sets a connection timeout or body-size limit. In Tomcat, -1 means that when a response finishes before the request body has been read, Http11InputBuffer.endRequest reads and throws away the rest of the body with no byte limit. This happens on the worker thread that handled the request, with blocking reads. The socket read timeout only fires when the client goes idle, so a client that keeps streaming chunked data holds the thread indefinitely. The default limit is 2 MB, after which Tomcat closes the connection instead.\n\nThe admin path can be reached without signing in. AdminSecurityConfiguration permits only the sign-in endpoint, so an anonymous POST to `/api/admin/sources` is refused by the security filter before the body is read, and the swallow then starts. For multipart, the 51 MB `max-request-size` stops the parser but not the swallow that follows. The comment on line 36 confirms the setting was added only to get a clean 413.\n\nCaveats that keep this at minor rather than higher:\n1. \"A handful\" of connections overstates it. Tomcat's default pool is 200 threads (max-connections 8192), so an attacker needs about 200 concurrent streaming connections. That is still trivial for one LAN machine.\n2. The attacker has to be on the home LAN (NFR-2). The DNS-rebinding firewall does not help, because the attacker can just use the IP as the Host header.\n3. Some exposure exists without this setting. The child chain is permitAll with no body-size cap, so a slowly dripped or endless JSON body to a child endpoint that reads its body (e.g. the settings PUT handled through SettingsBodyAdvice) can also tie up threads while Jackson reads. The setting adds a second, very cheap route that needs no valid endpoint and still works after the server has answered.\n\nThe suggested fix, a bounded value just above `max-request-size` (e.g. 52MB), keeps the clean 413 for legal-size oversized uploads and removes the unbounded swallow."
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1340,
+      "durationMs": 37496,
+      "sessionId": "a5abc16c-c936-42d7-b958-53e194ad3c7f",
+      "costUsd": 0.182348,
+      "numTurns": 12,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed, though I couldn't read the git index directly (permission denied). .gitignore:17 has the pattern `storage/`. With no leading slash it matches any directory named storage, including src/main/kotlin/cz/doucko/content/adapter/out/storage/, where FilesystemFileStorage.kt sits. Unless it was force-added, it is not tracked. The session-start git status showed only trace/ledger.jsonl modified and no untracked files, which fits an ignored file (technically ignored rather than untracked; the effect is the same). No other src/main class implements FileStoragePort; the only other implementation is the test-only InMemoryFileStorage. SourceService and TaskService depend on the port. StorageAndPdfTest.kt:4-5 imports adapter.out.storage.FilesystemFileStorage and StorageRoot, and the test at :40 covers the working-tree-refusal scenario. So a clean checkout of HEAD would fail test compilation and the app would have no FileStoragePort bean. The storage scenarios exist only in the uncommitted file, as claimed. Fix: anchor the ignore rule as `/storage/` and commit the adapter. Keep minor: this is a coverage summary, and the next finding carries the build-break defect.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1373,
+      "durationMs": 33979,
+      "sessionId": "bfdb3f76-3d8a-45fd-87a2-6f96f51b70dc",
+      "costUsd": 0.1693398,
+      "numTurns": 11,
+      "result": {
+        "refuted": false,
+        "reasoning": "I couldn't refute the mechanism. A clean checkout of HEAD would be missing the storage adapter.\n\nWhat I found:\n- The only implementation of `FileStoragePort` in main code is `src/main/kotlin/cz/doucko/content/adapter/out/storage/FilesystemFileStorage.kt`. It is the `@Component` class `FilesystemFileStorage`, which also contains the `StorageRoot.check` working-tree guard.\n- The repo `.gitignore` line 17 is `storage/`. That pattern has no leading slash, so it matches a directory named `storage` at any depth, including `adapter/out/storage/`.\n- Ripgrep follows gitignore rules. When I searched `src` for `FileStoragePort`, it found 7 files but skipped this one, even though the file contains that name on lines 4 and 21. That shows the path is ignored.\n- The snapshot `git status` lists only `M trace/ledger.jsonl`. Ignored files don't show up there, which fits with the file never having been added.\n- The only way it could still be in the commit is if someone ran `git add -f`. I couldn't check the git index because permission to read it was denied. Nothing suggests a force-add happened.\n\nWhat breaks without the file:\n- `SourceService` and `TaskService` require a `FileStoragePort` bean. Test code only supplies `InMemoryFileStorage`. So the app context fails to start in a fresh clone or in CI.\n- `StorageAndPdfTest.kt:40` uses `StorageRoot`, so test compilation fails too.\n- The two storage scenarios (\"stored outside repositories\" and \"root inside a working tree refused\") exist only in the ignored file.\n\nOne correction to the finding: it calls the file \"untracked\", but it is actually git-ignored. This matters for the fix: the developer needs `git add -f`, or better, should change the pattern to `/storage/`. The finding's core claim holds. Severity minor is right for this coverage summary, because the build break itself belongs to the companion finding.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/out/storage/FilesystemFileStorage.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1720,
+      "durationMs": 29710,
+      "sessionId": "3e38bac5-ac9a-487d-afb2-cae934aa4a8c",
+      "costUsd": 0.1454508,
+      "numTurns": 11,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the finding. Everything I could check agrees with it, but I could not prove the file is untracked; that would take `git ls-files`.\n\nWhat I checked directly:\n\n1. **The ignore rule matches the file.** `.gitignore:17` is an unanchored `storage/`. Unanchored, it matches a directory named `storage` at any depth, including `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. No negation rule (`!…storage…`) exists anywhere in `.gitignore`.\n2. **The file exists on disk and is the only real implementation.** `FilesystemFileStorage.kt:18-22` is a `@Component` that implements `FileStoragePort` and calls `StorageRoot.check(...)`, the NFR-17 rule that refuses a storage root inside a git tree.\n   - A ripgrep search of `src/` for `FileStoragePort` finds `Ports.kt` (the interface), `SourceService.kt:29` and `TaskService.kt:72` (where it is injected), and only a test fake, `InMemoryFileStorage` in `ContentTestSupport.kt`. `FilesystemFileStorage.kt` does not appear at all.\n   - ripgrep follows `.gitignore`, so the rule is in effect for this path.\n   - A search for `FilesystemFileStorage|StorageRoot` likewise found only `StorageAndPdfTest.kt` and docs, never the adapter itself.\n3. **Git status is consistent with an ignored file.** The session's git status snapshot lists only ` M trace/ledger.jsonl`. A new file that was neither committed nor ignored would appear as `??`. So the file is either committed or ignored.\n   - It could have been committed with `git add -f`. If so, the finding is wrong. I tried to inspect the worktree index, but the read was denied.\n   - With an unanchored rule matching the path and no sign of a force-add, an ignored file is by far the likelier case.\n4. **The consequence follows if the file is ignored.** On a clean checkout of HEAD:\n   - `StorageAndPdfTest.kt` imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage` and `StorageRoot`, so test compilation fails.\n   - In production, the Spring context has no `FileStoragePort` bean for `SourceService` and `TaskService`, so it cannot start.\n   - NFR-17's enforcement point disappears.\n\nNone of the usual ways out applies: there is no other bean or `@Bean` factory in main, and it is not guarded elsewhere. A clean-clone CI run would hit this.\n\nKeep the severity at critical. Before acting on it, confirm with `git ls-files src/main/kotlin/cz/doucko/content/adapter/out/storage` or `git check-ignore -v <file>`.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/out/storage/FilesystemFileStorage.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1753,
+      "durationMs": 26817,
+      "sessionId": "3b5a8c2d-2326-41e6-9792-b2b274ea974a",
+      "costUsd": 0.1434146,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds up. I couldn't read the git index (permission was denied), but the ignore rule alone settles it:\n\n- **The ignore rule catches the file.** `.gitignore:17` is `storage/`. It has no leading or middle slash, so it ignores any directory named `storage` at any depth. That includes `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. No later rule re-includes it. A plain `git add` therefore skips the directory, and `git status` won't list it as untracked, which matches the finding. The only way it got committed is if someone ran `git add -f` on purpose, and the finding says `git ls-files` doesn't list it.\n- **The file is on disk.** Glob finds `FilesystemFileStorage.kt` in that directory, and only that file. The QA log (`docs/qa/automated-verification-latest.md:1376-1379`) shows `FilesystemFileStorage.class` and `StorageRoot.class` being scanned from `target/classes`. So the local build passed only because the untracked file exists in this worktree.\n- **No other committed main-code class implements `FileStoragePort`.** `Ports.kt:18` declares it, and `SourceService.kt:29` and `TaskService.kt:72` inject it. The only other implementation is `InMemoryFileStorage`, in test code (`ContentTestSupport.kt:218`).\n- **A clean checkout breaks.** `StorageAndPdfTest.kt:4-5` imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage` and `StorageRoot`, so test compilation fails. Even without that test, `UploadLimitsIT` and `ContentAuthoringIT` autowire `FileStoragePort`, and the app's services need it too. With no bean to supply it, Spring fails to start the application.\n- **The storage-root safety check isn't committed either.** The check that refuses a storage root inside a git working tree (NFR-17) lives in that same uncommitted directory.\n\nThis affects every clean clone, CI run and merge, so it's reproducible and not just theoretical. Critical severity fits: the merged slice won't build. The suggested fix is right: anchor the rule as `/storage/` (or add a negation for `src/**/storage/`), then commit the adapter.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-authoring-tasks-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1159,
+      "durationMs": 28608,
+      "sessionId": "0aeb7039-cf9d-4b05-9395-d139b769d279",
+      "costUsd": 0.1413558,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the mechanism, and I confirmed most of it from the files.\n\n1. `.gitignore:17` has `storage/` with no leading slash. In gitignore, a pattern like that matches a directory named `storage` at any depth. So it ignores `src/main/kotlin/cz/doucko/content/adapter/out/storage/`, not only the runtime data folder it was meant for (the comment says \"runtime data\").\n\n2. The file is on disk at `src/main/kotlin/cz/doucko/content/adapter/out/storage/FilesystemFileStorage.kt`. The git status snapshot shows only `trace/ledger.jsonl` as modified and no untracked entry for this folder. That fits the folder being ignored rather than freshly added.\n\n3. The evidence file `docs/qa/automated-verification-latest.md:1376` shows the run scanned `...backend-slice5-authoring-tasks\\target\\classes\\...\\FilesystemFileStorage.class`. So the qa:verify run compiled the class from the local worktree.\n\n4. `src/test/kotlin/cz/doucko/content/StorageAndPdfTest.kt:4` imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage`. Without the file, a clean checkout would not even compile its tests. qa:verify could not be green there, so ticking 5.1 against that evidence overstates what the commit proves.\n\n5. Task 4.1 in `tasks.md:20` claims `adapter/out/storage (filesystem, repo guard)` is done. The source for that adapter lives under the ignored folder.\n\nOne thing I could not check directly: permission to read the worktree's git index was denied. So I cannot rule out that someone ran `git add -f` on the file in 499b23c. But the ignore rule clearly matches the path, and nothing suggests a force-add. The claim holds unless the author shows the file in `git ls-tree 499b23c`.\n\nSeverity: major is right. This is a false done-claim, and a clean checkout would fail to compile the test sources. The fix is to anchor the ignore rule as `/storage/` and commit the adapter. Then re-run qa:verify from a clean checkout.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-authoring-tasks-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1192,
+      "durationMs": 33992,
+      "sessionId": "247dbce4-05f1-4586-b9a5-519aa4a7dad3",
+      "costUsd": 0.19168,
+      "numTurns": 12,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism with one gap: I could not inspect the commit's contents directly.\n\n1. Line 17 of `.gitignore` is `storage/`. It is unanchored, so git ignores every directory named `storage` at any depth. That includes `src/main/kotlin/cz/doucko/content/adapter/out/storage/`, which is the only place `FilesystemFileStorage.kt` exists in the worktree.\n2. `git status` at session start shows only `trace/ledger.jsonl` modified. An ignored, untracked file would not appear there either, so this neither confirms nor refutes the finding. But nothing suggests the file was force-added with `git add -f`, which is the only way past the ignore rule.\n3. It breaks the build, not just the bookkeeping. `src/test/kotlin/cz/doucko/content/StorageAndPdfTest.kt:4` imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage`, and `design.md:109` names it as the storage adapter. On a clean checkout of 499b23c the test sources fail to compile, so `npm run qa:verify` fails. If the class is also the Spring storage bean, the app has no storage implementation too.\n4. The evidence file `docs/qa/automated-verification-latest.md` (lines 1376 and 3423) shows the run scanning `C:\\projects\\school-tutor\\backend-slice5-authoring-tasks\\target\\classes\\...\\FilesystemFileStorage.class`. So the green run was built from the local worktree, where the ignored file exists.\n\nSo the \"546 unit, 44 integration green\" claim in task 5.1 and the `adapter/out/storage` claim in task 4.1 depend on a file that the ignore rule keeps out of git. Anyone who clones the branch, including CI, gets a compile failure. That breaks AGENTS.md's rule that done-claims need evidence pointers.\n\nWhat I could not check: the permission prompt blocked reading the git index, so I have not seen the commit's file list. The only way the finding is wrong is if someone force-added the file, which is unlikely.\n\nSeverity stays major: the problem reproduces for anyone who checks out the branch. The fix is to anchor the ignore rule (`/storage/`) and commit the adapter.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-authoring-tasks-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1090,
+      "durationMs": 15674,
+      "sessionId": "a6499be6-d2d1-4966-ac57-6f8767a41e83",
+      "costUsd": 0.08562879999999999,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed at tasks.md:29. The line is `- [x] 5.4 Real-stack smoke: NOT RUN (...)`, so the checkbox is ticked even though the line itself says the step did not run. OpenSpec and the gate tooling count `[x]` items as complete, so 5.4 is counted as done. AGENTS.md says a SKIP or zero-scope result must never be folded into a pass. Nothing elsewhere guards against this. The referenced docs/qa/evidence/slice5-compose-smoke.md does exist, but it only records a click path for later, not results from a run. I recommend a downgrade because the line is honest about the gap: it says \"NOT RUN\" and gives the reason, so a human reader is not misled. Only the machine-readable checkbox status is wrong. The correct state is unticked, or an explicit SKIP-pending/waiver, until the smoke has run and its output is recorded.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-authoring-tasks-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1123,
+      "durationMs": 18845,
+      "sessionId": "fc6b3b38-572d-4c9c-a936-6d498d35fadd",
+      "costUsd": 0.110763,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed at openspec/changes/implement-authoring-tasks-api/tasks.md:29. The line is `- [x] 5.4 Real-stack smoke: NOT RUN ...`, so the box is ticked for a step that did not run. The evidence file docs/qa/evidence/slice5-compose-smoke.md agrees: \"Result: NOT RUN, not a pass. No request was sent through 127.0.0.1:8081\". OpenSpec counts completion from the checkboxes. That makes 5.4 count as done in the task tally, and it removes a blocker on the later archive step (5.6) even though no smoke evidence exists. This is the vacuous-pass / done-claim pattern AGENTS.md forbids, because the verdict is carried by the checkbox, not by a check that sets an exit code. Mitigating factors: the line and the evidence file both state NOT RUN in plain words, with a reason (the owner's stack holds port 8081 under Compose project `doucko`) and a click path to run after the merge. A human reader is not misled. It is also a process and traceability defect only: no real user or attacker can trigger anything, and integration tests (ContentAuthoringIT, UploadLimitsIT) cover the behavior in the meantime. The mechanism is real, so the finding is not refuted. Because the step is openly disclosed and has no runtime impact, it is closer to minor than major.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1309,
+      "durationMs": 27687,
+      "sessionId": "63bccfe9-3ba0-4927-b5bd-90e940eeaaa5",
+      "costUsd": 0.16052180000000002,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The factual core holds. The change delta `openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md` has 10 requirements, and none of them mentions FR-2, `getSourceFile`, or serving the source PDF. Other FRs in the change are each cited by a delta requirement (FR-1, FR-3..FR-8, FR-10, FR-11, NFR-17), so FR-2 is the odd one out. proposal.md:10 lists FR-2 as backend-owned, and the plan row exists (mvp-capability-plan.md:249). The endpoint exists at SourceController.kt:60, and the test is SourceApiTest.kt:225-227.\n\nTwo points cut against the \"major\" severity and the claim that coverage \"cannot be traced\":\n1. design.md:17 maps FR-2 to `getSourceFile` (serves the bytes, `pageCount` gives the range). The test at SourceApiTest.kt:225 carries `// @trace FR-2`, which is the repo's traceability mechanism. FR-2 is therefore traceable from the change to the code and tests.\n2. The store spec already states FR-2 (contract/openspec/specs/content-authoring/spec.md:204: jump to a page by number, FR-2).\n\nThe real gap is that the backend delta spec has no requirement or scenario for the file endpoint's contract (200 application/pdf, 404 unknown). That makes it inconsistent with how the other FRs are written up. It is a documentation and spec-completeness gap, not a code or behaviour defect, so I recommend downgrading the severity."
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1342,
+      "durationMs": 15906,
+      "sessionId": "adbcf698-0ece-4fb7-8429-f7ce4055cf00",
+      "costUsd": 0.12858999999999998,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed as a spec-traceability gap; it is not a runtime defect. I grepped the change directory. The delta spec openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md (all 160 lines read) has no requirement or scenario for `getSourceFile` or serving the source PDF, and it never cites FR-2 or FR-13. Its FR citations are FR-1, FR-3, FR-4, FR-5..FR-8, FR-10 and FR-11. The rest of the change does claim FR-2: proposal.md:10 lists it as backend-owned, proposal.md:16 lists `getSourceFile`, design.md:17 maps FR-2 to `getSourceFile`, and tasks.md:31 puts FR-2 and FR-13 in the commit trailer. So the delta does not trace FR-2 as the finding says. Through the exploitability lens, no user or attacker can trigger anything from this. The endpoint is implemented (SourceController) and tested (SourceApiTest), so it is a documentation and traceability problem with no runtime effect. The mechanism the finding describes is real, but 'major' overstates it. Recommend a downgrade.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1439,
+      "durationMs": 16032,
+      "sessionId": "933eb605-523c-4ed4-889e-bc7acc8860c5",
+      "costUsd": 0.1011482,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds up. `TaskService.delete` (TaskService.kt:114-119) loads the task, deletes it, and removes its image files after commit. It checks nothing about attempts, reports, hints or missions. `setStatus` (lines 121-129) changes the status without any guard. Nothing at these call sites or elsewhere enforces the contract's 409 rules.\n\ndesign.md:34 and :36 do defer them on purpose: the mission rules CA-D6..CA-D10 and the `ContentUsage` port guards move to slice 6. But I searched the change's delta spec (specs/content-authoring/spec.md) for `deleteTask`, `setTaskStatus` and \"interim\" and found no requirement or scenario covering either endpoint. The only nearby match is `deleteTaskImage`. proposal.md:18 lists both endpoints as implemented, but they have no spec-level statement of their interim behavior.\n\nSo the mechanism is real: the implementation differs from the contract, and the difference is recorded only in a design table. Severity stays minor because, as the finding says, nothing creates attempts, reports, hints or missions yet, so the missing guards can't cause harm at runtime today. The real risk is that slice 6 forgets to add the guards.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1472,
+      "durationMs": 18517,
+      "sessionId": "f5146fff-df15-43c2-9c70-768f1acc9c67",
+      "costUsd": 0.11027740000000003,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding is accurate about the code but describes nothing a real user or attacker can trigger. TaskService.delete (lines 114-119) and setStatus (lines 121-129) do run with no 409 guards, and the change's delta spec has no requirement for deleteTask or setTaskStatus. However, every 409 condition in the contract depends on things that cannot exist in this build. The only tables are child_profile (V1) and topic, source, task and task_image (V2__content_authoring.sql). There are no attempt, problem-report, hint or mission tables, and no code that creates them. So 'refused with attempts, reports, opened hints, or while in a published mission' can never be true. For every request that is possible today, the unguarded code behaves exactly like guarded code would. Both endpoints are also admin-only, so no outside caller can reach them. The deferral is written down: design.md:34 and design.md:36 say the mission and usage guards (CA-D6..CA-D10 and the `ContentUsage` port) arrive with slice 6. The finding itself says 'there is no runtime harm today'. What remains is a forward-looking note about spec traceability, not a reproducible defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/in/web/ReferenceController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1329,
+      "durationMs": 16842,
+      "sessionId": "0d731850-d3c2-4090-afe5-3faef0143288",
+      "costUsd": 0.091417,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "This finding is about spec traceability, not a correctness defect, and part of it is factually wrong. (1) The title says repeated-id rejection in bulk publish has no delta requirement. But the delta spec at openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md:137-146 has a 'Requirement: Bulk publish' whose scenario says 'an empty list, 101 ids or a repeated id is 400'. The finding cites that same line, so it contradicts itself. Whether the store spec should restate the rule is a docs-store wording question, not wrong behaviour in this code. (2) ReferenceController.kt only maps ReferenceService output (grades, subjects, topics, taskLocales) into the generated ReferenceData model. Nothing there is wrong. The delta's auth requirement (spec.md:3-5) explicitly covers 'image' and 'reference' operations, and the store requirement 'Topics come from configuration' already describes the behaviour. A missing extra delta scenario for reference data or image serving is a coverage and documentation gap at most. It does not show any mechanism that produces incorrect results. Through the correctness lens, nothing in the cited code is wrong.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/in/web/ReferenceController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1362,
+      "durationMs": 14433,
+      "sessionId": "c899bbad-780b-48be-9a55-bce4acc00c6c",
+      "costUsd": 0.0843028,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "Refuted, because nothing here can be reproduced or exploited. The finding is about spec traceability, not runtime behaviour. Its claims also don't hold up against the delta spec:\n\n1. **Repeated-id rejection is already in the delta.** `openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md:146` says \"an empty list, 101 ids or a repeated id is 400\". The finding quotes this line itself, which contradicts its title (\"implemented without a delta requirement\"). What remains is a complaint that the store spec doesn't list this case. Rejecting duplicate ids with a 400 is stricter than the store spec, not looser. No user or attacker gains anything from it, and it returns a proper 400 problem response rather than a 500.\n\n2. **Reference data and image serving are covered by the delta.** Line 5 brings every source, task, image, preview, tester, bulk-publish and reference operation under the admin-auth requirement. That is the security-relevant property: these are admin-only reads. Neither one changes content or exposes answer keys to child endpoints. Having no dedicated behavioural scenario is a gap in how complete the docs are. It is not a defect anyone can trigger.\n\nNo input, actor or path leads to wrong behaviour, a data leak or a crash. At most this is a docs-hygiene note about the store spec, not a code finding against `ReferenceController.kt:1`.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1067,
+      "durationMs": 21421,
+      "sessionId": "333f4681-4f05-4faf-b30c-d4ffe4d4ee46",
+      "costUsd": 0.1387084,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The contract already specifies this behaviour. The global Conventions section of contract/api/openapi.yaml (lines 39-41) says: \"Query and path parameters use their own name (`weeks`, `status`, `q`, `reportId`, `taskId`, …); a path id that is not a UUID is 400 before any lookup.\" So a 400 response for GET /api/admin/sources/not-a-uuid, with errors[].field = \"sourceId\", is the documented contract. The test at SourceApiTest.kt:244 checks exactly that. It is true that the getSource (lines 405-412) and getSourceFile (lines 464-471) operations don't repeat 400 in their own responses lists. That is a documentation-completeness nit, not a correctness or spec-compliance defect. The finding's own suggestion even offers \"accept this as a documented global convention\", and that convention already exists in the file. Nothing in the code behaves incorrectly.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1100,
+      "durationMs": 19332,
+      "sessionId": "480d045b-446d-4e88-b7c6-9587d7542d37",
+      "costUsd": 0.1337812,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the finding. SourceApiTest.kt:244 calls GET /api/admin/sources/not-a-uuid and expects a 400 field problem on sourceId. Any signed-in admin can trigger this just by typing a bad path. In contract/api/openapi.yaml, getSource (lines 401-412) declares only 200, 401 and 404. getSourceFile (lines 459-471) declares the same three. Both use the shared SourceId path parameter.\n\nI looked for a global rule that would cover this (in openapi.yaml, the store specs and the ADRs) and found nothing about malformed ids or UUID path parameters. So the behavior is not covered by any documented convention. The response really does go outside the declared contract: a client generated from the spec, or a contract test, will not expect a 400 on these operations.\n\ndeleteSource has the same gap, and other GET-by-id operations may too, so this looks like a wider contract pattern rather than a bug added in this slice.\n\nThe impact is small: 400 is a reasonable answer to a malformed id and does not break the no-raw-500 rule. It is a documentation and spec-compliance gap, not a security or correctness problem, so the 'minor' severity is right.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1220,
+      "durationMs": 15296,
+      "sessionId": "8f24f91a-e91e-4389-bbe6-469db6a50549",
+      "costUsd": 0.11686600000000001,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "Through the correctness lens, nothing here is wrong, and the finding admits as much (\"the behavior is correct\"). TaskController.testAnswers (TaskController.kt:131-139) calls service.test and maps the result to a response. TaskService.test (TaskService.kt:206-241) does only three things: it reads the task with get(id), checks the request shape, and calls the pure AnswerChecker. It never calls a repository save, a ledger or any other write port, so there is no path that could change the database. TaskApiTest.kt:431 (`the answer tester shows verdicts and records nothing`) asserts `tasks.tasks shouldBe before` over the store port, and that is the only state the service could reach. A Postgres-level IT would only re-test that a read-only path is read-only. What the finding describes is a small coverage or spec-wording preference, not a mechanism that is actually wrong. Refuted for correctness; at most a nit.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1253,
+      "durationMs": 11733,
+      "sessionId": "765e3a49-2a38-4d03-893d-12400aaed120",
+      "costUsd": 0.0808626,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "Checked from the angle of whether this can actually happen: no user or attacker can trigger the problem. `TaskService.test` (`TaskService.kt:206-241`) only calls `get(id)`, which is read-only. After that it validates the answer shapes, which may throw `InvalidContent`. Then it maps each part through the pure `AnswerChecker.check`. There are no save, update or delete calls, and no port writes, so the tester endpoint cannot change the database. The finding says so itself: \"the behavior is correct\". What remains is a gap in the tests: the in-memory test stands in for the same persistence port, and the code has no write path for an IT to catch. Nothing is wrong at runtime. A Postgres IT could only catch a future change that adds a write. That's a test-hardening idea, not a defect in this change.",
+        "severityAdjustment": "downgrade"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "17 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 10, contested: 4, rejected: 3"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/implement-authoring-tasks-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "slice 5 authoring-tasks backend (implement-authoring-tasks-api)",
+    "summary": "Review gate for slice 5 authoring-tasks backend (implement-authoring-tasks-api): 10 confirmed, 4 contested (treat as confirmed unless trivially wrong), 3 rejected.",
+    "confirmed": [
+      {
+        "title": "FileStoragePort's only implementation (FilesystemFileStorage) is gitignored and missing from the commit",
+        "file": ".gitignore",
+        "line": 17,
+        "severity": "critical",
+        "confidence": "high",
+        "evidence": "`.gitignore:17` has `storage/`, which matches `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. `git ls-files src/main/kotlin/cz/doucko/content/adapter/out/storage` returns nothing, and `git grep FilesystemFileStorage HEAD` finds it only in the design doc and `src/test/.../StorageAndPdfTest.kt:4` (`import cz.doucko.content.adapter.out.storage.FilesystemFileStorage`). The file exists only in this working tree. A clean clone or CI build of 499b23c will fail test compilation, and the application context will have no `FileStoragePort` bean for `SourceService`/`TaskService`. The local `qa:verify` evidence in docs/qa was produced against an untracked file, so it does not describe the committed tree.",
+        "suggestion": "Anchor the ignore rule to the repo root (`/storage/`) or add a negation for `src/main/**/storage/`. Then commit `FilesystemFileStorage.kt` (including `StorageRoot`) and re-run `npm run qa:verify` from a clean clone before claiming the gate.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute this finding. The ignore mechanism is real. Line 17 of `.gitignore` is `storage/`. It has no leading slash and no slash in the middle, so under gitignore rules it matches a directory named `storage` at any depth. That includes `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. Glob shows the only file under any `src/**/storage/` path is `FilesystemFileStorage.kt`, so the rule catches it.\n\nIt is the only production implementation of `FileStoragePort`. The interface is in `content/application/Ports.kt:18`, and `SourceService.kt:29` and `TaskService.kt:72` inject it. The other implementation, `InMemoryFileStorage`, is in test sources. `StorageAndPdfTest.kt:4` imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage` directly, so a tree without that file fails test compilation. In a non-test application context, nothing would supply the `FileStoragePort` bean.\n\nThe git status snapshot shows only `trace/ledger.jsonl` as modified and the file is not listed as untracked. That fits a file hidden by an ignore rule; a tracked file would not be listed either. I could not read the git index or object store (permission denied), so I could not run `git ls-files` myself to rule out a force-add (`git add -f`). Nothing suggests a force-add happened, and the reviewer reports `git ls-files` and `git grep HEAD` results that agree with the ignore rule.\n\nThe QA evidence in `docs/qa/automated-verification-latest.md` was built from this worktree's `target/classes`, which contains `FilesystemFileStorage.class`. A local build would pass even though the committed tree lacks the source, which is the gap the finding describes.\n\nCritical severity is justified: a clean clone or CI build of 499b23c cannot compile its tests.",
+          "Mechanism confirmed. `.gitignore:17` is an unanchored `storage/`, which in gitignore semantics matches a directory named `storage` at any depth, including `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. The file `FilesystemFileStorage.kt` exists in the working tree. The session-start git status shows only `M trace/ledger.jsonl` and no `??` entry for it. That fits the file being ignored (ignored untracked files are hidden from status) and does not fit a normal untracked file. Callers: `SourceService.kt:29` and `TaskService.kt:72` inject `FileStoragePort`. The only production implementation lives in that ignored directory. The only other implementation is the test-only `InMemoryFileStorage` in `ContentTestSupport.kt:218`. `StorageAndPdfTest.kt:4-5` imports `adapter.out.storage.FilesystemFileStorage` and `StorageRoot` directly. On a clean clone, test compilation fails, and the production context has no `FileStoragePort` bean, so it would not start. The QA evidence (`docs/qa/automated-verification-latest.md:1376`) scanned `target/classes/.../FilesystemFileStorage.class` from this local working tree, so it does not describe the committed tree. One thing I could not check directly: the worktree git index (permission denied), so I can't rule out a `git add -f`. But the reviewer reports that `git ls-files` returned nothing, and the clean status supports that. CI and any fresh checkout are fully affected, so critical severity is warranted."
+        ]
+      },
+      {
+        "title": "Concurrent image uploads collide on the deferred (task_id, position) unique constraint and return a raw 500",
+        "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+        "line": 154,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`addImage` reads `task.images` without a lock, sets the position to `task.images.size + 1`, and checks the limit with `task.images.size >= Limits.IMAGES`. Two quick uploads to the same task (a double-click, or a multi-file drop sent in parallel) both pick the same position. The constraint `task_image_position_uq ... DEFERRABLE INITIALLY DEFERRED` then fails only at commit. No advice handles `DataIntegrityViolationException`/`TransactionSystemException` (ContentProblemAdvice has no such handler), so the client gets a generic 500. The same race lets a task go past 10 images.",
+        "suggestion": "Lock the task row (`SELECT ... FROM task WHERE id = ? FOR UPDATE`) at the start of addImage/reorder/deleteImage, or compute the position in SQL under that lock. Map a remaining constraint violation to a 409 problem response.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute the main mechanism; the code confirms it.\n\n- **No lock on the read.** `TaskService.addImage` (lines 145–157) loads the task through `JdbcTaskStore.find`, which runs a plain `SELECT ... WHERE id = ?` plus an images query. There is no `FOR UPDATE`. The only pessimistic lock in the codebase is in the profile module.\n- **Position comes from a stale count.** The position is `task.images.size + 1`, worked out in the application. The INSERT at `JdbcTaskStore.kt:152` passes it through unchanged.\n- **The duplicate fails only at commit.** `V2__content_authoring.sql:65` declares `task_image_position_uq UNIQUE (task_id, position) DEFERRABLE INITIALLY DEFERRED`. So two concurrent READ COMMITTED transactions both insert the same position, and the second one fails when it commits.\n- **Nothing turns that failure into a problem response.** The commit error surfaces as a `DataIntegrityViolationException` or `TransactionSystemException`, depending on the transaction manager. `ContentProblemAdvice` only handles `InvalidContent`, `ContentNotFound`, `ContentConflict`, upload, body, parameter and `ConstraintViolationException` (Bean Validation). No advice anywhere handles either exception or a generic `Exception`, so the client gets a raw 500. That breaks the AGENTS.md rule that no user input may produce a raw 500.\n- **The storage file is cleaned up.** `onRollback` deletes the stored file, so the remaining harm is the 500.\n\nOne part of the finding is overstated: \"the same race lets a task go past 10 images\" is mostly wrong. When the count is 9, both racers pick position 10, and the deferred unique constraint rejects the second at commit, so the limit can't be passed this way. That doesn't change the core claim.\n\nSeverity stays minor: this is a single-admin authoring flow and needs concurrent requests to trigger.",
+          "I could not refute this finding; the mechanism holds up in the code. `TaskService.addImage` (lines 140–159) runs in a default @Transactional (READ COMMITTED). It reads the task through `JdbcTaskStore.find`, which is a plain SELECT with no FOR UPDATE, no @Lock and no version column. It then checks `task.images.size >= Limits.IMAGES` and picks position `task.images.size + 1`. `JdbcTaskStore.addImage` is a plain INSERT, so nothing serialises two uploads to the same task. In V2__content_authoring.sql:65 the constraint is declared `task_image_position_uq UNIQUE (task_id, position) DEFERRABLE INITIALLY DEFERRED`. Because it is deferred, the second INSERT doesn't block or fail straight away. The duplicate is caught when the transaction commits, and Spring surfaces it as a DataIntegrityViolationException (or TransactionSystemException) after the method returns. ContentProblemAdvice has no handler for those types (it handles InvalidContent, ContentNotFound, ContentConflict, upload errors, unreadable/type-mismatch/missing-param/ConstraintViolation). No other advice in src/main handles them either, so the client gets an unmapped 500, which breaks the repo's own 'no raw 500' rule. The image-limit race is also real: two requests that both see 9 images both pass the check. Only an authenticated admin can reach this path, and it needs overlapping requests to the same task. A double-click or a multi-file upload sent in parallel can trigger it, so a real user can hit it without any attacker. The storage blob is cleaned up by onRollback, so there's no data corruption beyond the failed request. 'Minor' is the right severity."
+        ]
+      },
+      {
+        "title": "Check-then-act source delete / task save can hit FK violations that surface as 500",
+        "file": "src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+        "line": 89,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`delete` calls `sources.referencingTasks(id)` and then `sources.delete(id)`. `TaskService.validate` loads the source with `sources.find` and then inserts with `source_id REFERENCES source (id) ON DELETE RESTRICT`. If one request saves a task while another deletes its source, either the DELETE fails with an FK error or the INSERT references a row that no longer exists. Neither `DataIntegrityViolationException` is mapped, so the user gets a raw 500 instead of the 409/400 the spec defines.",
+        "suggestion": "Lock the source row (`FOR SHARE` on task save, `FOR UPDATE` on delete or grade change), or catch `DataIntegrityViolationException` in the content advice and map it to the matching `ContentConflict` / `sourceRef.sourceId` field error.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is real. `SourceService.delete` (SourceService.kt:86-93) runs `referencingTasks(id)` and then `DELETE FROM source WHERE id = ?` (JdbcSourceStore.kt:43-53) inside a plain @Transactional, which uses Postgres's default READ COMMITTED. Neither step takes a lock (I found no FOR UPDATE or FOR SHARE in content persistence). `task.source_id` is declared `REFERENCES source (id) ON DELETE RESTRICT` (V2__content_authoring.sql:45). Under READ COMMITTED, a task insert can race a source delete in two ways:\n(a) The task insert is not yet committed when the delete's check runs, so the check sees no tasks. The DELETE then blocks on the KEY SHARE lock the FK check took, and once the insert commits, RESTRICT fails.\n(b) The delete runs first but has not committed when TaskService validates with `sources.find`, so the source still looks present. The INSERT's FK check then waits on the deleted row and fails after the delete commits.\nIn both cases Spring raises DataIntegrityViolationException. ContentProblemAdvice handles only InvalidContent, ContentNotFound, ContentConflict, the upload exceptions, unreadable bodies, type mismatch, missing params and parts, and ConstraintViolationException. No handler maps DataIntegrityViolationException or a generic Exception, so the response is a raw 500, which breaks the project's \"no raw 500\" rule. Getting it requires two concurrent admin requests, and this is a single-admin app, so the race is unlikely in practice. The finding's severity of minor and confidence of low fit that, but the claim itself is correct.",
+          "The code matches the finding's description. In SourceService.delete (lines 86-93), the method calls `referencingTasks(id)` and then `sources.delete(id)` without taking any row lock. A search for `FOR UPDATE` / `FOR SHARE` / isolation settings in src/main finds nothing, so the transaction uses Postgres's default READ COMMITTED. V2__content_authoring.sql:45 declares `source_id ... REFERENCES source (id) ON DELETE RESTRICT`. No `@ExceptionHandler` anywhere in src/main handles DataIntegrityViolationException. ContentProblemAdvice only covers the content exceptions plus ConstraintViolationException, which is the bean-validation exception, not the database one. Two races can therefore happen: (a) the delete check sees no tasks, a task insert commits, then the DELETE hits an FK RESTRICT error; or (b) the task save validates the source, the delete commits, then the INSERT fails its FK check. Either way the error reaches the client as an unmapped 500, which breaks the \"no raw 500\" rule. The same check-then-act gap exists in update when the grade changes: a task could be attached after the grade-lock check. That one gives inconsistent data rather than a 500. In practice the risk is small. Only the admin can reach these endpoints, and this app has one admin, so it would take the same person sending a delete and a task save for that source at nearly the same moment (for example from two tabs). No attacker or child request can trigger it. The mechanism is real and reproducible with concurrent requests, so the finding stands; given how narrow the window is, \"minor\" is the right severity."
+        ]
+      },
+      {
+        "title": "The file storage adapter, which holds the path-traversal guard, is gitignored and missing from the commit, so a clean checkout cannot start",
+        "file": ".gitignore",
+        "line": 17,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "The `.gitignore` rule `storage/` (meant for runtime upload data) also matches the source package `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. `git ls-files` on that directory returns nothing, and 499b23c does not contain `FilesystemFileStorage.kt`. That file is the only `FileStoragePort` implementation. It also holds the only path-containment check (`locate()`: `normalize()` + `startsWith(root)`) and the `StorageRoot` check that keeps uploads out of any git working tree (NFR-17/NFR-4). On CI, a fresh clone or a Docker build from a clean tree, `SourceService` and `TaskService` have no bean to inject and the app fails to start. The local tests and the compose smoke pass only because the untracked file exists in this worktree, so the evidence in `docs/qa/` does not match what was committed. If someone later 'fixes' the startup by writing a quick replacement adapter, the containment and outside-the-repo guards are silently lost.",
+        "suggestion": "Anchor the ignore rules to the repo root (`/storage/`, `/uploads/`) or add `!src/main/**/storage/`. Then commit `FilesystemFileStorage.kt`. Add a CI step, or extend the pre-commit hook, that fails when any `src/main` file is git-ignored (`git ls-files -oi --exclude-standard src/main` must be empty).",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Checked: `.gitignore:17` is `storage/`, with no leading slash and no negation rule. In gitignore, a pattern with only a trailing slash and no other slash matches a directory of that name at any depth. So it matches `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. That directory exists on disk and holds `FilesystemFileStorage.kt`. The file defines the only `@Component` implementing `FileStoragePort`; outside tests the port appears only in Ports.kt (the interface), SourceService, TaskService and ContentModule (a KDoc mention). The same file holds `locate()` (`normalize()` + `startsWith(root)`) and `StorageRoot.check` (refuses a storage dir inside any git working tree). The git status snapshot shows only `M trace/ledger.jsonl`. That fits the file being ignored, since ignored files do not appear as `??`.\n\nNot checked: whether the file is in the index or in 499b23c. My read of the worktree's git index was denied and I had no git command available. The only way the finding is wrong is if someone force-added the file (`git add -f`). Nothing suggests that, and a normal `git add -A` skips ignored paths.\n\nImpact if the file is missing: worse than stated. A clean checkout fails before the app even starts. `src/test/kotlin/cz/doucko/content/StorageAndPdfTest.kt` imports `FilesystemFileStorage` and `StorageRoot`, so test compilation fails and `mvnw verify` breaks. Main code alone would still compile, but startup would fail with no `FileStoragePort` bean for SourceService and TaskService. `docs/qa/automated-verification-latest.md` shows classpath scanning of `target/classes/.../storage/FilesystemFileStorage.class` from this worktree, which supports the claim that the QA evidence depends on a local untracked file.\n\nThe cause is real and the impact holds. The suggested fix (anchor `/storage/` and `/uploads/`, commit the file, add a check that `git ls-files -oi --exclude-standard src/main` is empty) is correct. Severity major is appropriate.",
+          "The core mechanism is confirmed. In `.gitignore`, line 17 is the unanchored pattern `storage/`, which matches a directory named `storage` at any depth. That includes `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. The file `FilesystemFileStorage.kt` exists on disk in that directory. `git add -A` skips ignored files, so it stays out of commits unless someone force-adds it. The gitStatus snapshot can't help either way, because git status never lists ignored files.\n\n`FilesystemFileStorage` is the only `@Component` implementing `FileStoragePort` in `src/main`; the other implementation, `InMemoryFileStorage`, lives in the tests. `SourceService.kt:29` and `TaskService.kt:72` inject `FileStoragePort`. The file also holds the only `locate()` containment check (normalize + startsWith(root)) and the `StorageRoot` check that blocks storage inside a git working tree.\n\nA clean checkout actually fails earlier than the finding says. `src/test/.../StorageAndPdfTest.kt:4` imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage`, so `mvn verify` breaks at test compilation. A main-only or Docker build would compile, then fail at startup with no `FileStoragePort` bean.\n\nThe QA log at `docs/qa/automated-verification-latest.md:1376` shows the class compiled from this worktree, which fits the claim that local evidence depends on a file that isn't committed.\n\nOne limit: the tools available here couldn't read the git index (the read permission was denied), so I couldn't directly confirm that it is absent from 499b23c. Given the ignore rule, it can only be in the commit if someone force-added it, and nothing suggests that happened.\n\nThe problem reproduces for anyone who clones the repo, including CI. The security angle (a hasty replacement adapter dropping the guards) is a plausible later risk, not something an attacker can exploit today. Keeping the severity at major fits: it is a real, deterministic build/startup break, and it takes a security guard out of version control."
+        ]
+      },
+      {
+        "title": "`server.tomcat.max-swallow-size: -1` lets any LAN client hold request threads with endless bodies, without signing in",
+        "file": "src/main/resources/application.yaml",
+        "line": 36,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "With swallow size unlimited, Tomcat reads and discards the whole remaining body of any request it has already answered, whatever its size, to keep the connection alive. Endpoints that refuse early include the 401 from the admin chain, 413s and the 404 problem path. Any device on the home LAN can POST a never-ending chunked body to, for example, `/api/admin/sources` with no session. Tomcat answers 401 but keeps reading forever. A handful of such connections fill the worker pool, so the child surface and the admin surface stop responding. Tomcat's default (2 MB) caps this. The setting was added only so oversized uploads get a clean 413 instead of a reset.",
+        "suggestion": "Use a bounded value just above the largest legitimate body, e.g. `max-swallow-size: 52MB` (above `max-request-size` 51MB). That still turns any legal-size oversized upload into a clean 413 without making the swallow unbounded.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I couldn't refute the mechanism. The details are wrong in places, and the extra exposure is small.\n\n**What the code confirms**\n- `application.yaml:36` sets `server.tomcat.max-swallow-size: -1`.\n- Nothing else in `src/` touches this setting, virtual threads or the connector timeouts. So it runs on a normal Tomcat worker pool with default timeouts.\n\n**Why the mechanism holds**\n- After a response, Tomcat's `Http11InputBuffer.endRequest()` drains the unread body on the same worker thread, through `ChunkedInputFilter.end()` / `IdentityInputFilter.end()`.\n- Normally this stops with an IOException once more than `maxSwallowSize` bytes have been read. At -1 that check is off, so a chunked body with no end keeps being read for as long as the client keeps sending.\n- A 401 from Spring Security is a normal keep-alive response. Tomcat only turns off swallowing in special cases (an unmet `Expect: 100-continue`, aborted multipart uploads), so the unauthenticated 401 path does drain.\n\n**Where the finding overstates**\n1. **\"A handful\" of connections is not enough.** The default pool has 200 threads, so an attacker needs about 200 connections. On a LAN that is still easy.\n2. **The 2 MB default does not limit time.** It only limits bytes. Each read only has to arrive within the connection timeout (about 20–60 s), so a client sending 2 MB slowly can already hold a thread for a very long time. Any slowloris-style client can also stall threads by trickling headers or bodies to endpoints that read them.\n\nSo the -1 setting adds only a little to an availability risk that already exists. The attacker must be on the home LAN, and the suggested bounded value (e.g. 52MB) would not stop a slow-rate attack. Bounding the value is still sensible hygiene. The claimed mechanism is technically correct, but the real impact is lower than \"minor\" suggests.",
+          "The finding is accurate. `application.yaml:36` sets `server.tomcat.max-swallow-size: -1`, and nothing else in `src/` overrides it or sets a connection timeout or body-size limit. In Tomcat, -1 means that when a response finishes before the request body has been read, Http11InputBuffer.endRequest reads and throws away the rest of the body with no byte limit. This happens on the worker thread that handled the request, with blocking reads. The socket read timeout only fires when the client goes idle, so a client that keeps streaming chunked data holds the thread indefinitely. The default limit is 2 MB, after which Tomcat closes the connection instead.\n\nThe admin path can be reached without signing in. AdminSecurityConfiguration permits only the sign-in endpoint, so an anonymous POST to `/api/admin/sources` is refused by the security filter before the body is read, and the swallow then starts. For multipart, the 51 MB `max-request-size` stops the parser but not the swallow that follows. The comment on line 36 confirms the setting was added only to get a clean 413.\n\nCaveats that keep this at minor rather than higher:\n1. \"A handful\" of connections overstates it. Tomcat's default pool is 200 threads (max-connections 8192), so an attacker needs about 200 concurrent streaming connections. That is still trivial for one LAN machine.\n2. The attacker has to be on the home LAN (NFR-2). The DNS-rebinding firewall does not help, because the attacker can just use the IP as the Host header.\n3. Some exposure exists without this setting. The child chain is permitAll with no body-size cap, so a slowly dripped or endless JSON body to a child endpoint that reads its body (e.g. the settings PUT handled through SettingsBodyAdvice) can also tie up threads while Jackson reads. The setting adds a second, very cheap route that needs no valid endpoint and still works after the server has answered.\n\nThe suggested fix, a bounded value just above `max-request-size` (e.g. 52MB), keeps the clean 413 for legal-size oversized uploads and removes the unbounded swallow."
+        ]
+      },
+      {
+        "title": "Coverage summary — 17 scenarios: 15 implemented, 2 partial, 0 missing, 0 contradicted (the storage adapter is not in the commit, so HEAD does not build as committed)",
+        "file": "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md",
+        "line": 1,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "I mapped each of the 17 delta scenarios to its code and test. Source and task scenarios: SourceApiTest.kt:111-337 and TaskApiTest.kt:99-664. Upload limits: UploadLimitsIT.kt:100-126. Storage: ContentAuthoringIT.kt:208-229 and StorageAndPdfTest.kt:40. The two storage scenarios ('Stored files are outside the repositories', 'Storage root inside a working tree is refused') are implemented only in an untracked file. Every source and image scenario also depends on that file at runtime.",
+        "suggestion": "Commit the storage adapter (next finding). After that, all 17 scenarios are implemented and tested.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Confirmed, though I couldn't read the git index directly (permission denied). .gitignore:17 has the pattern `storage/`. With no leading slash it matches any directory named storage, including src/main/kotlin/cz/doucko/content/adapter/out/storage/, where FilesystemFileStorage.kt sits. Unless it was force-added, it is not tracked. The session-start git status showed only trace/ledger.jsonl modified and no untracked files, which fits an ignored file (technically ignored rather than untracked; the effect is the same). No other src/main class implements FileStoragePort; the only other implementation is the test-only InMemoryFileStorage. SourceService and TaskService depend on the port. StorageAndPdfTest.kt:4-5 imports adapter.out.storage.FilesystemFileStorage and StorageRoot, and the test at :40 covers the working-tree-refusal scenario. So a clean checkout of HEAD would fail test compilation and the app would have no FileStoragePort bean. The storage scenarios exist only in the uncommitted file, as claimed. Fix: anchor the ignore rule as `/storage/` and commit the adapter. Keep minor: this is a coverage summary, and the next finding carries the build-break defect.",
+          "I couldn't refute the mechanism. A clean checkout of HEAD would be missing the storage adapter.\n\nWhat I found:\n- The only implementation of `FileStoragePort` in main code is `src/main/kotlin/cz/doucko/content/adapter/out/storage/FilesystemFileStorage.kt`. It is the `@Component` class `FilesystemFileStorage`, which also contains the `StorageRoot.check` working-tree guard.\n- The repo `.gitignore` line 17 is `storage/`. That pattern has no leading slash, so it matches a directory named `storage` at any depth, including `adapter/out/storage/`.\n- Ripgrep follows gitignore rules. When I searched `src` for `FileStoragePort`, it found 7 files but skipped this one, even though the file contains that name on lines 4 and 21. That shows the path is ignored.\n- The snapshot `git status` lists only `M trace/ledger.jsonl`. Ignored files don't show up there, which fits with the file never having been added.\n- The only way it could still be in the commit is if someone ran `git add -f`. I couldn't check the git index because permission to read it was denied. Nothing suggests a force-add happened.\n\nWhat breaks without the file:\n- `SourceService` and `TaskService` require a `FileStoragePort` bean. Test code only supplies `InMemoryFileStorage`. So the app context fails to start in a fresh clone or in CI.\n- `StorageAndPdfTest.kt:40` uses `StorageRoot`, so test compilation fails too.\n- The two storage scenarios (\"stored outside repositories\" and \"root inside a working tree refused\") exist only in the ignored file.\n\nOne correction to the finding: it calls the file \"untracked\", but it is actually git-ignored. This matters for the fix: the developer needs `git add -f`, or better, should change the pattern to `/storage/`. The finding's core claim holds. Severity minor is right for this coverage summary, because the build break itself belongs to the companion finding."
+        ]
+      },
+      {
+        "title": "FilesystemFileStorage / StorageRoot (the only FileStoragePort implementation) is not committed: `.gitignore` rule `storage/` hides the adapter package",
+        "file": "src/main/kotlin/cz/doucko/content/adapter/out/storage/FilesystemFileStorage.kt",
+        "line": 18,
+        "severity": "critical",
+        "confidence": "high",
+        "evidence": "Spec: 'The storage root SHALL come from DOUCKO_STORAGE_DIR and SHALL NOT lie inside a git working tree; the backend SHALL refuse to start otherwise.' The file exists on disk, but it is missing from `git diff main..HEAD --name-only` and from `git ls-files`, and it does not show as untracked in `git status`. `.gitignore:17` has `storage/`, which matches `adapter/out/storage/`. SourceService.kt:29 and TaskService.kt:72 inject `FileStoragePort`, and no committed class implements it. StorageAndPdfTest.kt:4-5 imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage` and `StorageRoot`. On a clean checkout of HEAD (CI or the merge), test compilation fails. Even if it compiled, the context would fail with no FileStoragePort bean. NFR-17 (storage outside repositories) has no committed enforcement point.",
+        "suggestion": "Anchor the ignore rule (`/storage/`) or add `!src/**/storage/`, commit FilesystemFileStorage.kt, then re-run `npm run qa:verify` on a clean clone or worktree.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute the finding. Everything I could check agrees with it, but I could not prove the file is untracked; that would take `git ls-files`.\n\nWhat I checked directly:\n\n1. **The ignore rule matches the file.** `.gitignore:17` is an unanchored `storage/`. Unanchored, it matches a directory named `storage` at any depth, including `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. No negation rule (`!…storage…`) exists anywhere in `.gitignore`.\n2. **The file exists on disk and is the only real implementation.** `FilesystemFileStorage.kt:18-22` is a `@Component` that implements `FileStoragePort` and calls `StorageRoot.check(...)`, the NFR-17 rule that refuses a storage root inside a git tree.\n   - A ripgrep search of `src/` for `FileStoragePort` finds `Ports.kt` (the interface), `SourceService.kt:29` and `TaskService.kt:72` (where it is injected), and only a test fake, `InMemoryFileStorage` in `ContentTestSupport.kt`. `FilesystemFileStorage.kt` does not appear at all.\n   - ripgrep follows `.gitignore`, so the rule is in effect for this path.\n   - A search for `FilesystemFileStorage|StorageRoot` likewise found only `StorageAndPdfTest.kt` and docs, never the adapter itself.\n3. **Git status is consistent with an ignored file.** The session's git status snapshot lists only ` M trace/ledger.jsonl`. A new file that was neither committed nor ignored would appear as `??`. So the file is either committed or ignored.\n   - It could have been committed with `git add -f`. If so, the finding is wrong. I tried to inspect the worktree index, but the read was denied.\n   - With an unanchored rule matching the path and no sign of a force-add, an ignored file is by far the likelier case.\n4. **The consequence follows if the file is ignored.** On a clean checkout of HEAD:\n   - `StorageAndPdfTest.kt` imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage` and `StorageRoot`, so test compilation fails.\n   - In production, the Spring context has no `FileStoragePort` bean for `SourceService` and `TaskService`, so it cannot start.\n   - NFR-17's enforcement point disappears.\n\nNone of the usual ways out applies: there is no other bean or `@Bean` factory in main, and it is not guarded elsewhere. A clean-clone CI run would hit this.\n\nKeep the severity at critical. Before acting on it, confirm with `git ls-files src/main/kotlin/cz/doucko/content/adapter/out/storage` or `git check-ignore -v <file>`.",
+          "The finding holds up. I couldn't read the git index (permission was denied), but the ignore rule alone settles it:\n\n- **The ignore rule catches the file.** `.gitignore:17` is `storage/`. It has no leading or middle slash, so it ignores any directory named `storage` at any depth. That includes `src/main/kotlin/cz/doucko/content/adapter/out/storage/`. No later rule re-includes it. A plain `git add` therefore skips the directory, and `git status` won't list it as untracked, which matches the finding. The only way it got committed is if someone ran `git add -f` on purpose, and the finding says `git ls-files` doesn't list it.\n- **The file is on disk.** Glob finds `FilesystemFileStorage.kt` in that directory, and only that file. The QA log (`docs/qa/automated-verification-latest.md:1376-1379`) shows `FilesystemFileStorage.class` and `StorageRoot.class` being scanned from `target/classes`. So the local build passed only because the untracked file exists in this worktree.\n- **No other committed main-code class implements `FileStoragePort`.** `Ports.kt:18` declares it, and `SourceService.kt:29` and `TaskService.kt:72` inject it. The only other implementation is `InMemoryFileStorage`, in test code (`ContentTestSupport.kt:218`).\n- **A clean checkout breaks.** `StorageAndPdfTest.kt:4-5` imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage` and `StorageRoot`, so test compilation fails. Even without that test, `UploadLimitsIT` and `ContentAuthoringIT` autowire `FileStoragePort`, and the app's services need it too. With no bean to supply it, Spring fails to start the application.\n- **The storage-root safety check isn't committed either.** The check that refuses a storage root inside a git working tree (NFR-17) lives in that same uncommitted directory.\n\nThis affects every clean clone, CI run and merge, so it's reproducible and not just theoretical. Critical severity fits: the merged slice won't build. The suggested fix is right: anchor the rule as `/storage/` (or add a negation for `src/**/storage/`), then commit the adapter."
+        ]
+      },
+      {
+        "title": "Task 5.1 is ticked 'qa:verify green' but the committed tree cannot reproduce it",
+        "file": "openspec/changes/implement-authoring-tasks-api/tasks.md",
+        "line": 26,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "Task 5.1 says: '[x] 5.1 `npm run qa:verify` green (546 unit, 44 integration) … Evidence: docs/qa/automated-verification-latest.md'. That run used the local worktree, which contains the gitignored FilesystemFileStorage.kt. HEAD 499b23c does not contain the file. Task 4.1, '[x] … `adapter/out/storage` (filesystem, repo guard)', is also ticked while its artifact is missing from the commit.",
+        "suggestion": "Commit the adapter, re-run qa:verify from a clean checkout and refresh the evidence file. Until then, untick 4.1 and 5.1.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute the mechanism, and I confirmed most of it from the files.\n\n1. `.gitignore:17` has `storage/` with no leading slash. In gitignore, a pattern like that matches a directory named `storage` at any depth. So it ignores `src/main/kotlin/cz/doucko/content/adapter/out/storage/`, not only the runtime data folder it was meant for (the comment says \"runtime data\").\n\n2. The file is on disk at `src/main/kotlin/cz/doucko/content/adapter/out/storage/FilesystemFileStorage.kt`. The git status snapshot shows only `trace/ledger.jsonl` as modified and no untracked entry for this folder. That fits the folder being ignored rather than freshly added.\n\n3. The evidence file `docs/qa/automated-verification-latest.md:1376` shows the run scanned `...backend-slice5-authoring-tasks\\target\\classes\\...\\FilesystemFileStorage.class`. So the qa:verify run compiled the class from the local worktree.\n\n4. `src/test/kotlin/cz/doucko/content/StorageAndPdfTest.kt:4` imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage`. Without the file, a clean checkout would not even compile its tests. qa:verify could not be green there, so ticking 5.1 against that evidence overstates what the commit proves.\n\n5. Task 4.1 in `tasks.md:20` claims `adapter/out/storage (filesystem, repo guard)` is done. The source for that adapter lives under the ignored folder.\n\nOne thing I could not check directly: permission to read the worktree's git index was denied. So I cannot rule out that someone ran `git add -f` on the file in 499b23c. But the ignore rule clearly matches the path, and nothing suggests a force-add. The claim holds unless the author shows the file in `git ls-tree 499b23c`.\n\nSeverity: major is right. This is a false done-claim, and a clean checkout would fail to compile the test sources. The fix is to anchor the ignore rule as `/storage/` and commit the adapter. Then re-run qa:verify from a clean checkout.",
+          "I confirmed the mechanism with one gap: I could not inspect the commit's contents directly.\n\n1. Line 17 of `.gitignore` is `storage/`. It is unanchored, so git ignores every directory named `storage` at any depth. That includes `src/main/kotlin/cz/doucko/content/adapter/out/storage/`, which is the only place `FilesystemFileStorage.kt` exists in the worktree.\n2. `git status` at session start shows only `trace/ledger.jsonl` modified. An ignored, untracked file would not appear there either, so this neither confirms nor refutes the finding. But nothing suggests the file was force-added with `git add -f`, which is the only way past the ignore rule.\n3. It breaks the build, not just the bookkeeping. `src/test/kotlin/cz/doucko/content/StorageAndPdfTest.kt:4` imports `cz.doucko.content.adapter.out.storage.FilesystemFileStorage`, and `design.md:109` names it as the storage adapter. On a clean checkout of 499b23c the test sources fail to compile, so `npm run qa:verify` fails. If the class is also the Spring storage bean, the app has no storage implementation too.\n4. The evidence file `docs/qa/automated-verification-latest.md` (lines 1376 and 3423) shows the run scanning `C:\\projects\\school-tutor\\backend-slice5-authoring-tasks\\target\\classes\\...\\FilesystemFileStorage.class`. So the green run was built from the local worktree, where the ignored file exists.\n\nSo the \"546 unit, 44 integration green\" claim in task 5.1 and the `adapter/out/storage` claim in task 4.1 depend on a file that the ignore rule keeps out of git. Anyone who clones the branch, including CI, gets a compile failure. That breaks AGENTS.md's rule that done-claims need evidence pointers.\n\nWhat I could not check: the permission prompt blocked reading the git index, so I have not seen the commit's file list. The only way the finding is wrong is if someone force-added the file, which is unlikely.\n\nSeverity stays major: the problem reproduces for anyone who checks out the branch. The fix is to anchor the ignore rule (`/storage/`) and commit the adapter."
+        ]
+      },
+      {
+        "title": "Task 5.4 real-stack smoke is ticked although it was not run",
+        "file": "openspec/changes/implement-authoring-tasks-api/tasks.md",
+        "line": 29,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "Task 5.4 says: '[x] 5.4 Real-stack smoke: NOT RUN (the owner's stack … uses Compose project `doucko` and port 8081). Click path recorded in docs/qa/evidence/slice5-compose-smoke.md for after the merge.' A ticked checkbox over a step that did not run is a done-claim with no evidence (AGENTS.md lessons on vacuous passes and done-claims).",
+        "suggestion": "Untick 5.4 or mark it SKIP-pending with an explicit waiver. Tick it only after the smoke has run and its output is recorded.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Confirmed at tasks.md:29. The line is `- [x] 5.4 Real-stack smoke: NOT RUN (...)`, so the checkbox is ticked even though the line itself says the step did not run. OpenSpec and the gate tooling count `[x]` items as complete, so 5.4 is counted as done. AGENTS.md says a SKIP or zero-scope result must never be folded into a pass. Nothing elsewhere guards against this. The referenced docs/qa/evidence/slice5-compose-smoke.md does exist, but it only records a click path for later, not results from a run. I recommend a downgrade because the line is honest about the gap: it says \"NOT RUN\" and gives the reason, so a human reader is not misled. Only the machine-readable checkbox status is wrong. The correct state is unticked, or an explicit SKIP-pending/waiver, until the smoke has run and its output is recorded.",
+          "Confirmed at openspec/changes/implement-authoring-tasks-api/tasks.md:29. The line is `- [x] 5.4 Real-stack smoke: NOT RUN ...`, so the box is ticked for a step that did not run. The evidence file docs/qa/evidence/slice5-compose-smoke.md agrees: \"Result: NOT RUN, not a pass. No request was sent through 127.0.0.1:8081\". OpenSpec counts completion from the checkboxes. That makes 5.4 count as done in the task tally, and it removes a blocker on the later archive step (5.6) even though no smoke evidence exists. This is the vacuous-pass / done-claim pattern AGENTS.md forbids, because the verdict is carried by the checkbox, not by a check that sets an exit code. Mitigating factors: the line and the evidence file both state NOT RUN in plain words, with a reason (the owner's stack holds port 8081 under Compose project `doucko`) and a click path to run after the merge. A human reader is not misled. It is also a process and traceability defect only: no real user or attacker can trigger anything, and integration tests (ContentAuthoringIT, UploadLimitsIT) cover the behavior in the meantime. The mechanism is real, so the finding is not refuted. Because the step is openly disclosed and has no runtime impact, it is closer to minor than major."
+        ]
+      },
+      {
+        "title": "FR-2 (PDF viewer / getSourceFile) is backend-owned but has no requirement or scenario in the change delta",
+        "file": "openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md",
+        "line": 15,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "The plan lists 'FR-2 | authoring-tasks | backend, frontend' (mvp-capability-plan.md:249), and proposal.md:10 lists FR-2 as backend-owned. The delta spec never mentions FR-2 or `getSourceFile`. The code serves the PDF at SourceController.kt:60-65, and it is tested at SourceApiTest.kt:227. FR-13's 'open the PDF at that page' also depends on this endpoint. The plan's FR coverage cannot be traced through the delta.",
+        "suggestion": "Add a delta requirement for serving the source PDF to the viewer (200 application/pdf, 404 for an unknown id or missing file) that cites FR-2 and FR-13, with a scenario backed by SourceApiTest:227.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The factual core holds. The change delta `openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md` has 10 requirements, and none of them mentions FR-2, `getSourceFile`, or serving the source PDF. Other FRs in the change are each cited by a delta requirement (FR-1, FR-3..FR-8, FR-10, FR-11, NFR-17), so FR-2 is the odd one out. proposal.md:10 lists FR-2 as backend-owned, and the plan row exists (mvp-capability-plan.md:249). The endpoint exists at SourceController.kt:60, and the test is SourceApiTest.kt:225-227.\n\nTwo points cut against the \"major\" severity and the claim that coverage \"cannot be traced\":\n1. design.md:17 maps FR-2 to `getSourceFile` (serves the bytes, `pageCount` gives the range). The test at SourceApiTest.kt:225 carries `// @trace FR-2`, which is the repo's traceability mechanism. FR-2 is therefore traceable from the change to the code and tests.\n2. The store spec already states FR-2 (contract/openspec/specs/content-authoring/spec.md:204: jump to a page by number, FR-2).\n\nThe real gap is that the backend delta spec has no requirement or scenario for the file endpoint's contract (200 application/pdf, 404 unknown). That makes it inconsistent with how the other FRs are written up. It is a documentation and spec-completeness gap, not a code or behaviour defect, so I recommend downgrading the severity.",
+          "Confirmed as a spec-traceability gap; it is not a runtime defect. I grepped the change directory. The delta spec openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md (all 160 lines read) has no requirement or scenario for `getSourceFile` or serving the source PDF, and it never cites FR-2 or FR-13. Its FR citations are FR-1, FR-3, FR-4, FR-5..FR-8, FR-10 and FR-11. The rest of the change does claim FR-2: proposal.md:10 lists it as backend-owned, proposal.md:16 lists `getSourceFile`, design.md:17 maps FR-2 to `getSourceFile`, and tasks.md:31 puts FR-2 and FR-13 in the commit trailer. So the delta does not trace FR-2 as the finding says. Through the exploitability lens, no user or attacker can trigger anything from this. The endpoint is implemented (SourceController) and tested (SourceApiTest), so it is a documentation and traceability problem with no runtime effect. The mechanism the finding describes is real, but 'major' overstates it. Recommend a downgrade."
+        ]
+      }
+    ],
+    "contested": [
+      {
+        "title": "File cleanup in afterCommit can turn a committed delete into a 500",
+        "file": "src/main/kotlin/cz/doucko/content/application/Transactions.kt",
+        "line": 11,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`override fun afterCommit() = action()` runs `storage.delete(...)` (`Files.deleteIfExists`), which can throw an IOException, for example on Windows when the PDF is still open in `getSourceFile`'s stream. Spring propagates exceptions from `afterCommit` to the caller even though the row is already gone. `deleteSource`/`deleteTask`/`deleteTaskImage` then answer 500 for a delete that succeeded, a retry returns 404, and the file is orphaned with no record.",
+        "suggestion": "Wrap the after-commit action in try/catch and log the storage key (no content) instead of rethrowing. Optionally queue orphaned keys for a later sweep, so the HTTP result reflects the committed state.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The core mechanism holds, but the Windows example the finding gives is wrong.\n\nWhat the code does:\n- `Transactions.kt:11` registers `override fun afterCommit() = action()` with no try/catch.\n- `SourceService.delete` (`SourceService.kt:92`), `TaskService.delete` (`TaskService.kt:118`) and `TaskService.deleteImage` (`TaskService.kt:191`) are all `@Transactional`. Each deletes the row and then registers `afterCommit { storage.delete(key) }`.\n- The real port, `FilesystemFileStorage.delete` (`FilesystemFileStorage.kt:41-43`), calls `Files.deleteIfExists(locate(key))` and catches nothing. That call can throw an `IOException`, such as `AccessDeniedException`, a read-only volume or a broken mount.\n\nWhy it becomes a 500:\n- Spring documents that exceptions thrown from `TransactionSynchronization.afterCommit` are propagated to whoever called commit.\n- In `AbstractPlatformTransactionManager.processCommit`, `triggerAfterCommit` runs after the database commit. `invokeAfterCommit` does not swallow exceptions; only `afterCompletion` exceptions are caught and logged.\n- So the exception escapes the `@Transactional` proxy after the DELETE has already committed. The controller never returns its 204, and the client gets an error response, most likely a 500.\n- A retry then hits `get(id)` → `ContentNotFound` → 404, and the file is left orphaned. In `TaskService.delete`, one failing image also stops the `forEach` from deleting the task's remaining images.\n\nWhere the finding is weak:\n- Its example is a file held open by `getSourceFile` on Windows. Java's `Files.newInputStream` on Windows opens files with FILE_SHARE_DELETE by default, so deleting an open file normally succeeds and does not throw.\n- The failure therefore needs a less common filesystem error. The code path is real, the trigger is rare and the impact is limited to an admin-only endpoint, so \"minor\" is the right severity.",
+          "Only part of the mechanism is real, and the concrete trigger fails.\n\nWhat is real: `Transactions.kt:11` runs the action straight inside `TransactionSynchronization.afterCommit()`. Spring's `invokeAfterCommit` passes exceptions from `afterCommit` back to the caller, unlike `afterCompletion`, where they are only logged. So if `storage.delete` threw, `deleteSource`, `deleteTask` and `deleteTaskImage` would fail after the row was already committed.\n\nWhy the trigger fails: the storage adapter is `src/main/kotlin/cz/doucko/content/adapter/out/storage/FilesystemFileStorage.kt`. `open()` uses `Files.newInputStream` (NIO), not `java.io.FileInputStream`. On Windows, NIO's `WindowsChannelFactory` opens files with FILE_SHARE_READ, FILE_SHARE_WRITE and FILE_SHARE_DELETE all on by default. So `Files.deleteIfExists` on a PDF that `getSourceFile` is still streaming succeeds: Windows marks the file delete-pending and does not raise a sharing violation. On Linux/Docker, unlinking an open file always works. `deleteIfExists` also never throws when the file is already gone.\n\nWhat is left: generic environmental IO faults, such as the volume going read-only, permissions changing outside the app, or antivirus interference. These are operator or infrastructure failures, not something a user or attacker can trigger. All three delete endpoints are admin-only, so there is no attacker angle either.\n\nThe suggested hardening (log and swallow, or use `afterCompletion`) is a reasonable robustness tweak. But the specific scenario in the finding (a concurrent open stream on Windows causing a 500 and an orphaned file) cannot be reproduced with this adapter."
+        ]
+      },
+      {
+        "title": "Malformed topicId / sourceRef.sourceId reported as 'unknown' instead of 'not a UUID'",
+        "file": "src/main/kotlin/cz/doucko/content/domain/TaskRules.kt",
+        "line": 81,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`JsonReaders.uuid()` returns `In.Invalid` for a non-canonical UUID string. `TaskRules.topic` handles only `In.Missing` explicitly and otherwise falls through to `topic == null -> FieldError(\"topicId\", \"topic-unknown\")`. `sourceRef` likewise gives `source-unknown` for an `In.Invalid` sourceId. Path and query parameters use `not-uuid` (ContentProblems.parameterError), so the same mistake gets two different messages depending on where it appears.",
+        "suggestion": "Add an `is In.Invalid -> FieldError(path, \"not-uuid\")` branch for topicId and sourceRef.sourceId.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The code path is real: in TaskRules.kt:74–83, if topicId is `In.Invalid`, `topic` ends up null and the code reports `topic-unknown`. The same happens for sourceRef.sourceId at lines 112–113, which reports `source-unknown`. But calling this a correctness defect doesn't hold up:\n\n1. It is deliberate and tested. TaskRulesTest.kt:139 asserts exactly this: `errors(draft(topicId = In.Invalid), context.copy(topic = null)) shouldContainExactly listOf(\"topicId\" to \"topic-unknown\")`. The author pinned this mapping on purpose.\n\n2. Nothing in the contract requires `not-uuid` here. contract/api/openapi.yaml only declares `format: uuid`. No spec scenario I found says a malformed body id must produce `not-uuid` rather than `topic-unknown`.\n\n3. The behaviour is still correct and safe. The request is still rejected through the field-error path as a validation problem, not a 500, and nothing leaks. The messages (\"Choose a topic from the list.\" / \"This source does not exist.\") are human-readable and true: a malformed id cannot name an existing topic or source. That meets the AGENTS.md rule that validation errors get human messages.\n\n4. What's left is a wording difference between body fields and path/query parameters (ContentProblemAdvice.kt:151). That's a UX/consistency nit, not a wrong mechanism. Fixing it would also mean changing an intentional test.\n\nThe described mechanism is accurate, but it is intended, tested behaviour with no spec or correctness violation. So I'm treating the finding as refuted as a correctness bug.",
+          "I confirmed this by reading the code. An admin can trigger it with one request, and the only effect is a misleading error message.\n\nHow it happens:\n- `JsonReaders.kt:33` and `JsonReaders.kt:39` read `topicId` and `sourceRef.sourceId` from the request body with `uuid()`.\n- `uuid()` (`JsonReaders.kt:184-189`) returns `In.Invalid` when the text does not match `UUID_FORM`. Nothing earlier in the request handling rejects a malformed value.\n- In `TaskRules.topic` (`TaskRules.kt:74-83`), the topic is only matched when `value is In.Ok`, so an `In.Invalid` value leaves `topic == null`. The code then reports `FieldError(\"topicId\", \"topic-unknown\")`.\n- `sourceRef` (`TaskRules.kt:112`) does the same: `In.Invalid.orNull()` is null, which does not equal `source.id`, so it reports `source-unknown`.\n\nThe inconsistency is real in two places:\n- Path and query parameters map these names to `not-uuid` (`ContentProblemAdvice.kt:151`).\n- The `uuids()` helper in the same `JsonReaders.kt` reports `not-uuid` for malformed array items (line 153).\n\nReproduction: send a task create or update request with `\"topicId\": \"abc\"` and the response says `topic-unknown`, not `not-uuid`.\n\nImpact: it is still a correct 4xx validation error, with no 500, no data leak and no security effect. It is only a UX/consistency problem, so minor severity fits."
+        ]
+      },
+      {
+        "title": "deleteTask and setTaskStatus are implemented without the contract's 409 guards and without a delta requirement",
+        "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+        "line": 114,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "openapi.yaml:562 says deleteTask is 'refused (409) with attempts, problem reports or opened hints, or while in a published mission'. openapi.yaml:579 says setTaskStatus is '409 when a published mission holds it'. TaskService.delete (lines 114-119) and setStatus (lines 121-129) delete or change status with no guard. design.md:34-36,42 defers these guards to slice 6, but the delta spec has no requirement covering these endpoints or the interim behavior. Nothing creates attempts or missions yet, so there is no runtime harm today.",
+        "suggestion": "Add a delta requirement that records the interim behavior (unguarded delete/status, guards arrive with the slice-6 `ContentUsage` port), or add a TODO/ADR pointer at TaskService.delete/setStatus so slice 6 cannot miss it.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The finding holds up. `TaskService.delete` (TaskService.kt:114-119) loads the task, deletes it, and removes its image files after commit. It checks nothing about attempts, reports, hints or missions. `setStatus` (lines 121-129) changes the status without any guard. Nothing at these call sites or elsewhere enforces the contract's 409 rules.\n\ndesign.md:34 and :36 do defer them on purpose: the mission rules CA-D6..CA-D10 and the `ContentUsage` port guards move to slice 6. But I searched the change's delta spec (specs/content-authoring/spec.md) for `deleteTask`, `setTaskStatus` and \"interim\" and found no requirement or scenario covering either endpoint. The only nearby match is `deleteTaskImage`. proposal.md:18 lists both endpoints as implemented, but they have no spec-level statement of their interim behavior.\n\nSo the mechanism is real: the implementation differs from the contract, and the difference is recorded only in a design table. Severity stays minor because, as the finding says, nothing creates attempts, reports, hints or missions yet, so the missing guards can't cause harm at runtime today. The real risk is that slice 6 forgets to add the guards.",
+          "The finding is accurate about the code but describes nothing a real user or attacker can trigger. TaskService.delete (lines 114-119) and setStatus (lines 121-129) do run with no 409 guards, and the change's delta spec has no requirement for deleteTask or setTaskStatus. However, every 409 condition in the contract depends on things that cannot exist in this build. The only tables are child_profile (V1) and topic, source, task and task_image (V2__content_authoring.sql). There are no attempt, problem-report, hint or mission tables, and no code that creates them. So 'refused with attempts, reports, opened hints, or while in a published mission' can never be true. For every request that is possible today, the unguarded code behaves exactly like guarded code would. Both endpoints are also admin-only, so no outside caller can reach them. The deferral is written down: design.md:34 and design.md:36 say the mission and usage guards (CA-D6..CA-D10 and the `ContentUsage` port) arrive with slice 6. The finding itself says 'there is no runtime harm today'. What remains is a forward-looking note about spec traceability, not a reproducible defect."
+        ]
+      },
+      {
+        "title": "Malformed path ids return 400, which getSourceFile and getSource do not declare in the contract",
+        "file": "src/test/kotlin/cz/doucko/content/SourceApiTest.kt",
+        "line": 227,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The test is named 'the PDF is served for the viewer, unknown ids are 404 and malformed ids 400'. In openapi.yaml, getSourceFile (lines 464-471) declares only 200, 401 and 404, and getSource (lines 405-412) declares only 200, 401 and 404.",
+        "suggestion": "Declare 400 (BadRequest) on the GET operations with UUID path parameters in openapi.yaml through a docs-store change, or accept this as a documented global convention.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The contract already specifies this behaviour. The global Conventions section of contract/api/openapi.yaml (lines 39-41) says: \"Query and path parameters use their own name (`weeks`, `status`, `q`, `reportId`, `taskId`, …); a path id that is not a UUID is 400 before any lookup.\" So a 400 response for GET /api/admin/sources/not-a-uuid, with errors[].field = \"sourceId\", is the documented contract. The test at SourceApiTest.kt:244 checks exactly that. It is true that the getSource (lines 405-412) and getSourceFile (lines 464-471) operations don't repeat 400 in their own responses lists. That is a documentation-completeness nit, not a correctness or spec-compliance defect. The finding's own suggestion even offers \"accept this as a documented global convention\", and that convention already exists in the file. Nothing in the code behaves incorrectly.",
+          "I confirmed the finding. SourceApiTest.kt:244 calls GET /api/admin/sources/not-a-uuid and expects a 400 field problem on sourceId. Any signed-in admin can trigger this just by typing a bad path. In contract/api/openapi.yaml, getSource (lines 401-412) declares only 200, 401 and 404. getSourceFile (lines 459-471) declares the same three. Both use the shared SourceId path parameter.\n\nI looked for a global rule that would cover this (in openapi.yaml, the store specs and the ADRs) and found nothing about malformed ids or UUID path parameters. So the behavior is not covered by any documented convention. The response really does go outside the declared contract: a client generated from the spec, or a contract test, will not expect a 400 on these operations.\n\ndeleteSource has the same gap, and other GET-by-id operations may too, so this looks like a wider contract pattern rather than a bug added in this slice.\n\nThe impact is small: 400 is a reasonable answer to a malformed id and does not break the no-raw-500 rule. It is a documentation and spec-compliance gap, not a security or correctness problem, so the 'minor' severity is right."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "Field paths echo client-supplied map keys into problem responses",
+        "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+        "line": 213,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`FieldError(\"answers.$key\", \"answer-unknown-part\")`, `FieldError(\"translations.$locale\", ...)` and `FieldError(\"$path.$key\", \"translation-key\")` (TaskRules.texts) build the `field` from arbitrary submitted object keys of any length. The design says 'Submitted values are never quoted in messages or logs' (NFR-3). The keys reach the response verbatim, and through any logging of problem bodies.",
+        "suggestion": "Validate the key shape first (part key regex `[a-z0-9]{1,20}`, locale `[a-z]{2}`). For keys that fail, report the error on the parent path (`answers`, `translations`, `...partLabels`) without echoing the key.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The code does what the finding says: `TaskService.kt:213/215` builds `answers.$key`, `TaskRules.kt:221` builds `translations.$locale`, and `TaskRules.kt:287/290` builds `$path.$key` from map keys the client sent. The same happens earlier at `JsonReaders.kt:90` and for unknown property names at `JsonReaders.kt:72`. The keys really are echoed. But this is not a correctness defect:\n\n1. **The design asks for these paths.** `design.md:128` says 400 responses carry `errors[]` with \"contract field paths\". The contract's paths for map-shaped fields (`answers.<partKey>`, `translations.<locale>`, `...partLabels.<key>`) include the key by definition. Reporting the error on the parent path, as suggested, would weaken the field-level error the spec requires. The `unknown-field` handling makes the same deliberate choice, so the pattern is consistent.\n\n2. **NFR-3 and the \"never quoted\" rule cover submitted values, not structural keys.** `design.md:132-133` is about values; the request tree is kept out of the generated DTOs so values are never held (`design.md:61-64`). Part keys, locales and option keys are schema identifiers (part keys are checked against `PART_KEY`, locales against the configured list). They are not free text or child data.\n\n3. **\"Any length\" is overstated.** The body size is capped before parsing (413 in the request filter), so keys are bounded.\n\n4. **No logging path was found.** Nothing in `src/main` logs problem bodies, and `RequestContentLogGuard` caps the loggers that print request content. The claimed log leak is hypothetical.\n\n5. **Only the admin can trigger it.** These are admin-only authoring and tester endpoints, so the only person who can put text into a key gets it back in their own response. No one else's data is exposed.\n\nAt most this is an optional hardening idea (bound the key shape before echoing). As a correctness bug it does not hold up: the behaviour follows the contract's field-path design and leaks nothing protected.",
+          "The code does what the finding says: `answers.$key` (TaskService.kt:213/215, plus JsonReaders.kt:90 before that), `translations.$locale` (TaskRules.kt:221) and `$path.$key` (TaskRules.kt:287) all put client-supplied object keys into `errors[].field`. JsonReaders.kt:72 does the same for unknown fields. But nobody can exploit or be harmed by this:\n1. Who can trigger it: these are admin authoring endpoints (task create/update, the tester, sources), and AGENTS.md says admin endpoints require the admin. The key goes back only to the same authenticated admin who sent it. Nothing crosses a trust boundary and no one else's data is exposed.\n2. The claim that it reaches logs through logging of problem bodies doesn't hold. Searching src/main/kotlin turns up no app code that logs problem bodies or requests. The only logging code is RequestContentLogGuard, which actively caps the request-content loggers at INFO/WARN to keep request content out of logs.\n3. NFR-3 and the advice's comment (ContentProblemAdvice.kt:30) say messages \"never quote a submitted value\". The messages here come from the catalog (`content.error.<code>`, line 125) and quote no values. The field path is a JSON pointer to the bad key, which is standard RFC 7807 practice. Object keys like part keys or locales are structural identifiers, not child PII.\n4. 'Any length' is bounded by the request body size limit, and the response goes back to the sender. There's no amplification and no injection sink (the body is serialized as JSON).\nAt most this is a style point about consistency. No real user or attacker can make the claimed NFR-3 leak happen."
+        ]
+      },
+      {
+        "title": "getReferenceData, getAdminImage and repeated-id rejection in bulk publish are implemented without a delta requirement",
+        "file": "src/main/kotlin/cz/doucko/content/adapter/in/web/ReferenceController.kt",
+        "line": 1,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The delta covers 'reference' operations only in the auth requirement. Its only bulk-publish rule comes from the delta itself: 'a repeated id is 400' (delta spec.md:146). The store spec 'Bulk publish from the task list' (store spec.md:810-813) refuses only an empty list or 101 ids. getReferenceData (seeded topics, grades, locales; TaskApiTest.kt:639) and getAdminImage (TaskController.kt:107-116) have no delta scenario.",
+        "suggestion": "Add the repeated-id rule to the store spec, or note it as a contract clarification. Add short delta scenarios for reference data (store requirement 'Topics come from configuration') and for image serving.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "This finding is about spec traceability, not a correctness defect, and part of it is factually wrong. (1) The title says repeated-id rejection in bulk publish has no delta requirement. But the delta spec at openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md:137-146 has a 'Requirement: Bulk publish' whose scenario says 'an empty list, 101 ids or a repeated id is 400'. The finding cites that same line, so it contradicts itself. Whether the store spec should restate the rule is a docs-store wording question, not wrong behaviour in this code. (2) ReferenceController.kt only maps ReferenceService output (grades, subjects, topics, taskLocales) into the generated ReferenceData model. Nothing there is wrong. The delta's auth requirement (spec.md:3-5) explicitly covers 'image' and 'reference' operations, and the store requirement 'Topics come from configuration' already describes the behaviour. A missing extra delta scenario for reference data or image serving is a coverage and documentation gap at most. It does not show any mechanism that produces incorrect results. Through the correctness lens, nothing in the cited code is wrong.",
+          "Refuted, because nothing here can be reproduced or exploited. The finding is about spec traceability, not runtime behaviour. Its claims also don't hold up against the delta spec:\n\n1. **Repeated-id rejection is already in the delta.** `openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md:146` says \"an empty list, 101 ids or a repeated id is 400\". The finding quotes this line itself, which contradicts its title (\"implemented without a delta requirement\"). What remains is a complaint that the store spec doesn't list this case. Rejecting duplicate ids with a 400 is stricter than the store spec, not looser. No user or attacker gains anything from it, and it returns a proper 400 problem response rather than a 500.\n\n2. **Reference data and image serving are covered by the delta.** Line 5 brings every source, task, image, preview, tester, bulk-publish and reference operation under the admin-auth requirement. That is the security-relevant property: these are admin-only reads. Neither one changes content or exposes answer keys to child endpoints. Having no dedicated behavioural scenario is a gap in how complete the docs are. It is not a defect anyone can trigger.\n\nNo input, actor or path leads to wrong behaviour, a data leak or a crash. At most this is a docs-hygiene note about the store spec, not a code finding against `ReferenceController.kt:1`."
+        ]
+      },
+      {
+        "title": "The tester's 'database is unchanged' claim is asserted only against in-memory stores",
+        "file": "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
+        "line": 431,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The scenario says: 'the results are CORRECT 0.5, WRONG 12400, and UNPARSEABLE with the checker's Czech tip, and the database is unchanged'. TaskApiTest runs over the in-memory stores from ContentTestSupport. ContentAuthoringIT has no testAnswers case against Postgres. TaskService.test (lines 206-241) does not write, so the behavior is correct, but the persistence half of the scenario is untested on the real database.",
+        "suggestion": "Add an IT assertion that runs testAnswers and then checks that the task row and row counts are unchanged, or reword the scenario to 'records nothing'.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "Through the correctness lens, nothing here is wrong, and the finding admits as much (\"the behavior is correct\"). TaskController.testAnswers (TaskController.kt:131-139) calls service.test and maps the result to a response. TaskService.test (TaskService.kt:206-241) does only three things: it reads the task with get(id), checks the request shape, and calls the pure AnswerChecker. It never calls a repository save, a ledger or any other write port, so there is no path that could change the database. TaskApiTest.kt:431 (`the answer tester shows verdicts and records nothing`) asserts `tasks.tasks shouldBe before` over the store port, and that is the only state the service could reach. A Postgres-level IT would only re-test that a read-only path is read-only. What the finding describes is a small coverage or spec-wording preference, not a mechanism that is actually wrong. Refuted for correctness; at most a nit.",
+          "Checked from the angle of whether this can actually happen: no user or attacker can trigger the problem. `TaskService.test` (`TaskService.kt:206-241`) only calls `get(id)`, which is read-only. After that it validates the answer shapes, which may throw `InvalidContent`. Then it maps each part through the pure `AnswerChecker.check`. There are no save, update or delete calls, and no port writes, so the tester endpoint cannot change the database. The finding says so itself: \"the behavior is correct\". What remains is a gap in the tests: the in-memory test stands in for the same persistence port, and the code has no write path for an IT to catch. Nothing is wrong at runtime. A Postgres IT could only catch a future change that adds a write. That's a test-hardening idea, not a defect in this change."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/implement-authoring-tasks-api/review-findings.json"
+  }
+}

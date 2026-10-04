@@ -142,6 +142,7 @@ class TaskService(
         taskId: UUID,
         file: Upload,
     ): TaskImage {
+        tasks.lock(taskId)
         val task = get(taskId)
         if (file.size > Limits.IMAGE_BYTES) throw UploadTooLarge(UploadKind.IMAGE)
         val bytes = file.read()
@@ -163,6 +164,7 @@ class TaskService(
         taskId: UUID,
         imageIds: List<UUID>,
     ): List<TaskImage> {
+        tasks.lock(taskId)
         val task = get(taskId)
         val duplicates = imageIds.withIndex().filter { (i, id) -> imageIds.indexOf(id) != i }
         if (duplicates.isNotEmpty()) throw InvalidContent(duplicates.map { FieldError("imageIds[${it.index}]", "duplicate") })
@@ -186,6 +188,7 @@ class TaskService(
         taskId: UUID,
         imageId: UUID,
     ) {
+        tasks.lock(taskId)
         val image = get(taskId).images.firstOrNull { it.id == imageId } ?: throw ContentNotFound()
         tasks.removeImage(taskId, imageId)
         afterCommit { storage.delete(image.storageKey) }

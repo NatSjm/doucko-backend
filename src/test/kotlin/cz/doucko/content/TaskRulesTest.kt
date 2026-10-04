@@ -136,7 +136,7 @@ class TaskRulesTest {
             listOf("topicId" to "topic-grade")
         errors(draft(topicId = In.Ok(UUID.randomUUID())), context.copy(topic = null)) shouldContainExactly
             listOf("topicId" to "topic-unknown")
-        errors(draft(topicId = In.Invalid), context.copy(topic = null)) shouldContainExactly listOf("topicId" to "topic-unknown")
+        errors(draft(topicId = In.Invalid), context.copy(topic = null)) shouldContainExactly listOf("topicId" to "not-uuid")
     }
 
     // @trace FR-3

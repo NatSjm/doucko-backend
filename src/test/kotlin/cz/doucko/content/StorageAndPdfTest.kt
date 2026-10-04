@@ -1,8 +1,8 @@
 package cz.doucko.content
 
+import cz.doucko.content.adapter.out.files.FilesystemFileStorage
+import cz.doucko.content.adapter.out.files.StorageRoot
 import cz.doucko.content.adapter.out.pdf.PdfBoxInspector
-import cz.doucko.content.adapter.out.storage.FilesystemFileStorage
-import cz.doucko.content.adapter.out.storage.StorageRoot
 import cz.doucko.content.application.ContentProperties
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldBeNull

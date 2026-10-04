@@ -11,7 +11,7 @@ Result: PASS, 27 warning(s)
 |---|---|---|---|---|---|
 | FR-1 | yes | yes | backend, frontend | 17 | - |
 | FR-2 | yes | yes | backend, frontend | 1 | - |
-| FR-3 | yes | yes | backend, frontend | 22 | - |
+| FR-3 | yes | yes | backend, frontend | 23 | - |
 | FR-4 | yes | yes | backend, frontend | 4 | - |
 | FR-5 | yes | yes | backend | 3 | - |
 | FR-6 | yes | yes | backend, frontend | 33 | - |
@@ -77,7 +77,7 @@ Result: PASS, 27 warning(s)
 | NFR-13 | frontend | n/a |
 | NFR-15 | backend | 17 |
 | NFR-16 | backend | 9 |
-| NFR-17 | backend, frontend | 15 |
+| NFR-17 | backend, frontend | 16 |
 | TC-1 | - | n/a |
 | TC-2 | - | n/a |
 | TC-3 | - | n/a |

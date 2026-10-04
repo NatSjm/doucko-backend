@@ -598,6 +598,16 @@ class TaskApiTest {
         mvc.adminJson("POST", admin, "/api/admin/tasks/publish", """{}""").isFieldProblem(400, "taskIds")
     }
 
+    // @trace FR-3
+    @Test
+    fun `a database rule broken by a concurrent edit is a 409, never a 500`() {
+        tasks.failNextInsert = true
+        create().andExpect {
+            status { isConflict() }
+            content { contentTypeCompatibleWith("application/problem+json") }
+        }
+    }
+
     // @trace FR-10
     @Test
     fun `the tester grades a part without an answer as unreadable`() {

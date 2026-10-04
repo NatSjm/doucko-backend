@@ -20,7 +20,7 @@ FR-5, FR-6, FR-7, FR-8, FR-10, FR-11, FR-13 and NFR-17.
   `bulkPublishTasks`) and `AdminReferenceApi` (`getReferenceData`), all behind
   the admin session and CSRF chain of slice 2.
 - New module `cz.doucko.content` (domain / application / adapter-in-web /
-  adapter-out-persistence / adapter-out-storage / adapter-out-pdf): field
+  adapter-out-persistence / adapter-out-files / adapter-out-pdf): field
   limits, answer-spec authoring rules (through `AnswerChecker.check` of
   `cz.doucko.checking`), file-type sniffing, the `FileStoragePort` with a
   filesystem adapter, a PDF page-count reader (PDFBox).
