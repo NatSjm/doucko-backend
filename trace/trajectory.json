@@ -14,7 +14,7 @@
     {
       "slice": "2026-10-04-implement-child-profile-api",
       "reviewEvidence": "clean",
-      "trailerCommits": 3,
+      "trailerCommits": 4,
       "libDomains": [
         "profile",
         "shared"
