@@ -17,7 +17,11 @@ class ProfileSettingsService(
     locales: TaskLocaleProperties,
 ) {
     /** The configured task locales, in configuration order (the 400 detail lists them). */
-    val supportedLocales: List<String> = locales.taskLocales.distinct()
+    val supportedLocales: List<String> =
+        locales.taskLocales.distinct().onEach {
+            // The contract's TaskLocale shape (it also fits the column): a bad configuration fails the startup, not a PATCH.
+            require(LOCALE_SHAPE.matches(it)) { "doucko.profile.task-locales: each entry must be two lowercase letters." }
+        }
 
     private val validator = SettingsValidator(supportedLocales.toSet())
 
@@ -31,5 +35,9 @@ class ProfileSettingsService(
             }
         if (patch.answerMode == Change.To(AnswerMode.GUIDED)) throw GuidedModeNotAvailableException()
         return store.updateSettings(patch::applyTo)
+    }
+
+    private companion object {
+        val LOCALE_SHAPE = Regex("[a-z]{2}")
     }
 }

@@ -55,7 +55,7 @@ Result: PASS, 47 warning(s)
 | FR-40 | yes | yes | backend, frontend | - | - |
 | FR-41 | yes | yes | backend, frontend | - | - |
 | FR-42 | yes | yes | backend | - | - |
-| FR-43 | yes | yes | backend | 50 | - |
+| FR-43 | yes | yes | backend | 52 | - |
 | FR-44 | yes | yes | backend | - | - |
 
 ## Other MVP requirements (NFR / TC / BC)
@@ -64,7 +64,7 @@ Result: PASS, 47 warning(s)
 |---|---|---|
 | NFR-1 | backend | 18 |
 | NFR-2 | backend | 11 |
-| NFR-3 | backend, frontend | 16 |
+| NFR-3 | backend, frontend | 17 |
 | NFR-4 | backend, frontend | 6 |
 | NFR-5 | backend, frontend | - |
 | NFR-6 | frontend | n/a |

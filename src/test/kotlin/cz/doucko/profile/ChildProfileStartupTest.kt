@@ -94,6 +94,26 @@ class ChildProfileStartupTest {
         store.creates shouldBe 0
     }
 
+    // @trace FR-43
+    // @trace NFR-3
+    @Test
+    fun `a placeholder in the name is stored as written, never resolved`() {
+        val store = InMemoryChildProfileStore(existing = false)
+        start(store, "DOUCKO_CHILD_DISPLAY_NAME=Hrd\${other.secret}", "other.secret=SECRET-VALUE").run { context ->
+            context.startupFailure shouldBe null
+        }
+        store.displayName shouldBe "Hrd\${other.secret}"
+    }
+
+    // @trace FR-43
+    @ParameterizedTest
+    @ValueSource(strings = ["UK", "uk-UA", "ukr", "a-very-long-locale-name"])
+    fun `a configured task locale outside the contract shape fails the startup`(locale: String) {
+        start(InMemoryChildProfileStore(), "doucko.profile.task-locales=$locale").run { context ->
+            context.startupFailure.shouldNotBeNull().allText() shouldContain "doucko.profile.task-locales"
+        }
+    }
+
     // @trace NFR-3
     @Test
     fun `a successful first start logs no display name`(output: CapturedOutput) {

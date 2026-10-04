@@ -1,0 +1,899 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-04T15:40:20.426Z",
+  "finishedAt": "2026-10-04T15:44:59.406Z",
+  "args": {
+    "scope": "slice 4 child-profile backend (implement-child-profile-api)",
+    "baseRef": "slice2-admin-access",
+    "headRef": "HEAD",
+    "change": "implement-child-profile-api"
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": null,
+    "budgetPerAgentUsd": 2,
+    "maxTotalUsd": 20,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 4.8872,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 455,
+      "durationMs": 125965,
+      "sessionId": "982cca3f-253e-4d29-b4cc-4d153286b5fd",
+      "costUsd": 0.6197424000000001,
+      "numTurns": 10,
+      "result": {
+        "findings": [
+          {
+            "title": "A non-JSON Content-Type gets an undeclared 415 instead of the contract's 400 (or 413 when oversized)",
+            "file": "src/main/kotlin/cz/doucko/profile/adapter/in/web/SettingsBodyAdvice.kt",
+            "line": 321,
+            "confidence": "medium",
+            "severity": "minor",
+            "evidence": "`SettingsBodyAdvice.beforeBodyRead` only runs after a JSON converter has accepted the request's media type. A PATCH sent as `text/plain` (or with no Content-Type) fails earlier with `HttpMediaTypeNotSupportedException`. The global `SignInFailureAdvice` then turns that into Spring's standard 415. The contract (`contract/api/openapi.yaml:278-285`) declares only 200/400/413/422 for `updateProfileSettings`, and the spec says \"bodies that are not a JSON object SHALL be 400\" and \"a body over 16 KB SHALL be 413\". A 20 KB `text/plain` body gets 415, not 413. No profile test sends a non-JSON content type.",
+            "suggestion": "Either declare 415 in the docs-store contract for `updateProfileSettings`, or handle `HttpMediaTypeNotSupportedException` for this endpoint in `ProfileProblemAdvice` (map it to `profile-settings-unreadable` 400, after the size check). Add a test that sends `text/plain`."
+          },
+          {
+            "title": "A configured task locale longer than 16 characters passes validation, then fails on the DB write as a raw 500",
+            "file": "src/main/resources/db/migration/V1__child_profile.sql",
+            "line": 10,
+            "confidence": "medium",
+            "severity": "minor",
+            "evidence": "The column is `secondary_task_locale varchar(16)`. `TaskLocaleProperties.taskLocales` and `SettingsValidator` put no length limit on configured values: `if (field.value in supportedLocales) Change.To(field.value)`. If an operator configures a longer tag such as `zh-Hant-TW-x-private`, a valid PATCH reaches the flush inside `JpaChildProfileStore.updateSettings`. Postgres rejects the value, and the resulting `DataIntegrityViolationException` has no handler, so the client gets a 500. AGENTS.md says no input may produce a raw 500.",
+            "suggestion": "Validate `doucko.profile.task-locales` at startup: annotate the `@ConfigurationProperties` with `@Validated` and add a size/pattern check on each element of at most 16 characters, or refuse in `ProfileConfiguration`, so a bad configuration fails the start instead of a request."
+          },
+          {
+            "title": "The display name is read through Environment, which resolves `${...}` placeholders in the value",
+            "file": "src/main/kotlin/cz/doucko/profile/application/ChildProfileInitializer.kt",
+            "line": 22,
+            "confidence": "low",
+            "severity": "minor",
+            "evidence": "`environment.getProperty(DisplayNamePolicy.VARIABLE)` resolves nested placeholders. A value containing `${...}` is either silently replaced with the resolved text (a different name is stored) or throws `IllegalArgumentException: Could not resolve placeholder '...' in value \"...\"`. That exception message quotes the raw value, so the startup failure log would contain part of the name. This bypasses the DisplayNamePolicy guarantee that refusals name the variable and never the value (NFR-3).",
+            "suggestion": "Read the raw value without placeholder resolution, e.g. `System.getenv(VARIABLE)` with the test property-source fallback, or iterate `ConfigurableEnvironment.propertySources` and call `getProperty` on the source directly. Add a test with a value containing `${x}`."
+          },
+          {
+            "title": "The control-character rule allows line/paragraph separators and bidi-override characters",
+            "file": "src/main/kotlin/cz/doucko/profile/domain/DisplayNamePolicy.kt",
+            "line": 36,
+            "confidence": "low",
+            "severity": "minor",
+            "evidence": "The check is `Character.getType(it) == Character.CONTROL.toInt()`, which covers category Cc only. U+2028/U+2029 (Zl/Zp) break lines like a newline, and U+202E RIGHT-TO-LEFT OVERRIDE (Cf) reorders displayed text. All three are accepted and stored, and the name will be rendered in the UI. The spec rejects newlines because they are line breaks, so it likely wants these refused too.",
+            "suggestion": "Also refuse `LINE_SEPARATOR`, `PARAGRAPH_SEPARATOR` and `FORMAT` (Cf) code points, or at least the bidi controls U+202A–U+202E and U+2066–U+2069, if the store spec agrees. Add golden cases to `DisplayNamePolicyTest`."
+          },
+          {
+            "title": "The controller ignores the generated body parameter and depends on a hidden request attribute; a missing attribute is a raw 500",
+            "file": "src/main/kotlin/cz/doucko/profile/adapter/in/web/ProfileSettingsController.kt",
+            "line": 272,
+            "confidence": "low",
+            "severity": "minor",
+            "evidence": "`updateProfileSettings` discards `profileSettingsPatch`. It fetches the request through `RequestContextHolder` and calls `SettingsBodyAdvice.input(request)`, which is `checkNotNull(request.getAttribute(INPUT) as? SettingsInput)`. The attribute is set only if `SettingsBodyAdvice.supports` matched. Any path where the advice is skipped throws `IllegalStateException`, which nothing maps, so the client gets a 500. Examples: a converter other than Jackson reading the DTO, or a refactor that changes the parameter type. The coupling is invisible from the controller signature.",
+            "suggestion": "Map a missing input to `UnreadableSettingsException` (400) instead of `checkNotNull`. Prefer an injected `HttpServletRequest` parameter or a small `HandlerMethodArgumentResolver` for `SettingsInput` over the static `RequestContextHolder` lookup."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 483,
+      "durationMs": 76183,
+      "sessionId": "3ffb70ff-6a07-4c14-a327-436e63fbeedb",
+      "costUsd": 0.456151,
+      "numTurns": 14,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 426,
+      "durationMs": 130067,
+      "sessionId": "200b6012-2c1c-4d7a-aed4-29ea8312e359",
+      "costUsd": 0.7466041999999999,
+      "numTurns": 14,
+      "result": {
+        "findings": [
+          {
+            "title": "Coverage summary: 11 change-spec scenarios: 10 implemented, 1 partial, 0 missing, 0 contradicted. The in-scope store-spec scenarios add 2 more partials (UTF-8 bytes, container restart).",
+            "file": "openspec/changes/implement-child-profile-api/specs/child-profile/spec.md",
+            "line": 1,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "Implemented with tests: First start trims the name (ChildProfileStartupTest/IT); Restart keeps the profile and its settings (ChildProfileStartupIT:92); Fifty code points accepted (ChildProfileStartupIT:128); Defaults, set and clear; Omitted and unknown fields; Validation wins over GUIDED; GUIDED discards the whole request; Oversized locale not echoed; Empty configuration (ProfileSettingsTest:83-317); Log capture (ProfileSettingsIT:98, ChildProfileStartupIT). Partial: Invalid names refuse to start, because a placeholder-shaped value leaks (see the separate finding). Store-spec scenarios that need HQ, XP, e2e, the privacy scan or recordings are listed under 'Scope NOT delivered' in docs/current-state.md and the design Non-goals, so they are deferred and not missing.",
+            "suggestion": "No action for this entry. It only records the coverage line the output contract asks for."
+          },
+          {
+            "title": "The display name is read through Spring's placeholder-resolving Environment, so a value containing '${' can be echoed in the startup error or silently replaced",
+            "file": "src/main/kotlin/cz/doucko/profile/application/ChildProfileInitializer.kt",
+            "line": 19,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "Spec: 'the startup SHALL fail ... with a message that names DOUCKO_CHILD_DISPLAY_NAME and the rule and never the value'. Store spec: 'the printed error ... contains neither Hrdinka nor the x run'. Code: `DisplayNamePolicy.check(environment.getProperty(DisplayNamePolicy.VARIABLE))`. `PropertyResolver.getProperty` resolves nested placeholders. With a value like `Ann${x}`, it throws a PlaceholderResolutionException whose message quotes the whole value (`Could not resolve placeholder 'x' in value \"Ann${x}\"`). Spring Boot logs that message as 'Application run failed', which is an NFR-3 leak. With a value like `Ann${HOME}`, a different name is stored without any error. No test covers placeholder syntax.",
+            "suggestion": "Read the raw value without placeholder resolution. Options: `System.getenv(VARIABLE)` behind an injectable supplier, or `(environment as ConfigurableEnvironment).propertySources` with direct lookup in the systemEnvironment source. Add a DisplayNamePolicy or startup test where the variable is `Hrdinka${nope}`: the refusal and the captured output must not contain it, or the value must be stored verbatim."
+          },
+          {
+            "title": "Task 5.4 (compose smoke) is ticked but was skipped and has no artifact",
+            "file": "openspec/changes/implement-child-profile-api/tasks.md",
+            "line": 29,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "tasks.md reads `- [x] 5.4 Smoke through 127.0.0.1:8081 (GET, PATCH uk, PATCH GUIDED 422). SKIPPED 2026-10-04 ...`. No smoke evidence file exists (slice 2 had docs/qa/evidence/slice2-compose-smoke.md; slice 4 has none). The store-spec scenario 'Setting survives a backend restart' (WHEN 'the backend containers restart') is covered only by in-process context restarts in ChildProfileStartupIT, not by a container restart.",
+            "suggestion": "Untick 5.4, or mark it explicitly as a waiver rather than done, until the smoke runs. Then run it on a free stack, including a `docker compose restart backend` followed by GET, and record docs/qa/evidence/slice4-compose-smoke.md."
+          },
+          {
+            "title": "The invalid UTF-8 scenario is tested only with a literal U+FFFD string, never with the byte sequence 0xC3 0x28",
+            "file": "src/test/kotlin/cz/doucko/profile/DisplayNamePolicyTest.kt",
+            "line": 52,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "Store spec scenario 'Name that is not valid UTF-8 is refused': 'GIVEN ... the display-name variable containing the byte sequence 0xC3 0x28 (invalid UTF-8) ... THEN it exits with a non-zero status'. The implementation relies on the JVM decoding the environment bytes to U+FFFD (DisplayNamePolicy.kt:33, comment line 49). The tests inject a Kotlin string that already contains U+FFFD, so the actual env-decoding path (sun.jnu.encoding in the container) is never exercised.",
+            "suggestion": "Add a test that launches the JVM (ProcessBuilder or a Testcontainers backend image) with raw env bytes C3 28, and assert a non-zero exit, the variable name in the output, and no row. If that is impractical, document the assumption (UTF-8 jnu encoding in eclipse-temurin) in design.md and record it as a waiver."
+          },
+          {
+            "title": "Configured task locales are not validated against the contract shape or the column width",
+            "file": "src/main/kotlin/cz/doucko/profile/application/TaskLocaleProperties.kt",
+            "line": 10,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "openapi.yaml ProfileSettings/ProfileSettingsPatch: `secondaryTaskLocale: pattern: ^[a-z]{2}$`. Code: `data class TaskLocaleProperties(val taskLocales: List<String> = emptyList())` has no validation, and V1__child_profile.sql has `secondary_task_locale varchar(16)`. A configured value such as `uk-UA` would be accepted and returned in a 200 that violates the contract pattern. A value over 16 characters would cause a DB error on PATCH, which is a raw 500.",
+            "suggestion": "Validate `doucko.profile.task-locales` at startup (each entry matches ^[a-z]{2}$, otherwise refuse to start), with a unit test. Alternatively, amend the contract description."
+          },
+          {
+            "title": "The unknown answer-mode message tells the child to use GUIDED, which is always refused",
+            "file": "src/main/resources/messages.properties",
+            "line": 35,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "Store spec: '`answerMode`: ... in MVP only `DIRECT` is accepted'; 'GUIDED SHALL be refused as not available yet (422)'. Code: `profile.field.UNKNOWN_VALUE=Use DIRECT or GUIDED.` The 400 `errors[].message` for `SOCRATIC`/`direct` steers the client to a value that is then answered 422.",
+            "suggestion": "Change the message to 'Use DIRECT.' (or 'DIRECT; GUIDED is not available yet'), and assert the text in ProfileSettingsTest."
+          },
+          {
+            "title": "The schema and the persistence enum allow GUIDED to be stored, while the spec says no other value can be stored",
+            "file": "src/main/resources/db/migration/V1__child_profile.sql",
+            "line": 11,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "Store spec exclusions: '`answerMode` ... while it is `DIRECT`, and no other value can be stored.' The migration has `CHECK (answer_mode IN ('DIRECT', 'GUIDED'))`. Only ProfileSettingsService.kt:316 enforces DIRECT-only; there is no persistence-level guard. This is a deliberate forward-compatibility choice, but it is not recorded as a requirement or design decision in the change spec.",
+            "suggestion": "Record the choice in design.md (the schema is ready for later phases; the service is the single enforcement point). Alternatively, restrict the CHECK to 'DIRECT' and widen it in a later append-only migration."
+          },
+          {
+            "title": "An undocumented hardening change in the shared log guard (org.hibernate.validator capped) has no requirement in the change spec",
+            "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+            "line": 58,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "The diff adds `\"org.hibernate.validator\"` to the capped loggers in the shared module. The change spec and proposal mention only extending the NFR-3 log-capture test, not changing shared logging policy. The RED-run evidence (slice4-red-run.md) shows this fixed a real TRACE-level leak, so the change is justified.",
+            "suggestion": "Add a line to proposal.md 'What Changes' or design.md that names the shared log-guard change under NFR-3, so the platform-foundation logging policy stays traceable."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 695,
+      "durationMs": 22594,
+      "sessionId": "1af64651-dbcc-49d5-af05-dd7777a0e285",
+      "costUsd": 0.055436,
+      "numTurns": 3,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/adapter/in/web/SettingsBodyAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1561,
+      "durationMs": 42858,
+      "sessionId": "6ea91699-91fb-451b-93f9-825dfef09533",
+      "costUsd": 0.2424152,
+      "numTurns": 11,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed, with corrections to the details. SettingsBodyAdvice.kt has only 113 lines, so line 321 is wrong. The behaviour is still real. The generated `ChildProfileApi.kt:52` declares `consumes = [\"application/json\"]` on the mapping. So a PATCH sent as `text/plain`, or with no Content-Type, fails at handler mapping: RequestMappingInfoHandlerMapping throws HttpMediaTypeNotSupportedException before the controller is chosen or the body is read. The 16 KB check in SettingsBodyAdvice.beforeBodyRead (lines 50-52) and the not-a-JSON-object check never run. The global SignInFailureAdvice (`@Order(HIGHEST_PRECEDENCE)`, catching HttpMediaTypeNotSupportedException) only special-cases `POST /api/admin/session`. For every other path it hands the exception to the standard ResponseEntityExceptionHandler, which returns 415. The contract for updateProfileSettings (`contract/api/openapi.yaml:272-285`) lists only 200/400/422/413. The store spec (`child-profile/spec.md:247-258`) says invalid PATCHes use the status codes from openapi.yaml. So a 415 is undeclared, and a 20 KB text/plain body gets 415 instead of 413. No src test mentions 415 or text/plain. Severity minor is right: it is still an RFC 7807 problem, not a 500, so nothing leaks. The suggested fix needs a correction. Because the 415 is raised during handler mapping, there is no handler yet. `ProfileProblemAdvice(assignableTypes = [ProfileSettingsController])` would never see it. The fix has to go in the global advice, switched on the path (like SignInFailureAdvice), or the contract has to declare 415.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/adapter/in/web/SettingsBodyAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1594,
+      "durationMs": 29947,
+      "sessionId": "8a8ea8e2-cfa4-4658-8d05-cbbddc12f064",
+      "costUsd": 0.1359242,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this. The mechanism holds, though the cited line is wrong: SettingsBodyAdvice.kt has only 114 lines, and the size and JSON checks are at lines 50–52 and 69–80.\n\nHow it happens:\n- `SettingsBodyAdvice` is a `RequestBodyAdviceAdapter`. Spring only calls `beforeBodyRead`/`handleEmptyBody` after a message converter has accepted the request's media type for `ProfileSettingsPatch`.\n- A PATCH sent as `text/plain`, or with no Content-Type (Spring treats that as `application/octet-stream`), fails earlier with `HttpMediaTypeNotSupportedException`. That happens whether it is raised at handler mapping (if the generated interface declares `consumes = application/json`) or at converter selection.\n- Nothing in profile handles that exception. Searching src/main finds it only in `SignInFailureAdvice` (admin), which is global and `HIGHEST_PRECEDENCE`. For any request that is not POST /api/admin/session, it falls through to `ResponseEntityExceptionHandler.handleException`, which returns the standard 415.\n- No global body-size filter exists. 413 is produced only by `SettingsBodyAdvice` via `ProfileProblemAdvice`. So a 20 KB `text/plain` body gets 415, not 413.\n- Contract openapi.yaml:266–285 declares only 200/400/422/413 for `updateProfileSettings`, so 415 is undeclared.\n\nAnyone can reproduce this with curl. Impact is low, though: the response is still a clean RFC 7807 problem, not a raw 500. Nothing leaks, and the real frontend always sends JSON. It is a contract/spec mismatch, so \"minor\" is right.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V1__child_profile.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1484,
+      "durationMs": 27379,
+      "sessionId": "a56b2421-4653-4acd-9b56-49966201b3b4",
+      "costUsd": 0.1313766,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism holds. `TaskLocaleProperties` (`application/TaskLocaleProperties.kt:9-12`) is a plain `@ConfigurationProperties` class. It has no `@Validated` and no constraint on its elements. `ProfileSettingsService` (`ProfileSettingsService.kt:20-22`) uses the configured list as-is for `SettingsValidator`. The validator (`domain/SettingsPatch.kt:97`) accepts any submitted value that exactly matches a configured locale and does no length or format check. The column is `secondary_task_locale varchar(16)` (`V1__child_profile.sql:10`). Postgres raises a \"value too long\" error for a longer string, which reaches the app as a `DataIntegrityViolationException`. None of the advice classes handle it: `ProfileProblemAdvice` handles only `InvalidSettings`, `UnreadableSettings`, `GuidedModeNotAvailable` and `SettingsBodyTooLarge`, and `SignInFailureAdvice` covers admin sign-in only. So a PATCH carrying a configured locale longer than 16 characters ends in a raw 500. Mitigating factors: only operator misconfiguration can trigger it, not ordinary user input, and the shipped config is `task-locales: uk`. It is a latent issue, so minor severity fits.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V1__child_profile.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1517,
+      "durationMs": 24966,
+      "sessionId": "52cb6ef4-6928-4490-b562-58805d4e8b5d",
+      "costUsd": 0.105955,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The mechanism is real but no user or attacker can trigger it. These parts check out: `V1__child_profile.sql:10` declares `secondary_task_locale varchar(16)`. `TaskLocaleProperties` is an unvalidated `List<String>`. `ProfileSettingsService` only uses `locales.taskLocales.distinct()` as the allow-list. `ProfileProblemAdvice` has no `DataIntegrityViolationException` handler, and no other advice does either.\n\nBut a client can only send a value that is already in the operator-configured allow-list. Any other value is rejected first by `SettingsValidator`. The only configured value is `task-locales: uk` in `application.yaml:67`, which is 2 characters. So with the shipped configuration, no request can reach the overflow.\n\nTriggering it would take an operator deliberately setting a locale tag of 17 or more characters. Real BCP-47 task locales like `uk`, `en-GB` or `zh-Hant-TW` all fit. That is a deployment misconfiguration, not \"user input producing a raw 500\" as AGENTS.md defines it. Seen as exploitable or reproducible by a real user or attacker, the finding does not hold.\n\nChecking the configuration at startup would still be reasonable hardening. If kept at all, it should be a nit about configuration robustness, not a correctness defect."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/application/ChildProfileInitializer.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1435,
+      "durationMs": 23014,
+      "sessionId": "2a9d3aa4-c523-4d46-87e4-30f92c2e2e19",
+      "costUsd": 0.0884868,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this finding. At `ChildProfileInitializer.kt:19` the code calls `environment.getProperty(DisplayNamePolicy.VARIABLE)` on a Spring `Environment`. That call goes through `PropertySourcesPropertyResolver.getProperty(key, String.class, resolveNestedPlaceholders = true)`, so Spring resolves placeholders inside the value before `DisplayNamePolicy.check` ever sees it.\n\nThere are two ways this goes wrong:\n- **Resolvable placeholder:** a value like `${HOME}` is silently replaced by the resolved text, and that different name is stored.\n- **Unresolvable placeholder:** `ignoreUnresolvableNestedPlaceholders` is false by default, so `resolveRequiredPlaceholders` throws `IllegalArgumentException` (`PlaceholderResolutionException` in Spring 6.2+). Its message is `Could not resolve placeholder 'x' in value \"<raw value>\"`. Spring Boot logs this when startup fails, so part of the name ends up in the log, which goes against NFR-3.\n\nNothing guards against this. `DisplayNamePolicy` only checks for a missing value, length, control characters and UTF-8, and it runs after resolution has already happened.\n\nThe trigger is unlikely: a child's display name containing `${` is rare and set by the operator. So confidence low and severity minor are reasonable, but the mechanism is real.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/application/ChildProfileInitializer.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1468,
+      "durationMs": 27450,
+      "sessionId": "6495938c-0b1a-4610-9cda-62fceb10a757",
+      "costUsd": 0.1007164,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The mechanism is real. `ChildProfileInitializer.kt:19` calls `environment.getProperty(DisplayNamePolicy.VARIABLE)`. In Spring's `AbstractEnvironment`, this goes through `PropertySourcesPropertyResolver.getProperty(key, String, resolveNestedPlaceholders=true)`, so `${...}` inside the value gets resolved. Spring Boot does not turn on `ignoreUnresolvableNestedPlaceholders` by default. So a value like `${x}` either resolves silently to other text or throws `PlaceholderResolutionException`/IAE, and that exception message quotes the raw value (\"Could not resolve placeholder 'x' in value \\\"...\\\"\"). Nothing in the code reads the raw value first: `DisplayNamePolicy.check` only sees the already-resolved string, and none of its violations (MISSING/TOO_LONG/CONTROL_CHARACTER/NOT_UTF8) applies before resolution. So I can't refute it on the mechanism.\n\nThe real-world risk is close to zero, though:\n(1) The value comes only from the operator's own env/.env (`DOUCKO_CHILD_DISPLAY_NAME`) and is read once, on first start. No HTTP request or child input reaches this path, so there is no attacker.\n(2) To trigger it, a parent would have to deliberately type `${` into their child's display name. That is not a realistic name.\n(3) If docker compose supplies the env, compose already interpolates `${...}` in .env/env_file values before Spring sees them, which hides the case further.\n(4) The worst outcome is a fragment of the name in the operator's own startup log on their own machine. Nothing crosses a trust boundary.\n\nThe fix is cheap and reasonable as a hardening step: read through `System.getenv` or the raw property source. Keep it as a minor/nit hardening item, not a correctness or privacy defect."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/domain/DisplayNamePolicy.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1256,
+      "durationMs": 19038,
+      "sessionId": "aa11ca90-5f6f-44ac-909c-8eb30e547b01",
+      "costUsd": 0.09807579999999999,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding is right about what the code does: line 34 (the finding says 36) only checks Character.CONTROL, which is category Cc, so U+2028, U+2029 and U+202E get through. That is still not a correctness defect. The behaviour was chosen on purpose and is written down. design.md decision 6 says \"no control characters (category Cc) and no U+FFFD\", and the KDoc on the policy says \"no control character (category Cc)\". The store spec says \"no control character\" and its scenario lists only newline, tab and U+FFFD, all of which the code refuses. Zl and Zp are not control characters in Unicode terms. Cf is \"format\", not \"control\". So the code does what the spec and design say. The rest of the finding is a guess (\"the spec … likely wants these refused\"), not a demonstrated bug.\n\nThe input also limits the impact. The name comes only from the DOUCKO_CHILD_DISPLAY_NAME environment variable, which the operator sets in .env. It is read once, on the first start, from an empty database. No request can set it, so there is no attacker-controlled path for bidi spoofing. Rendering is the frontend's job, and React escapes text, so a U+2028 in a text node does not break any markup. At most this is a suggestion to tighten the spec in the docs store first. It is not a mechanism that is wrong in this code.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/domain/DisplayNamePolicy.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1289,
+      "durationMs": 14609,
+      "sessionId": "70212007-2272-4153-b2e6-9fa95a787c04",
+      "costUsd": 0.087119,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The mechanism is real: `Character.getType(...) == CONTROL` (`DisplayNamePolicy.kt:34`) only matches category Cc, so U+2028, U+2029 and U+202E would get through. But from an exploitability point of view, nobody can trigger this as an attacker.\n\n1. **Only the operator sets the input.** The value comes from the `DOUCKO_CHILD_DISPLAY_NAME` environment variable, which the person running the deployment puts in `.env` before the first start. The messages say so. No child or other untrusted user can submit it. The only person who could put a bidi override or line separator into the name is the trusted admin/parent who also controls the whole server, so this is not a security boundary.\n2. **The code matches the spec.** `design.md:67` says \"no control characters (category Cc) and no U+FFFD\", and the KDoc repeats it. The spec scenario (`spec.md:33`) lists only newline, tab and U+FFFD as refused. Refusing Zl/Zp/Cf would go beyond the spec. Even the finding says the spec only \"likely wants\" it, and the confidence is low.\n3. **The worst case is cosmetic and self-inflicted.** The operator's own child's name would show reversed or across two lines in their own UI. Blocking all Cf code points could also wrongly refuse legitimate names that use ZWJ/ZWNJ (also Cf).\n\nThis is at most a possible spec improvement, not a defect a real user or attacker can exploit.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/adapter/in/web/ProfileSettingsController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1534,
+      "durationMs": 21774,
+      "sessionId": "4d48e263-02f8-43c3-b8b6-5e04701d363c",
+      "costUsd": 0.1156256,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "I couldn't find any request that reaches the handler without the attribute set, so the claimed 500 doesn't happen in the current code.\n\n- **The advice runs for every converter.** `SettingsBodyAdvice.supports` (SettingsBodyAdvice.kt:42) checks only `methodParameter.parameterType == ProfileSettingsPatch::class.java`. It ignores `converterType`. So the finding's first example, \"a converter other than Jackson reading the DTO\", doesn't skip the advice. Spring's `AbstractMessageConverterMethodArgumentResolver` calls `beforeBodyRead` for whichever converter `canRead` the body.\n- **Every outcome of `beforeBodyRead` is safe.** It either stores the parsed `SettingsInput` or throws one of its own mapped exceptions: `SettingsBodyTooLargeException` (413) or `UnreadableSettingsException` (400).\n- **Empty bodies are covered.** An empty body either fails to parse (null tree → `UnreadableSettingsException`) or goes to `handleEmptyBody`, which throws the same exception.\n- **No converter means no handler call.** If no converter can read the content type, Spring throws `HttpMediaTypeNotSupportedException` (415) before the handler is invoked.\n\nSo whenever `updateProfileSettings` actually runs, the attribute is present. `checkNotNull` is an invariant assertion, not a reachable error path.\n\nThe finding's second example, \"a refactor that changes the parameter type\", is a maintainability concern about something that might break later. It isn't a correctness defect in this code. The class KDoc and the controller comment both document the coupling. The suggestion to inject `HttpServletRequest` or use an argument resolver is a style point, not a fix for a live bug.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/adapter/in/web/ProfileSettingsController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1567,
+      "durationMs": 18096,
+      "sessionId": "a395967f-0767-495c-be67-059c25da1d7a",
+      "costUsd": 0.09914200000000001,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "I could not find a way for a real client to make the handler run without the attribute set. In Spring MVC, the `@RequestBody` resolver (`AbstractMessageConverterMethodArgumentResolver`) applies the `RequestBodyAdvice` chain to every converter that can read the target type. `SettingsBodyAdvice.supports` checks only that the parameter type is `ProfileSettingsPatch`, so the converter in use does not matter.\n\nThat leaves three request shapes, and each one is covered:\n- **Non-empty body:** `beforeBodyRead` always runs. It either sets INPUT or throws `SettingsBodyTooLargeException` (413) or `UnreadableSettingsException` (400).\n- **Empty body:** `handleEmptyBody` throws `UnreadableSettingsException`.\n- **Content type no converter can read:** Spring throws `HttpMediaTypeNotSupportedException` (415) before the handler is called.\n\nSo the handler only runs after INPUT has been set, and the `checkNotNull` failure cannot happen at runtime. The finding's own examples (a refactor that changes the parameter type, or a different setup) are hypothetical future code changes, not anything a user or attacker can trigger. What remains is a maintainability point about hidden coupling, not a reachable 500.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-child-profile-api/specs/child-profile/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1634,
+      "durationMs": 18800,
+      "sessionId": "1e0dca60-69dd-4482-8020-eb7c54393a7a",
+      "costUsd": 0.083564,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "This entry is a coverage summary. It doesn't claim any wrong mechanism, so there is nothing for a correctness check to refute. Its factual parts hold up against the code:\n- The change spec has exactly 11 scenarios (spec.md lines 11, 17, 30, 36, 49, 55, 71, 76, 82, 92, 103).\n- The cited tests exist: ChildProfileStartupIT has the restart test at line 92 and the 50-code-point test at line 128. ChildProfileStartupTest, ProfileSettingsTest and ProfileSettingsIT are also present.\n- The one \"partial\" (Invalid names refuse to start) has a matching test at ChildProfileStartupIT:112, which checks that a refused name fails startup and that the value is never logged. Whether that scenario is really partial depends on the separate placeholder-leak finding, so this entry adds no defect of its own.\nThe entry suggests no action and is purely informational. That fits the lowest severity level (\"info\"), not \"minor\", so I'm downgrading it.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-child-profile-api/specs/child-profile/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1667,
+      "durationMs": 16164,
+      "sessionId": "dd2cd53e-d476-4fc4-9a4c-bb14f70a83e3",
+      "costUsd": 0.0702874,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "I'm marking this refuted because it isn't a defect, so it can't be exploited or reproduced. The entry is a coverage tally that the review output contract asks for. Its own suggestion is \"No action for this entry.\"\n\nThe tally itself checks out:\n- The change spec has exactly 11 `#### Scenario` headings.\n- All four test files it cites exist under `src/test/kotlin/cz/doucko/profile/` (`ChildProfileStartupIT`, `ChildProfileStartupTest`, `ProfileSettingsIT`, `ProfileSettingsTest`).\n\nThe only concrete problem it mentions is the \"partial\" scenario, where a placeholder-shaped value leaks. That belongs to a separate finding and should be judged there, not counted again through this summary. The same applies to the two store-spec partials (UTF-8 bytes and container restart): nothing here shows a way for a user or attacker to trigger them.\n\nBecause there's no mechanism to confirm, this shouldn't stand as a minor-severity finding. At most it's an informational note.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/application/ChildProfileInitializer.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1861,
+      "durationMs": 22051,
+      "sessionId": "98c7afdd-655a-440a-9f3b-9d0f7d0dc8cd",
+      "costUsd": 0.0956686,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I couldn't refute this; the mechanism holds. At `ChildProfileInitializer.kt:19` the code calls `environment.getProperty(\"DOUCKO_CHILD_DISPLAY_NAME\")` on the Spring `Environment`. In Spring Boot that call goes through `ConfigurationPropertySourcesPropertyResolver` (or `PropertySourcesPropertyResolver`) via `getProperty(key, String, resolveNestedPlaceholders=true)`, so `${...}` inside the env-var value gets resolved.\n\nNothing in `src` sets `ignoreUnresolvableNestedPlaceholders`, so the default (false) applies:\n- **Unresolvable placeholder:** a value like `Hrdinka${nope}` throws `PlaceholderResolutionException`, whose message quotes the whole value. That exception is thrown during the bean's `afterPropertiesSet`, gets wrapped in `BeanCreationException`, and Spring Boot logs it as \"Application run failed\". The raw name lands in the startup output, which breaks the spec rule that the error must never contain the value (NFR-3).\n- **Resolvable placeholder:** a value like `Ann${HOME}` is expanded silently before `DisplayNamePolicy.check` sees it, so a different name is stored.\n\nPlaceholder resolution happens before the policy check, so the policy can't guard against it, and no test covers `${` in the value.\n\nI'm keeping the severity as major. The trigger is unusual (a `${` in a child's display name), but the leak path is real and breaks a stated spec scenario and a PII rule.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/application/ChildProfileInitializer.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1894,
+      "durationMs": 23998,
+      "sessionId": "3d95c424-06b6-41ff-99d1-f312a70dbcf8",
+      "costUsd": 0.120087,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism in the code. ChildProfileInitializer.kt:19 reads the name with `environment.getProperty(DisplayNamePolicy.VARIABLE)`. Spring's `AbstractEnvironment.getProperty` delegates to a property resolver that resolves nested placeholders by default. `ignoreUnresolvableNestedPlaceholders` defaults to false, so `resolveRequiredPlaceholders` runs. That has two effects:\n(a) If the value contains an unresolvable `${x}`, `getProperty` throws a PlaceholderResolutionException whose message quotes the whole raw value (for example `Could not resolve placeholder 'x' in value \"Ann${x}\"`). This happens before DisplayNamePolicy.check runs, so the policy's careful never-print-the-value messages are bypassed, and Spring Boot logs the exception as 'Application run failed'.\n(b) If the value contains a resolvable `${HOME}` or similar, the name is silently substituted. DisplayNamePolicy only checks blankness, U+FFFD, control characters and length, so a value like `Ann${USER}` would be accepted and stored with the substitution.\nNothing guards against this elsewhere. No test uses `$` or `{` in the name, and DisplayNamePolicy cannot intervene because resolution happens first. So the spec breach is real (\"never the value\", \"contains neither Hrdinka nor the x run\").\n\nExploitability is low, though. The only person who can set DOUCKO_CHILD_DISPLAY_NAME is the operator or parent configuring .env. A child's display name containing `${` is very unlikely in practice. The leaked value goes only to the operator's own startup console, which the operator already has. No remote attacker can influence the value or trigger the path. The issue is real and reproducible, but it is a correctness and spec-compliance defect with negligible real-world impact, not a major security issue. I recommend downgrading the severity.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-child-profile-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1287,
+      "durationMs": 21072,
+      "sessionId": "8f43f7aa-592b-4b1c-b31d-e5746e4cc356",
+      "costUsd": 0.10932739999999999,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed, with one wrong detail: the task is at tasks.md:32, not line 29 (line 29 is 5.1). Task 5.4 is ticked `[x]` even though its own text says \"SKIPPED 2026-10-04\" because the shared `doucko` Compose stack was already running. docs/qa/evidence/ has slice1/slice2 compose-smoke files and slice4-red-run.md, but no slice4 smoke evidence. The store spec (contract/openspec/specs/child-profile/spec.md:231-234) says \"WHEN the backend containers restart\". design.md:27-30 admits the restart is proven in-process, \"not by restarting Compose containers (the compose smoke covers the containers when it can run)\". So container-level coverage was handed to exactly the smoke that was skipped. That leaves the container-restart half of the scenario unproven. A ticked checkbox over a skipped step is what AGENTS.md's \"SKIP never counted as PASS\" and \"done-claims need evidence\" lessons forbid. Points in mitigation: the skip is disclosed openly in the task text, and the reason (avoiding clobbering the main checkout's stack and data volume) is sound. Persistence is also covered substantially by Postgres-backed ITs. That makes this a process and traceability issue more than a hidden defect. It is still a real violation of the repo's own rules. Severity kept, with the line number corrected.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-child-profile-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1320,
+      "durationMs": 17012,
+      "sessionId": "ddb04a65-74b0-4dd1-87f3-698ee0bfad68",
+      "costUsd": 0.0835932,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The facts check out, but the cited line is wrong. Task 5.4 is on tasks.md line 32, not line 29. It is ticked `[x]` while its own text says \"SKIPPED 2026-10-04 … Run the smoke when the stack is free.\" docs/qa/evidence/ has slice1 and slice2 compose-smoke files but no slice4 one. So a skipped step is marked as done, and OpenSpec task-completion tooling or the archive step (5.6) will count it as complete. That is the done-claims-need-evidence problem the repo's rules warn about.\n\nSeen through exploitability, nothing here is a runtime defect: no user or attacker can trigger anything. It is a bookkeeping and process problem only. The skip is also disclosed inline with a reason (the shared `doucko` Compose project and port 8081 would replace the stack already running from the main checkout) and names the substitute coverage (ProfileSettingsIT and ChildProfileStartupIT against Postgres 16). Nothing is hidden. The fix is to change the checkbox to an explicit waiver or untick it, or to run the smoke. The point about a container restart versus an in-process restart is a fair coverage gap but a minor one. I confirm the finding but rate it minor, not major."
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/profile/DisplayNamePolicyTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1465,
+      "durationMs": 29333,
+      "sessionId": "5298ad39-0de2-4337-9418-7ace0c2817c4",
+      "costUsd": 0.148405,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "I'm refuting this finding. Its main factual claim is wrong, and the mechanism it questions does work.\n\n1. **The test does use the real bytes.** The finding says the test injects a string that already contains U+FFFD. It doesn't. `DisplayNamePolicyTest.kt:54` builds the value from the bytes 'H', 0xC3, 0x28 with `String(byteArrayOf(...), Charsets.UTF_8)`, which is the exact sequence from the spec scenario. So the step where invalid UTF-8 bytes turn into U+FFFD is exercised. Only the platform's own decoding of the environment variable is not.\n\n2. **The production check is correct.** `ChildProfileInitializer` reads the variable through `Environment.getProperty`, which in the end comes from `System.getenv`. On Linux, JDK 21 decodes environment bytes with `sun.jnu.encoding`, which follows the locale:\n   - **UTF-8 locale** (eclipse-temurin images set `LANG=en_US.UTF-8`): 0xC3 0x28 is malformed and becomes U+FFFD, then '('.\n   - **C/POSIX locale** (ANSI_X3.4-1968 / ASCII): every byte above 0x7F becomes U+FFFD.\n\n   Either way, `DisplayNamePolicy.check` finds U+FFFD and refuses with `NOT_UTF8`. The initializer then throws, so the context fails, startup stops and no row is created.\n\n   The startup failure path itself is covered: `docs/qa/automated-verification-latest.md:521` shows `childProfileInitializer` failing with \"DOUCKO_CHILD_DISPLAY_NAME is not valid UTF-8 text.\"\n\n3. **The assumption is already written down.** `design.md:67-69` says the JVM decodes invalid UTF-8 in the environment to U+FFFD and that this is how the 0xC3 0x28 scenario is covered.\n\nWhat's left is a test-fidelity nit: no test launches a process with raw environment bytes. That is not a correctness defect, and with the evidence misstated, \"major\" severity isn't justified.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/profile/DisplayNamePolicyTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1498,
+      "durationMs": 27696,
+      "sessionId": "ed553279-c944-42a2-874a-3178f359b3ae",
+      "costUsd": 0.13004700000000002,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The finding's main claim is wrong. DisplayNamePolicyTest.kt:52-56 does not use a literal U+FFFD string. It builds the input from the raw bytes `byteArrayOf('H', 0xC3, 0x28)` and decodes them with Charsets.UTF_8, so the 0xC3 0x28 sequence the spec names is what gets tested. DisplayNamePolicy.kt:33 then refuses it as NOT_UTF8 because the decoded string contains U+FFFD.\n\nWhat is left is a narrower point: no test starts a JVM with a raw environment variable and checks how the operating system's text encoding decodes it (`sun.jnu.encoding`). This does not show the scenario can actually fail:\n- In the eclipse-temurin images the UTF-8 locale is set, so a malformed byte sequence decodes to U+FFFD and the startup is refused.\n- Even under a POSIX/ASCII locale, the JDK decoder turns non-ASCII bytes into U+FFFD, so the input is still refused.\n- The only setting that would accept it as text (\"Ã(\") is a Latin-1 locale, which this deployment doesn't use.\n\nThe assumption is also already written down: design.md:67-69 states that the JVM decodes invalid UTF-8 in the environment to U+FFFD, and that this rule covers the 0xC3 0x28 scenario. That is exactly what the suggestion asked for as the fallback.\n\nFinally, there is no attacker here. The variable is set by the operator in .env, so the worst case is a misconfigured display name, not a security or data-integrity problem. The finding is refuted as stated. At most, an end-to-end test of how the environment is decoded is a minor nice-to-have."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/application/TaskLocaleProperties.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1302,
+      "durationMs": 36035,
+      "sessionId": "066e27b2-ff12-42cd-84c0-34ba876f7044",
+      "costUsd": 0.23329139999999998,
+      "numTurns": 14,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. The submitted value never reaches the generated @Pattern check. SettingsBodyAdvice.beforeBodyRead (SettingsBodyAdvice.kt:53-58) parses the raw body itself and then gives Jackson the literal `{}`. That means the generated ProfileSettingsPatch, which has `@get:Pattern(regexp=\"^[a-z]{2}$\")` and is bound with @Valid, always validates a null secondaryTaskLocale. The only check on the real value is SettingsValidator (SettingsPatch.kt:97): `field.value in supportedLocales`. supportedLocales comes from TaskLocaleProperties, which is unvalidated (`List<String>`, with no @Validated or constraints). So:\n\n1. If the config contains `uk-UA`, PATCH accepts it, stores it, and returns it in a 200 response (ProfileSettingsController.toApi). That response breaks the contract's `^[a-z]{2}$` pattern.\n2. If the config contains an entry longer than 16 characters, the column limit `secondary_task_locale varchar(16)` (V1__child_profile.sql:10) causes a DB error on write. I found no DataIntegrityViolation, DataAccessException or catch-all handler under src/main, so the client would get a raw 500.\n\nThis breaks the repo's own rule that no user input may produce a raw 500.\n\nBoth cases need an operator misconfiguration first; the shipped application.yaml sets only `uk`. That makes this a latent robustness/spec-compliance gap, not an active bug, so minor is the right severity. A fail-fast startup check on `doucko.profile.task-locales` is the appropriate fix.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/application/TaskLocaleProperties.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1335,
+      "durationMs": 20834,
+      "sessionId": "3bb8a95f-8aab-41b9-8542-0266e17aec3a",
+      "costUsd": 0.1335098,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code mechanism is real, but no real user or attacker can trigger it. `TaskLocaleProperties` (`TaskLocaleProperties.kt:10`) has no validation. `SettingsValidator.validate` (`SettingsPatch.kt:97`) only checks that the submitted value is in `supportedLocales` and never checks it against `^[a-z]{2}$`.\n\nRequest input can't reach either failure. Any value outside the configured list is refused with a 400. `ProfileSettingsTest` and `ChildProfileStartupIT` cover `ru`, empty, wrong-type and oversized values. A client can only store a value that is already on the allowlist.\n\nSo both bad outcomes depend on the operator first setting `doucko.profile.task-locales` to something unusual: a 200 response that breaks the contract pattern (for example `uk-UA`), or a raw 500 from a value longer than 16 characters overflowing `varchar(16)`. The shipped `application.yaml:67` sets only `uk`, which fits both the pattern and the column. This is single-family, self-hosted software. The only person who can set this property is the operator, through deployment config. That is the same trust level as setting a bad datasource URL, so it isn't exploitable.\n\nAt most this is a hardening suggestion (fail-fast config validation). It isn't a correctness defect that a user can hit. Under the reproducibility lens the claimed problem does not occur in the delivered configuration.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/messages.properties",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1046,
+      "durationMs": 17873,
+      "sessionId": "0fc2aee0-432a-4a59-974b-d55313771f9b",
+      "costUsd": 0.09932120000000001,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism holds, with one small correction. In messages.properties, line 36 (the finding says 35) reads `profile.field.UNKNOWN_VALUE=Use DIRECT or GUIDED.`. Validation produces this message for any answerMode outside the AnswerMode enum (SettingsPatch.kt:116), so `SOCRATIC` and `direct` both get it. GUIDED itself passes validation by design (SettingsPatch.kt:79). ProfileSettingsService.kt:32 then always refuses it with 422 guided-not-available, which ProfileSettingsTest:143 and ProfileSettingsIT:74 both confirm. So a client that does what the 400 message says gets a guaranteed 422. That contradicts the spec, which says only DIRECT is accepted in MVP. Nothing else catches this: no other code path rewrites the message, and no test checks its text.\n\nTwo points weaken the finding without refuting it. First, line 3 of the file says API-level copy is English and the child UI shows Czech text from the frontend catalog, so \"tells the child\" overstates who sees it. The real audience is API clients and developers. Second, the message does correctly list the contract's enum values, and GUIDED is a legal schema value that is refused only for availability. Even so, as guidance it points to a value that is always rejected. This is a real spec/UX mismatch of minor severity, and the cheap fix is still to say \"Use DIRECT.\" (optionally adding that GUIDED is not available yet).",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/messages.properties",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1079,
+      "durationMs": 15768,
+      "sessionId": "15699896-356f-451b-98b8-e49a1c6f6854",
+      "costUsd": 0.087568,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the problem in the code, and anyone can trigger it with an ordinary request. `messages.properties:36` sets `profile.field.UNKNOWN_VALUE=Use DIRECT or GUIDED.` Only `SettingsPatch.kt:116` raises `UNKNOWN_VALUE`, when `answerMode` doesn't match the enum. `ProfileProblemAdvice.kt:42` puts that text into the 400 response as `errors[].message`. So a PATCH with `answerMode:\"SOCRATIC\"` gets a 400 that says to use DIRECT or GUIDED. If the client then sends GUIDED, `ProfileSettingsService.kt:32` throws `GuidedModeNotAvailableException`, which returns 422. Tests at `ProfileSettingsTest.kt:143` and `ProfileSettingsIT.kt:74` confirm the 422. The message therefore points the client to a value the API always refuses in MVP, which goes against the spec ('in MVP only DIRECT is accepted'). No other locale bundle or code path rewrites the message. The impact is limited to misleading text in a response, so minor is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V1__child_profile.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1275,
+      "durationMs": 17167,
+      "sessionId": "24603108-4b00-4c2e-8bb9-6cc469c159a4",
+      "costUsd": 0.0999536,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "From a correctness standpoint, the claimed mechanism doesn't hold up. (1) No code path can store GUIDED. The only writer is ProfileSettingsService, and at line 32 (not 316 as the finding cites; the file is short) it throws GuidedModeNotAvailableException before anything is written. Tests cover this: ProfileSettingsTest:143/151/159 and ProfileSettingsIT:74, which asserts 422 and that the row is unchanged. Row creation on first start uses the column's DEFAULT 'DIRECT'. So the spec's behavioural promise that no other value can be stored holds for every reachable input. (2) The finding's main point, that the schema choice \"is not recorded as a requirement or design decision in the change\", is factually wrong. openspec/changes/implement-child-profile-api/design.md:96 explicitly documents the `answer_mode` column rule as \"`DIRECT` or `GUIDED`\". Line 108 and lines 56–57 record that the service is the enforcement point (422 after validation, nothing written). The suggested fix (record it in design.md) is already done. The other option, narrowing the CHECK, is a defence-in-depth preference, not a correctness defect. A broader CHECK that only an out-of-band SQL writer could exploit is not reachable through user input.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V1__child_profile.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1308,
+      "durationMs": 15923,
+      "sessionId": "010d097d-5926-4d7c-8a33-9dfa75ea2043",
+      "costUsd": 0.113259,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "I couldn't find any way a user or attacker can get GUIDED stored. The only write path is PATCH settings → ProfileSettingsService. At ProfileSettingsService.kt:32 (the finding cites :316, but the file is much shorter), the service throws GuidedModeNotAvailableException (422) when the patch is `Change.To(GUIDED)`, and it does this before anything is written. The tests prove it at both levels: ProfileSettingsTest lines 143/151 and ProfileSettingsIT line 74 send GUIDED, alone and together with a valid locale, and both get 422 with nothing changed. JpaChildProfileStore.kt:29 only receives the service's already-checked result. No other endpoint or code path writes answer_mode. So the \"no other value can be stored\" behaviour holds for every real caller. Only someone with direct DB access could store GUIDED, and that is outside the threat model. The finding's second claim, that the choice isn't recorded, is also wrong. The change's design.md:96 records that the `answer_mode` column accepts `DIRECT` or `GUIDED`, and design.md:56/108 records that the service returns 422 before writing. This is an intentional, documented forward-compatible schema with the service as the single enforcement point. That is exactly what the finding suggests adding, and it is already there.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1186,
+      "durationMs": 15229,
+      "sessionId": "21ef3f96-edb0-4235-a1b8-102469565034",
+      "costUsd": 0.11350840000000001,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding's main claim is false. It says the change spec and proposal mention only extending the NFR-3 log-capture test, not the shared logging policy change. But `openspec/changes/implement-child-profile-api/design.md:49-51` names the change explicitly under NFR-3: \"That matters for NFR-3: the RED run showed Hibernate Validator tracing the bound DTO (values included) at TRACE; `org.hibernate.validator` is now also capped by the log guard.\" The class KDoc in `RequestContentLogGuard.kt:12` and the inline comment at line 57 also document it. The finding's own suggestion offers design.md as an acceptable place for this note, and that is already done. So the change is not undocumented, and the traceability gap does not exist.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1219,
+      "durationMs": 14656,
+      "sessionId": "4421623f-76a0-4dcd-bb0c-614002a38041",
+      "costUsd": 0.0830312,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding says the change is undocumented, and that's wrong. `openspec/changes/implement-child-profile-api/design.md` lines 50–51 say: \"RED run showed Hibernate Validator tracing the bound DTO (values included) at TRACE; `org.hibernate.validator` is now also capped by the log guard.\" The suggested fix was to add this to design.md, and that line is already there. The code also carries its own explanation: the KDoc at `RequestContentLogGuard.kt:12` and the inline comment at line 57 both cover the Hibernate Validator trace. Looked at for exploitability, nothing a user or attacker could trigger exists here. The change only adds a logger to the list that gets blocked below INFO, which is purely hardening. No missing NFR-3 protection is involved, so no real-world impact can be shown.",
+        "severityAdjustment": "downgrade"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "13 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 5, contested: 3, rejected: 5"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/implement-child-profile-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "slice 4 child-profile backend (implement-child-profile-api)",
+    "summary": "Review gate for slice 4 child-profile backend (implement-child-profile-api): 5 confirmed, 3 contested (treat as confirmed unless trivially wrong), 5 rejected.",
+    "confirmed": [
+      {
+        "title": "A non-JSON Content-Type gets an undeclared 415 instead of the contract's 400 (or 413 when oversized)",
+        "file": "src/main/kotlin/cz/doucko/profile/adapter/in/web/SettingsBodyAdvice.kt",
+        "line": 321,
+        "confidence": "medium",
+        "severity": "minor",
+        "evidence": "`SettingsBodyAdvice.beforeBodyRead` only runs after a JSON converter has accepted the request's media type. A PATCH sent as `text/plain` (or with no Content-Type) fails earlier with `HttpMediaTypeNotSupportedException`. The global `SignInFailureAdvice` then turns that into Spring's standard 415. The contract (`contract/api/openapi.yaml:278-285`) declares only 200/400/413/422 for `updateProfileSettings`, and the spec says \"bodies that are not a JSON object SHALL be 400\" and \"a body over 16 KB SHALL be 413\". A 20 KB `text/plain` body gets 415, not 413. No profile test sends a non-JSON content type.",
+        "suggestion": "Either declare 415 in the docs-store contract for `updateProfileSettings`, or handle `HttpMediaTypeNotSupportedException` for this endpoint in `ProfileProblemAdvice` (map it to `profile-settings-unreadable` 400, after the size check). Add a test that sends `text/plain`.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Confirmed, with corrections to the details. SettingsBodyAdvice.kt has only 113 lines, so line 321 is wrong. The behaviour is still real. The generated `ChildProfileApi.kt:52` declares `consumes = [\"application/json\"]` on the mapping. So a PATCH sent as `text/plain`, or with no Content-Type, fails at handler mapping: RequestMappingInfoHandlerMapping throws HttpMediaTypeNotSupportedException before the controller is chosen or the body is read. The 16 KB check in SettingsBodyAdvice.beforeBodyRead (lines 50-52) and the not-a-JSON-object check never run. The global SignInFailureAdvice (`@Order(HIGHEST_PRECEDENCE)`, catching HttpMediaTypeNotSupportedException) only special-cases `POST /api/admin/session`. For every other path it hands the exception to the standard ResponseEntityExceptionHandler, which returns 415. The contract for updateProfileSettings (`contract/api/openapi.yaml:272-285`) lists only 200/400/422/413. The store spec (`child-profile/spec.md:247-258`) says invalid PATCHes use the status codes from openapi.yaml. So a 415 is undeclared, and a 20 KB text/plain body gets 415 instead of 413. No src test mentions 415 or text/plain. Severity minor is right: it is still an RFC 7807 problem, not a 500, so nothing leaks. The suggested fix needs a correction. Because the 415 is raised during handler mapping, there is no handler yet. `ProfileProblemAdvice(assignableTypes = [ProfileSettingsController])` would never see it. The fix has to go in the global advice, switched on the path (like SignInFailureAdvice), or the contract has to declare 415.",
+          "I could not refute this. The mechanism holds, though the cited line is wrong: SettingsBodyAdvice.kt has only 114 lines, and the size and JSON checks are at lines 50–52 and 69–80.\n\nHow it happens:\n- `SettingsBodyAdvice` is a `RequestBodyAdviceAdapter`. Spring only calls `beforeBodyRead`/`handleEmptyBody` after a message converter has accepted the request's media type for `ProfileSettingsPatch`.\n- A PATCH sent as `text/plain`, or with no Content-Type (Spring treats that as `application/octet-stream`), fails earlier with `HttpMediaTypeNotSupportedException`. That happens whether it is raised at handler mapping (if the generated interface declares `consumes = application/json`) or at converter selection.\n- Nothing in profile handles that exception. Searching src/main finds it only in `SignInFailureAdvice` (admin), which is global and `HIGHEST_PRECEDENCE`. For any request that is not POST /api/admin/session, it falls through to `ResponseEntityExceptionHandler.handleException`, which returns the standard 415.\n- No global body-size filter exists. 413 is produced only by `SettingsBodyAdvice` via `ProfileProblemAdvice`. So a 20 KB `text/plain` body gets 415, not 413.\n- Contract openapi.yaml:266–285 declares only 200/400/422/413 for `updateProfileSettings`, so 415 is undeclared.\n\nAnyone can reproduce this with curl. Impact is low, though: the response is still a clean RFC 7807 problem, not a raw 500. Nothing leaks, and the real frontend always sends JSON. It is a contract/spec mismatch, so \"minor\" is right."
+        ]
+      },
+      {
+        "title": "The display name is read through Environment, which resolves `${...}` placeholders in the value",
+        "file": "src/main/kotlin/cz/doucko/profile/application/ChildProfileInitializer.kt",
+        "line": 22,
+        "confidence": "low",
+        "severity": "minor",
+        "evidence": "`environment.getProperty(DisplayNamePolicy.VARIABLE)` resolves nested placeholders. A value containing `${...}` is either silently replaced with the resolved text (a different name is stored) or throws `IllegalArgumentException: Could not resolve placeholder '...' in value \"...\"`. That exception message quotes the raw value, so the startup failure log would contain part of the name. This bypasses the DisplayNamePolicy guarantee that refusals name the variable and never the value (NFR-3).",
+        "suggestion": "Read the raw value without placeholder resolution, e.g. `System.getenv(VARIABLE)` with the test property-source fallback, or iterate `ConfigurableEnvironment.propertySources` and call `getProperty` on the source directly. Add a test with a value containing `${x}`.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute this finding. At `ChildProfileInitializer.kt:19` the code calls `environment.getProperty(DisplayNamePolicy.VARIABLE)` on a Spring `Environment`. That call goes through `PropertySourcesPropertyResolver.getProperty(key, String.class, resolveNestedPlaceholders = true)`, so Spring resolves placeholders inside the value before `DisplayNamePolicy.check` ever sees it.\n\nThere are two ways this goes wrong:\n- **Resolvable placeholder:** a value like `${HOME}` is silently replaced by the resolved text, and that different name is stored.\n- **Unresolvable placeholder:** `ignoreUnresolvableNestedPlaceholders` is false by default, so `resolveRequiredPlaceholders` throws `IllegalArgumentException` (`PlaceholderResolutionException` in Spring 6.2+). Its message is `Could not resolve placeholder 'x' in value \"<raw value>\"`. Spring Boot logs this when startup fails, so part of the name ends up in the log, which goes against NFR-3.\n\nNothing guards against this. `DisplayNamePolicy` only checks for a missing value, length, control characters and UTF-8, and it runs after resolution has already happened.\n\nThe trigger is unlikely: a child's display name containing `${` is rare and set by the operator. So confidence low and severity minor are reasonable, but the mechanism is real.",
+          "The mechanism is real. `ChildProfileInitializer.kt:19` calls `environment.getProperty(DisplayNamePolicy.VARIABLE)`. In Spring's `AbstractEnvironment`, this goes through `PropertySourcesPropertyResolver.getProperty(key, String, resolveNestedPlaceholders=true)`, so `${...}` inside the value gets resolved. Spring Boot does not turn on `ignoreUnresolvableNestedPlaceholders` by default. So a value like `${x}` either resolves silently to other text or throws `PlaceholderResolutionException`/IAE, and that exception message quotes the raw value (\"Could not resolve placeholder 'x' in value \\\"...\\\"\"). Nothing in the code reads the raw value first: `DisplayNamePolicy.check` only sees the already-resolved string, and none of its violations (MISSING/TOO_LONG/CONTROL_CHARACTER/NOT_UTF8) applies before resolution. So I can't refute it on the mechanism.\n\nThe real-world risk is close to zero, though:\n(1) The value comes only from the operator's own env/.env (`DOUCKO_CHILD_DISPLAY_NAME`) and is read once, on first start. No HTTP request or child input reaches this path, so there is no attacker.\n(2) To trigger it, a parent would have to deliberately type `${` into their child's display name. That is not a realistic name.\n(3) If docker compose supplies the env, compose already interpolates `${...}` in .env/env_file values before Spring sees them, which hides the case further.\n(4) The worst outcome is a fragment of the name in the operator's own startup log on their own machine. Nothing crosses a trust boundary.\n\nThe fix is cheap and reasonable as a hardening step: read through `System.getenv` or the raw property source. Keep it as a minor/nit hardening item, not a correctness or privacy defect."
+        ]
+      },
+      {
+        "title": "The display name is read through Spring's placeholder-resolving Environment, so a value containing '${' can be echoed in the startup error or silently replaced",
+        "file": "src/main/kotlin/cz/doucko/profile/application/ChildProfileInitializer.kt",
+        "line": 19,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "Spec: 'the startup SHALL fail ... with a message that names DOUCKO_CHILD_DISPLAY_NAME and the rule and never the value'. Store spec: 'the printed error ... contains neither Hrdinka nor the x run'. Code: `DisplayNamePolicy.check(environment.getProperty(DisplayNamePolicy.VARIABLE))`. `PropertyResolver.getProperty` resolves nested placeholders. With a value like `Ann${x}`, it throws a PlaceholderResolutionException whose message quotes the whole value (`Could not resolve placeholder 'x' in value \"Ann${x}\"`). Spring Boot logs that message as 'Application run failed', which is an NFR-3 leak. With a value like `Ann${HOME}`, a different name is stored without any error. No test covers placeholder syntax.",
+        "suggestion": "Read the raw value without placeholder resolution. Options: `System.getenv(VARIABLE)` behind an injectable supplier, or `(environment as ConfigurableEnvironment).propertySources` with direct lookup in the systemEnvironment source. Add a DisplayNamePolicy or startup test where the variable is `Hrdinka${nope}`: the refusal and the captured output must not contain it, or the value must be stored verbatim.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I couldn't refute this; the mechanism holds. At `ChildProfileInitializer.kt:19` the code calls `environment.getProperty(\"DOUCKO_CHILD_DISPLAY_NAME\")` on the Spring `Environment`. In Spring Boot that call goes through `ConfigurationPropertySourcesPropertyResolver` (or `PropertySourcesPropertyResolver`) via `getProperty(key, String, resolveNestedPlaceholders=true)`, so `${...}` inside the env-var value gets resolved.\n\nNothing in `src` sets `ignoreUnresolvableNestedPlaceholders`, so the default (false) applies:\n- **Unresolvable placeholder:** a value like `Hrdinka${nope}` throws `PlaceholderResolutionException`, whose message quotes the whole value. That exception is thrown during the bean's `afterPropertiesSet`, gets wrapped in `BeanCreationException`, and Spring Boot logs it as \"Application run failed\". The raw name lands in the startup output, which breaks the spec rule that the error must never contain the value (NFR-3).\n- **Resolvable placeholder:** a value like `Ann${HOME}` is expanded silently before `DisplayNamePolicy.check` sees it, so a different name is stored.\n\nPlaceholder resolution happens before the policy check, so the policy can't guard against it, and no test covers `${` in the value.\n\nI'm keeping the severity as major. The trigger is unusual (a `${` in a child's display name), but the leak path is real and breaks a stated spec scenario and a PII rule.",
+          "I confirmed the mechanism in the code. ChildProfileInitializer.kt:19 reads the name with `environment.getProperty(DisplayNamePolicy.VARIABLE)`. Spring's `AbstractEnvironment.getProperty` delegates to a property resolver that resolves nested placeholders by default. `ignoreUnresolvableNestedPlaceholders` defaults to false, so `resolveRequiredPlaceholders` runs. That has two effects:\n(a) If the value contains an unresolvable `${x}`, `getProperty` throws a PlaceholderResolutionException whose message quotes the whole raw value (for example `Could not resolve placeholder 'x' in value \"Ann${x}\"`). This happens before DisplayNamePolicy.check runs, so the policy's careful never-print-the-value messages are bypassed, and Spring Boot logs the exception as 'Application run failed'.\n(b) If the value contains a resolvable `${HOME}` or similar, the name is silently substituted. DisplayNamePolicy only checks blankness, U+FFFD, control characters and length, so a value like `Ann${USER}` would be accepted and stored with the substitution.\nNothing guards against this elsewhere. No test uses `$` or `{` in the name, and DisplayNamePolicy cannot intervene because resolution happens first. So the spec breach is real (\"never the value\", \"contains neither Hrdinka nor the x run\").\n\nExploitability is low, though. The only person who can set DOUCKO_CHILD_DISPLAY_NAME is the operator or parent configuring .env. A child's display name containing `${` is very unlikely in practice. The leaked value goes only to the operator's own startup console, which the operator already has. No remote attacker can influence the value or trigger the path. The issue is real and reproducible, but it is a correctness and spec-compliance defect with negligible real-world impact, not a major security issue. I recommend downgrading the severity."
+        ]
+      },
+      {
+        "title": "Task 5.4 (compose smoke) is ticked but was skipped and has no artifact",
+        "file": "openspec/changes/implement-child-profile-api/tasks.md",
+        "line": 29,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "tasks.md reads `- [x] 5.4 Smoke through 127.0.0.1:8081 (GET, PATCH uk, PATCH GUIDED 422). SKIPPED 2026-10-04 ...`. No smoke evidence file exists (slice 2 had docs/qa/evidence/slice2-compose-smoke.md; slice 4 has none). The store-spec scenario 'Setting survives a backend restart' (WHEN 'the backend containers restart') is covered only by in-process context restarts in ChildProfileStartupIT, not by a container restart.",
+        "suggestion": "Untick 5.4, or mark it explicitly as a waiver rather than done, until the smoke runs. Then run it on a free stack, including a `docker compose restart backend` followed by GET, and record docs/qa/evidence/slice4-compose-smoke.md.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Confirmed, with one wrong detail: the task is at tasks.md:32, not line 29 (line 29 is 5.1). Task 5.4 is ticked `[x]` even though its own text says \"SKIPPED 2026-10-04\" because the shared `doucko` Compose stack was already running. docs/qa/evidence/ has slice1/slice2 compose-smoke files and slice4-red-run.md, but no slice4 smoke evidence. The store spec (contract/openspec/specs/child-profile/spec.md:231-234) says \"WHEN the backend containers restart\". design.md:27-30 admits the restart is proven in-process, \"not by restarting Compose containers (the compose smoke covers the containers when it can run)\". So container-level coverage was handed to exactly the smoke that was skipped. That leaves the container-restart half of the scenario unproven. A ticked checkbox over a skipped step is what AGENTS.md's \"SKIP never counted as PASS\" and \"done-claims need evidence\" lessons forbid. Points in mitigation: the skip is disclosed openly in the task text, and the reason (avoiding clobbering the main checkout's stack and data volume) is sound. Persistence is also covered substantially by Postgres-backed ITs. That makes this a process and traceability issue more than a hidden defect. It is still a real violation of the repo's own rules. Severity kept, with the line number corrected.",
+          "The facts check out, but the cited line is wrong. Task 5.4 is on tasks.md line 32, not line 29. It is ticked `[x]` while its own text says \"SKIPPED 2026-10-04 … Run the smoke when the stack is free.\" docs/qa/evidence/ has slice1 and slice2 compose-smoke files but no slice4 one. So a skipped step is marked as done, and OpenSpec task-completion tooling or the archive step (5.6) will count it as complete. That is the done-claims-need-evidence problem the repo's rules warn about.\n\nSeen through exploitability, nothing here is a runtime defect: no user or attacker can trigger anything. It is a bookkeeping and process problem only. The skip is also disclosed inline with a reason (the shared `doucko` Compose project and port 8081 would replace the stack already running from the main checkout) and names the substitute coverage (ProfileSettingsIT and ChildProfileStartupIT against Postgres 16). Nothing is hidden. The fix is to change the checkbox to an explicit waiver or untick it, or to run the smoke. The point about a container restart versus an in-process restart is a fair coverage gap but a minor one. I confirm the finding but rate it minor, not major."
+        ]
+      },
+      {
+        "title": "The unknown answer-mode message tells the child to use GUIDED, which is always refused",
+        "file": "src/main/resources/messages.properties",
+        "line": 35,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "Store spec: '`answerMode`: ... in MVP only `DIRECT` is accepted'; 'GUIDED SHALL be refused as not available yet (422)'. Code: `profile.field.UNKNOWN_VALUE=Use DIRECT or GUIDED.` The 400 `errors[].message` for `SOCRATIC`/`direct` steers the client to a value that is then answered 422.",
+        "suggestion": "Change the message to 'Use DIRECT.' (or 'DIRECT; GUIDED is not available yet'), and assert the text in ProfileSettingsTest.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism holds, with one small correction. In messages.properties, line 36 (the finding says 35) reads `profile.field.UNKNOWN_VALUE=Use DIRECT or GUIDED.`. Validation produces this message for any answerMode outside the AnswerMode enum (SettingsPatch.kt:116), so `SOCRATIC` and `direct` both get it. GUIDED itself passes validation by design (SettingsPatch.kt:79). ProfileSettingsService.kt:32 then always refuses it with 422 guided-not-available, which ProfileSettingsTest:143 and ProfileSettingsIT:74 both confirm. So a client that does what the 400 message says gets a guaranteed 422. That contradicts the spec, which says only DIRECT is accepted in MVP. Nothing else catches this: no other code path rewrites the message, and no test checks its text.\n\nTwo points weaken the finding without refuting it. First, line 3 of the file says API-level copy is English and the child UI shows Czech text from the frontend catalog, so \"tells the child\" overstates who sees it. The real audience is API clients and developers. Second, the message does correctly list the contract's enum values, and GUIDED is a legal schema value that is refused only for availability. Even so, as guidance it points to a value that is always rejected. This is a real spec/UX mismatch of minor severity, and the cheap fix is still to say \"Use DIRECT.\" (optionally adding that GUIDED is not available yet).",
+          "I confirmed the problem in the code, and anyone can trigger it with an ordinary request. `messages.properties:36` sets `profile.field.UNKNOWN_VALUE=Use DIRECT or GUIDED.` Only `SettingsPatch.kt:116` raises `UNKNOWN_VALUE`, when `answerMode` doesn't match the enum. `ProfileProblemAdvice.kt:42` puts that text into the 400 response as `errors[].message`. So a PATCH with `answerMode:\"SOCRATIC\"` gets a 400 that says to use DIRECT or GUIDED. If the client then sends GUIDED, `ProfileSettingsService.kt:32` throws `GuidedModeNotAvailableException`, which returns 422. Tests at `ProfileSettingsTest.kt:143` and `ProfileSettingsIT.kt:74` confirm the 422. The message therefore points the client to a value the API always refuses in MVP, which goes against the spec ('in MVP only DIRECT is accepted'). No other locale bundle or code path rewrites the message. The impact is limited to misleading text in a response, so minor is the right severity."
+        ]
+      }
+    ],
+    "contested": [
+      {
+        "title": "A configured task locale longer than 16 characters passes validation, then fails on the DB write as a raw 500",
+        "file": "src/main/resources/db/migration/V1__child_profile.sql",
+        "line": 10,
+        "confidence": "medium",
+        "severity": "minor",
+        "evidence": "The column is `secondary_task_locale varchar(16)`. `TaskLocaleProperties.taskLocales` and `SettingsValidator` put no length limit on configured values: `if (field.value in supportedLocales) Change.To(field.value)`. If an operator configures a longer tag such as `zh-Hant-TW-x-private`, a valid PATCH reaches the flush inside `JpaChildProfileStore.updateSettings`. Postgres rejects the value, and the resulting `DataIntegrityViolationException` has no handler, so the client gets a 500. AGENTS.md says no input may produce a raw 500.",
+        "suggestion": "Validate `doucko.profile.task-locales` at startup: annotate the `@ConfigurationProperties` with `@Validated` and add a size/pattern check on each element of at most 16 characters, or refuse in `ProfileConfiguration`, so a bad configuration fails the start instead of a request.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The mechanism holds. `TaskLocaleProperties` (`application/TaskLocaleProperties.kt:9-12`) is a plain `@ConfigurationProperties` class. It has no `@Validated` and no constraint on its elements. `ProfileSettingsService` (`ProfileSettingsService.kt:20-22`) uses the configured list as-is for `SettingsValidator`. The validator (`domain/SettingsPatch.kt:97`) accepts any submitted value that exactly matches a configured locale and does no length or format check. The column is `secondary_task_locale varchar(16)` (`V1__child_profile.sql:10`). Postgres raises a \"value too long\" error for a longer string, which reaches the app as a `DataIntegrityViolationException`. None of the advice classes handle it: `ProfileProblemAdvice` handles only `InvalidSettings`, `UnreadableSettings`, `GuidedModeNotAvailable` and `SettingsBodyTooLarge`, and `SignInFailureAdvice` covers admin sign-in only. So a PATCH carrying a configured locale longer than 16 characters ends in a raw 500. Mitigating factors: only operator misconfiguration can trigger it, not ordinary user input, and the shipped config is `task-locales: uk`. It is a latent issue, so minor severity fits.",
+          "The mechanism is real but no user or attacker can trigger it. These parts check out: `V1__child_profile.sql:10` declares `secondary_task_locale varchar(16)`. `TaskLocaleProperties` is an unvalidated `List<String>`. `ProfileSettingsService` only uses `locales.taskLocales.distinct()` as the allow-list. `ProfileProblemAdvice` has no `DataIntegrityViolationException` handler, and no other advice does either.\n\nBut a client can only send a value that is already in the operator-configured allow-list. Any other value is rejected first by `SettingsValidator`. The only configured value is `task-locales: uk` in `application.yaml:67`, which is 2 characters. So with the shipped configuration, no request can reach the overflow.\n\nTriggering it would take an operator deliberately setting a locale tag of 17 or more characters. Real BCP-47 task locales like `uk`, `en-GB` or `zh-Hant-TW` all fit. That is a deployment misconfiguration, not \"user input producing a raw 500\" as AGENTS.md defines it. Seen as exploitable or reproducible by a real user or attacker, the finding does not hold.\n\nChecking the configuration at startup would still be reasonable hardening. If kept at all, it should be a nit about configuration robustness, not a correctness defect."
+        ]
+      },
+      {
+        "title": "Coverage summary: 11 change-spec scenarios: 10 implemented, 1 partial, 0 missing, 0 contradicted. The in-scope store-spec scenarios add 2 more partials (UTF-8 bytes, container restart).",
+        "file": "openspec/changes/implement-child-profile-api/specs/child-profile/spec.md",
+        "line": 1,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "Implemented with tests: First start trims the name (ChildProfileStartupTest/IT); Restart keeps the profile and its settings (ChildProfileStartupIT:92); Fifty code points accepted (ChildProfileStartupIT:128); Defaults, set and clear; Omitted and unknown fields; Validation wins over GUIDED; GUIDED discards the whole request; Oversized locale not echoed; Empty configuration (ProfileSettingsTest:83-317); Log capture (ProfileSettingsIT:98, ChildProfileStartupIT). Partial: Invalid names refuse to start, because a placeholder-shaped value leaks (see the separate finding). Store-spec scenarios that need HQ, XP, e2e, the privacy scan or recordings are listed under 'Scope NOT delivered' in docs/current-state.md and the design Non-goals, so they are deferred and not missing.",
+        "suggestion": "No action for this entry. It only records the coverage line the output contract asks for.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "This entry is a coverage summary. It doesn't claim any wrong mechanism, so there is nothing for a correctness check to refute. Its factual parts hold up against the code:\n- The change spec has exactly 11 scenarios (spec.md lines 11, 17, 30, 36, 49, 55, 71, 76, 82, 92, 103).\n- The cited tests exist: ChildProfileStartupIT has the restart test at line 92 and the 50-code-point test at line 128. ChildProfileStartupTest, ProfileSettingsTest and ProfileSettingsIT are also present.\n- The one \"partial\" (Invalid names refuse to start) has a matching test at ChildProfileStartupIT:112, which checks that a refused name fails startup and that the value is never logged. Whether that scenario is really partial depends on the separate placeholder-leak finding, so this entry adds no defect of its own.\nThe entry suggests no action and is purely informational. That fits the lowest severity level (\"info\"), not \"minor\", so I'm downgrading it.",
+          "I'm marking this refuted because it isn't a defect, so it can't be exploited or reproduced. The entry is a coverage tally that the review output contract asks for. Its own suggestion is \"No action for this entry.\"\n\nThe tally itself checks out:\n- The change spec has exactly 11 `#### Scenario` headings.\n- All four test files it cites exist under `src/test/kotlin/cz/doucko/profile/` (`ChildProfileStartupIT`, `ChildProfileStartupTest`, `ProfileSettingsIT`, `ProfileSettingsTest`).\n\nThe only concrete problem it mentions is the \"partial\" scenario, where a placeholder-shaped value leaks. That belongs to a separate finding and should be judged there, not counted again through this summary. The same applies to the two store-spec partials (UTF-8 bytes and container restart): nothing here shows a way for a user or attacker to trigger them.\n\nBecause there's no mechanism to confirm, this shouldn't stand as a minor-severity finding. At most it's an informational note."
+        ]
+      },
+      {
+        "title": "Configured task locales are not validated against the contract shape or the column width",
+        "file": "src/main/kotlin/cz/doucko/profile/application/TaskLocaleProperties.kt",
+        "line": 10,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "openapi.yaml ProfileSettings/ProfileSettingsPatch: `secondaryTaskLocale: pattern: ^[a-z]{2}$`. Code: `data class TaskLocaleProperties(val taskLocales: List<String> = emptyList())` has no validation, and V1__child_profile.sql has `secondary_task_locale varchar(16)`. A configured value such as `uk-UA` would be accepted and returned in a 200 that violates the contract pattern. A value over 16 characters would cause a DB error on PATCH, which is a raw 500.",
+        "suggestion": "Validate `doucko.profile.task-locales` at startup (each entry matches ^[a-z]{2}$, otherwise refuse to start), with a unit test. Alternatively, amend the contract description.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The finding holds. The submitted value never reaches the generated @Pattern check. SettingsBodyAdvice.beforeBodyRead (SettingsBodyAdvice.kt:53-58) parses the raw body itself and then gives Jackson the literal `{}`. That means the generated ProfileSettingsPatch, which has `@get:Pattern(regexp=\"^[a-z]{2}$\")` and is bound with @Valid, always validates a null secondaryTaskLocale. The only check on the real value is SettingsValidator (SettingsPatch.kt:97): `field.value in supportedLocales`. supportedLocales comes from TaskLocaleProperties, which is unvalidated (`List<String>`, with no @Validated or constraints). So:\n\n1. If the config contains `uk-UA`, PATCH accepts it, stores it, and returns it in a 200 response (ProfileSettingsController.toApi). That response breaks the contract's `^[a-z]{2}$` pattern.\n2. If the config contains an entry longer than 16 characters, the column limit `secondary_task_locale varchar(16)` (V1__child_profile.sql:10) causes a DB error on write. I found no DataIntegrityViolation, DataAccessException or catch-all handler under src/main, so the client would get a raw 500.\n\nThis breaks the repo's own rule that no user input may produce a raw 500.\n\nBoth cases need an operator misconfiguration first; the shipped application.yaml sets only `uk`. That makes this a latent robustness/spec-compliance gap, not an active bug, so minor is the right severity. A fail-fast startup check on `doucko.profile.task-locales` is the appropriate fix.",
+          "The code mechanism is real, but no real user or attacker can trigger it. `TaskLocaleProperties` (`TaskLocaleProperties.kt:10`) has no validation. `SettingsValidator.validate` (`SettingsPatch.kt:97`) only checks that the submitted value is in `supportedLocales` and never checks it against `^[a-z]{2}$`.\n\nRequest input can't reach either failure. Any value outside the configured list is refused with a 400. `ProfileSettingsTest` and `ChildProfileStartupIT` cover `ru`, empty, wrong-type and oversized values. A client can only store a value that is already on the allowlist.\n\nSo both bad outcomes depend on the operator first setting `doucko.profile.task-locales` to something unusual: a 200 response that breaks the contract pattern (for example `uk-UA`), or a raw 500 from a value longer than 16 characters overflowing `varchar(16)`. The shipped `application.yaml:67` sets only `uk`, which fits both the pattern and the column. This is single-family, self-hosted software. The only person who can set this property is the operator, through deployment config. That is the same trust level as setting a bad datasource URL, so it isn't exploitable.\n\nAt most this is a hardening suggestion (fail-fast config validation). It isn't a correctness defect that a user can hit. Under the reproducibility lens the claimed problem does not occur in the delivered configuration."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "The control-character rule allows line/paragraph separators and bidi-override characters",
+        "file": "src/main/kotlin/cz/doucko/profile/domain/DisplayNamePolicy.kt",
+        "line": 36,
+        "confidence": "low",
+        "severity": "minor",
+        "evidence": "The check is `Character.getType(it) == Character.CONTROL.toInt()`, which covers category Cc only. U+2028/U+2029 (Zl/Zp) break lines like a newline, and U+202E RIGHT-TO-LEFT OVERRIDE (Cf) reorders displayed text. All three are accepted and stored, and the name will be rendered in the UI. The spec rejects newlines because they are line breaks, so it likely wants these refused too.",
+        "suggestion": "Also refuse `LINE_SEPARATOR`, `PARAGRAPH_SEPARATOR` and `FORMAT` (Cf) code points, or at least the bidi controls U+202A–U+202E and U+2066–U+2069, if the store spec agrees. Add golden cases to `DisplayNamePolicyTest`.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding is right about what the code does: line 34 (the finding says 36) only checks Character.CONTROL, which is category Cc, so U+2028, U+2029 and U+202E get through. That is still not a correctness defect. The behaviour was chosen on purpose and is written down. design.md decision 6 says \"no control characters (category Cc) and no U+FFFD\", and the KDoc on the policy says \"no control character (category Cc)\". The store spec says \"no control character\" and its scenario lists only newline, tab and U+FFFD, all of which the code refuses. Zl and Zp are not control characters in Unicode terms. Cf is \"format\", not \"control\". So the code does what the spec and design say. The rest of the finding is a guess (\"the spec … likely wants these refused\"), not a demonstrated bug.\n\nThe input also limits the impact. The name comes only from the DOUCKO_CHILD_DISPLAY_NAME environment variable, which the operator sets in .env. It is read once, on the first start, from an empty database. No request can set it, so there is no attacker-controlled path for bidi spoofing. Rendering is the frontend's job, and React escapes text, so a U+2028 in a text node does not break any markup. At most this is a suggestion to tighten the spec in the docs store first. It is not a mechanism that is wrong in this code.",
+          "The mechanism is real: `Character.getType(...) == CONTROL` (`DisplayNamePolicy.kt:34`) only matches category Cc, so U+2028, U+2029 and U+202E would get through. But from an exploitability point of view, nobody can trigger this as an attacker.\n\n1. **Only the operator sets the input.** The value comes from the `DOUCKO_CHILD_DISPLAY_NAME` environment variable, which the person running the deployment puts in `.env` before the first start. The messages say so. No child or other untrusted user can submit it. The only person who could put a bidi override or line separator into the name is the trusted admin/parent who also controls the whole server, so this is not a security boundary.\n2. **The code matches the spec.** `design.md:67` says \"no control characters (category Cc) and no U+FFFD\", and the KDoc repeats it. The spec scenario (`spec.md:33`) lists only newline, tab and U+FFFD as refused. Refusing Zl/Zp/Cf would go beyond the spec. Even the finding says the spec only \"likely wants\" it, and the confidence is low.\n3. **The worst case is cosmetic and self-inflicted.** The operator's own child's name would show reversed or across two lines in their own UI. Blocking all Cf code points could also wrongly refuse legitimate names that use ZWJ/ZWNJ (also Cf).\n\nThis is at most a possible spec improvement, not a defect a real user or attacker can exploit."
+        ]
+      },
+      {
+        "title": "The controller ignores the generated body parameter and depends on a hidden request attribute; a missing attribute is a raw 500",
+        "file": "src/main/kotlin/cz/doucko/profile/adapter/in/web/ProfileSettingsController.kt",
+        "line": 272,
+        "confidence": "low",
+        "severity": "minor",
+        "evidence": "`updateProfileSettings` discards `profileSettingsPatch`. It fetches the request through `RequestContextHolder` and calls `SettingsBodyAdvice.input(request)`, which is `checkNotNull(request.getAttribute(INPUT) as? SettingsInput)`. The attribute is set only if `SettingsBodyAdvice.supports` matched. Any path where the advice is skipped throws `IllegalStateException`, which nothing maps, so the client gets a 500. Examples: a converter other than Jackson reading the DTO, or a refactor that changes the parameter type. The coupling is invisible from the controller signature.",
+        "suggestion": "Map a missing input to `UnreadableSettingsException` (400) instead of `checkNotNull`. Prefer an injected `HttpServletRequest` parameter or a small `HandlerMethodArgumentResolver` for `SettingsInput` over the static `RequestContextHolder` lookup.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "I couldn't find any request that reaches the handler without the attribute set, so the claimed 500 doesn't happen in the current code.\n\n- **The advice runs for every converter.** `SettingsBodyAdvice.supports` (SettingsBodyAdvice.kt:42) checks only `methodParameter.parameterType == ProfileSettingsPatch::class.java`. It ignores `converterType`. So the finding's first example, \"a converter other than Jackson reading the DTO\", doesn't skip the advice. Spring's `AbstractMessageConverterMethodArgumentResolver` calls `beforeBodyRead` for whichever converter `canRead` the body.\n- **Every outcome of `beforeBodyRead` is safe.** It either stores the parsed `SettingsInput` or throws one of its own mapped exceptions: `SettingsBodyTooLargeException` (413) or `UnreadableSettingsException` (400).\n- **Empty bodies are covered.** An empty body either fails to parse (null tree → `UnreadableSettingsException`) or goes to `handleEmptyBody`, which throws the same exception.\n- **No converter means no handler call.** If no converter can read the content type, Spring throws `HttpMediaTypeNotSupportedException` (415) before the handler is invoked.\n\nSo whenever `updateProfileSettings` actually runs, the attribute is present. `checkNotNull` is an invariant assertion, not a reachable error path.\n\nThe finding's second example, \"a refactor that changes the parameter type\", is a maintainability concern about something that might break later. It isn't a correctness defect in this code. The class KDoc and the controller comment both document the coupling. The suggestion to inject `HttpServletRequest` or use an argument resolver is a style point, not a fix for a live bug.",
+          "I could not find a way for a real client to make the handler run without the attribute set. In Spring MVC, the `@RequestBody` resolver (`AbstractMessageConverterMethodArgumentResolver`) applies the `RequestBodyAdvice` chain to every converter that can read the target type. `SettingsBodyAdvice.supports` checks only that the parameter type is `ProfileSettingsPatch`, so the converter in use does not matter.\n\nThat leaves three request shapes, and each one is covered:\n- **Non-empty body:** `beforeBodyRead` always runs. It either sets INPUT or throws `SettingsBodyTooLargeException` (413) or `UnreadableSettingsException` (400).\n- **Empty body:** `handleEmptyBody` throws `UnreadableSettingsException`.\n- **Content type no converter can read:** Spring throws `HttpMediaTypeNotSupportedException` (415) before the handler is called.\n\nSo the handler only runs after INPUT has been set, and the `checkNotNull` failure cannot happen at runtime. The finding's own examples (a refactor that changes the parameter type, or a different setup) are hypothetical future code changes, not anything a user or attacker can trigger. What remains is a maintainability point about hidden coupling, not a reachable 500."
+        ]
+      },
+      {
+        "title": "The invalid UTF-8 scenario is tested only with a literal U+FFFD string, never with the byte sequence 0xC3 0x28",
+        "file": "src/test/kotlin/cz/doucko/profile/DisplayNamePolicyTest.kt",
+        "line": 52,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "Store spec scenario 'Name that is not valid UTF-8 is refused': 'GIVEN ... the display-name variable containing the byte sequence 0xC3 0x28 (invalid UTF-8) ... THEN it exits with a non-zero status'. The implementation relies on the JVM decoding the environment bytes to U+FFFD (DisplayNamePolicy.kt:33, comment line 49). The tests inject a Kotlin string that already contains U+FFFD, so the actual env-decoding path (sun.jnu.encoding in the container) is never exercised.",
+        "suggestion": "Add a test that launches the JVM (ProcessBuilder or a Testcontainers backend image) with raw env bytes C3 28, and assert a non-zero exit, the variable name in the output, and no row. If that is impractical, document the assumption (UTF-8 jnu encoding in eclipse-temurin) in design.md and record it as a waiver.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "I'm refuting this finding. Its main factual claim is wrong, and the mechanism it questions does work.\n\n1. **The test does use the real bytes.** The finding says the test injects a string that already contains U+FFFD. It doesn't. `DisplayNamePolicyTest.kt:54` builds the value from the bytes 'H', 0xC3, 0x28 with `String(byteArrayOf(...), Charsets.UTF_8)`, which is the exact sequence from the spec scenario. So the step where invalid UTF-8 bytes turn into U+FFFD is exercised. Only the platform's own decoding of the environment variable is not.\n\n2. **The production check is correct.** `ChildProfileInitializer` reads the variable through `Environment.getProperty`, which in the end comes from `System.getenv`. On Linux, JDK 21 decodes environment bytes with `sun.jnu.encoding`, which follows the locale:\n   - **UTF-8 locale** (eclipse-temurin images set `LANG=en_US.UTF-8`): 0xC3 0x28 is malformed and becomes U+FFFD, then '('.\n   - **C/POSIX locale** (ANSI_X3.4-1968 / ASCII): every byte above 0x7F becomes U+FFFD.\n\n   Either way, `DisplayNamePolicy.check` finds U+FFFD and refuses with `NOT_UTF8`. The initializer then throws, so the context fails, startup stops and no row is created.\n\n   The startup failure path itself is covered: `docs/qa/automated-verification-latest.md:521` shows `childProfileInitializer` failing with \"DOUCKO_CHILD_DISPLAY_NAME is not valid UTF-8 text.\"\n\n3. **The assumption is already written down.** `design.md:67-69` says the JVM decodes invalid UTF-8 in the environment to U+FFFD and that this is how the 0xC3 0x28 scenario is covered.\n\nWhat's left is a test-fidelity nit: no test launches a process with raw environment bytes. That is not a correctness defect, and with the evidence misstated, \"major\" severity isn't justified.",
+          "The finding's main claim is wrong. DisplayNamePolicyTest.kt:52-56 does not use a literal U+FFFD string. It builds the input from the raw bytes `byteArrayOf('H', 0xC3, 0x28)` and decodes them with Charsets.UTF_8, so the 0xC3 0x28 sequence the spec names is what gets tested. DisplayNamePolicy.kt:33 then refuses it as NOT_UTF8 because the decoded string contains U+FFFD.\n\nWhat is left is a narrower point: no test starts a JVM with a raw environment variable and checks how the operating system's text encoding decodes it (`sun.jnu.encoding`). This does not show the scenario can actually fail:\n- In the eclipse-temurin images the UTF-8 locale is set, so a malformed byte sequence decodes to U+FFFD and the startup is refused.\n- Even under a POSIX/ASCII locale, the JDK decoder turns non-ASCII bytes into U+FFFD, so the input is still refused.\n- The only setting that would accept it as text (\"Ã(\") is a Latin-1 locale, which this deployment doesn't use.\n\nThe assumption is also already written down: design.md:67-69 states that the JVM decodes invalid UTF-8 in the environment to U+FFFD, and that this rule covers the 0xC3 0x28 scenario. That is exactly what the suggestion asked for as the fallback.\n\nFinally, there is no attacker here. The variable is set by the operator in .env, so the worst case is a misconfigured display name, not a security or data-integrity problem. The finding is refuted as stated. At most, an end-to-end test of how the environment is decoded is a minor nice-to-have."
+        ]
+      },
+      {
+        "title": "The schema and the persistence enum allow GUIDED to be stored, while the spec says no other value can be stored",
+        "file": "src/main/resources/db/migration/V1__child_profile.sql",
+        "line": 11,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "Store spec exclusions: '`answerMode` ... while it is `DIRECT`, and no other value can be stored.' The migration has `CHECK (answer_mode IN ('DIRECT', 'GUIDED'))`. Only ProfileSettingsService.kt:316 enforces DIRECT-only; there is no persistence-level guard. This is a deliberate forward-compatibility choice, but it is not recorded as a requirement or design decision in the change spec.",
+        "suggestion": "Record the choice in design.md (the schema is ready for later phases; the service is the single enforcement point). Alternatively, restrict the CHECK to 'DIRECT' and widen it in a later append-only migration.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "From a correctness standpoint, the claimed mechanism doesn't hold up. (1) No code path can store GUIDED. The only writer is ProfileSettingsService, and at line 32 (not 316 as the finding cites; the file is short) it throws GuidedModeNotAvailableException before anything is written. Tests cover this: ProfileSettingsTest:143/151/159 and ProfileSettingsIT:74, which asserts 422 and that the row is unchanged. Row creation on first start uses the column's DEFAULT 'DIRECT'. So the spec's behavioural promise that no other value can be stored holds for every reachable input. (2) The finding's main point, that the schema choice \"is not recorded as a requirement or design decision in the change\", is factually wrong. openspec/changes/implement-child-profile-api/design.md:96 explicitly documents the `answer_mode` column rule as \"`DIRECT` or `GUIDED`\". Line 108 and lines 56–57 record that the service is the enforcement point (422 after validation, nothing written). The suggested fix (record it in design.md) is already done. The other option, narrowing the CHECK, is a defence-in-depth preference, not a correctness defect. A broader CHECK that only an out-of-band SQL writer could exploit is not reachable through user input.",
+          "I couldn't find any way a user or attacker can get GUIDED stored. The only write path is PATCH settings → ProfileSettingsService. At ProfileSettingsService.kt:32 (the finding cites :316, but the file is much shorter), the service throws GuidedModeNotAvailableException (422) when the patch is `Change.To(GUIDED)`, and it does this before anything is written. The tests prove it at both levels: ProfileSettingsTest lines 143/151 and ProfileSettingsIT line 74 send GUIDED, alone and together with a valid locale, and both get 422 with nothing changed. JpaChildProfileStore.kt:29 only receives the service's already-checked result. No other endpoint or code path writes answer_mode. So the \"no other value can be stored\" behaviour holds for every real caller. Only someone with direct DB access could store GUIDED, and that is outside the threat model. The finding's second claim, that the choice isn't recorded, is also wrong. The change's design.md:96 records that the `answer_mode` column accepts `DIRECT` or `GUIDED`, and design.md:56/108 records that the service returns 422 before writing. This is an intentional, documented forward-compatible schema with the service as the single enforcement point. That is exactly what the finding suggests adding, and it is already there."
+        ]
+      },
+      {
+        "title": "An undocumented hardening change in the shared log guard (org.hibernate.validator capped) has no requirement in the change spec",
+        "file": "src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt",
+        "line": 58,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "The diff adds `\"org.hibernate.validator\"` to the capped loggers in the shared module. The change spec and proposal mention only extending the NFR-3 log-capture test, not changing shared logging policy. The RED-run evidence (slice4-red-run.md) shows this fixed a real TRACE-level leak, so the change is justified.",
+        "suggestion": "Add a line to proposal.md 'What Changes' or design.md that names the shared log-guard change under NFR-3, so the platform-foundation logging policy stays traceable.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding's main claim is false. It says the change spec and proposal mention only extending the NFR-3 log-capture test, not the shared logging policy change. But `openspec/changes/implement-child-profile-api/design.md:49-51` names the change explicitly under NFR-3: \"That matters for NFR-3: the RED run showed Hibernate Validator tracing the bound DTO (values included) at TRACE; `org.hibernate.validator` is now also capped by the log guard.\" The class KDoc in `RequestContentLogGuard.kt:12` and the inline comment at line 57 also document it. The finding's own suggestion offers design.md as an acceptable place for this note, and that is already done. So the change is not undocumented, and the traceability gap does not exist.",
+          "The finding says the change is undocumented, and that's wrong. `openspec/changes/implement-child-profile-api/design.md` lines 50–51 say: \"RED run showed Hibernate Validator tracing the bound DTO (values included) at TRACE; `org.hibernate.validator` is now also capped by the log guard.\" The suggested fix was to add this to design.md, and that line is already there. The code also carries its own explanation: the KDoc at `RequestContentLogGuard.kt:12` and the inline comment at line 57 both cover the Hibernate Validator trace. Looked at for exploitability, nothing a user or attacker could trigger exists here. The change only adds a logger to the list that gets blocked below INFO, which is purely hardening. No missing NFR-3 protection is involved, so no real-world impact can be shown."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/implement-child-profile-api/review-findings.json"
+  }
+}

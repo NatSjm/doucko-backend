@@ -3,7 +3,7 @@ package cz.doucko.profile.application
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.core.env.Environment
+import org.springframework.core.env.ConfigurableEnvironment
 
 /** The profile's use case and first-start initializer, over whichever [ChildProfileStore] is present. */
 @Configuration(proxyBeanMethods = false)
@@ -18,6 +18,6 @@ class ProfileConfiguration {
     @Bean
     fun childProfileInitializer(
         store: ChildProfileStore,
-        environment: Environment,
+        environment: ConfigurableEnvironment,
     ) = ChildProfileInitializer(store, environment)
 }

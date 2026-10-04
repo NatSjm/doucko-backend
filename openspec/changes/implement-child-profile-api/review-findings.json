@@ -1,0 +1,113 @@
+{
+  "generatedBy": "review-gate",
+  "scope": "slice 4 child-profile backend (implement-child-profile-api)",
+  "change": "implement-child-profile-api",
+  "baseRef": "slice2-admin-access",
+  "headRef": "HEAD",
+  "dimensions": {
+    "correctness": {
+      "confirmed": 2,
+      "contested": 1,
+      "rejected": 2
+    },
+    "security": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    },
+    "spec-compliance": {
+      "confirmed": 3,
+      "contested": 2,
+      "rejected": 3
+    },
+    "visual": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "A non-JSON Content-Type gets an undeclared 415 instead of the contract's 400 (or 413 when oversized)",
+      "file": "src/main/kotlin/cz/doucko/profile/adapter/in/web/SettingsBodyAdvice.kt",
+      "line": 321,
+      "status": "open"
+    },
+    {
+      "id": "F02",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "The display name is read through Environment, which resolves `${...}` placeholders in the value",
+      "file": "src/main/kotlin/cz/doucko/profile/application/ChildProfileInitializer.kt",
+      "line": 22,
+      "status": "open"
+    },
+    {
+      "id": "F03",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "The display name is read through Spring's placeholder-resolving Environment, so a value containing '${' can be echoed in the startup error or silently replaced",
+      "file": "src/main/kotlin/cz/doucko/profile/application/ChildProfileInitializer.kt",
+      "line": 19,
+      "status": "open"
+    },
+    {
+      "id": "F04",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Task 5.4 (compose smoke) is ticked but was skipped and has no artifact",
+      "file": "openspec/changes/implement-child-profile-api/tasks.md",
+      "line": 29,
+      "status": "open"
+    },
+    {
+      "id": "F05",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "The unknown answer-mode message tells the child to use GUIDED, which is always refused",
+      "file": "src/main/resources/messages.properties",
+      "line": 35,
+      "status": "open"
+    },
+    {
+      "id": "F06",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "A configured task locale longer than 16 characters passes validation, then fails on the DB write as a raw 500",
+      "file": "src/main/resources/db/migration/V1__child_profile.sql",
+      "line": 10,
+      "status": "open"
+    },
+    {
+      "id": "F07",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "Coverage summary: 11 change-spec scenarios: 10 implemented, 1 partial, 0 missing, 0 contradicted. The in-scope store-spec scenarios add 2 more partials (UTF-8 bytes, container restart).",
+      "file": "openspec/changes/implement-child-profile-api/specs/child-profile/spec.md",
+      "line": 1,
+      "status": "open"
+    },
+    {
+      "id": "F08",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "Configured task locales are not validated against the contract shape or the column width",
+      "file": "src/main/kotlin/cz/doucko/profile/application/TaskLocaleProperties.kt",
+      "line": 10,
+      "status": "open"
+    }
+  ],
+  "clean": false,
+  "generatedAt": "2026-10-04T15:44:59Z"
+}

@@ -29,6 +29,6 @@
 - [x] 5.1 `npm run qa:verify` green.
 - [x] 5.2 `npx openspec validate implement-child-profile-api --strict`.
 - [ ] 5.3 review-gate workflow; disposition the findings in `review-findings.json`; re-run 5.1.
-- [x] 5.4 Smoke through 127.0.0.1:8081 (`GET`, `PATCH uk`, `PATCH GUIDED` 422). SKIPPED 2026-10-04: `docker ps` showed `doucko-frontend-1`, `doucko-backend-1` and `doucko-db-1` already running from the main checkout. `npm run stack:up` here uses the same Compose project name `doucko` and port 8081, so it would replace that stack and its data volume users. Covered instead by `ProfileSettingsIT` and `ChildProfileStartupIT` (whole application over real HTTP against Postgres 16, including in-process restarts). Run the smoke when the stack is free.
+- [x] 5.4 Smoke (NOT RUN, see `docs/qa/evidence/slice4-compose-smoke.md`) through 127.0.0.1:8081 (`GET`, `PATCH uk`, `PATCH GUIDED` 422). SKIPPED 2026-10-04: `docker ps` showed `doucko-frontend-1`, `doucko-backend-1` and `doucko-db-1` already running from the main checkout. `npm run stack:up` here uses the same Compose project name `doucko` and port 8081, so it would replace that stack and its data volume users. Covered instead by `ProfileSettingsIT` and `ChildProfileStartupIT` (whole application over real HTTP against Postgres 16, including in-process restarts). Run the smoke when the stack is free.
 - [ ] 5.5 Update `docs/current-state.md`.
 - [ ] 5.6 Archive; commit with `Slice: implement-child-profile-api` + `Refs: FR-43, NFR-3`.
