@@ -12,7 +12,7 @@ Result: PASS, 1 warning(s)
 |---|---|---|---|---|
 | 2026-10-04-implement-admin-access-api | clean | 4 | yes | admin, shared |
 | 2026-10-04-implement-answer-checking-api | clean | 4 | yes | checking |
-| 2026-10-04-implement-authoring-missions-api | clean | 2 | yes | content |
+| 2026-10-04-implement-authoring-missions-api | clean | 3 | yes | content |
 | 2026-10-04-implement-authoring-tasks-api | clean | 7 | yes | content |
 | 2026-10-04-implement-child-profile-api | clean | 4 | yes | profile, shared |
 | 2026-10-04-implement-platform-foundation-api | clean | 8 | yes | shared |
