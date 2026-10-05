@@ -1,0 +1,1347 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-05T17:33:09.855Z",
+  "finishedAt": "2026-10-05T17:39:19.937Z",
+  "args": {
+    "scope": "fix-restore-schema-drift backend (tools/restore.mjs: Flyway version check, backend restart after restore, storage note)",
+    "baseRef": "394ed08",
+    "headRef": "HEAD",
+    "change": "fix-restore-schema-drift",
+    "focus": "Operator tooling in tools/ (plain Node), run on Windows and POSIX; the IT runs a separate compose project. Check the restart/health-wait logic, failure exits after the restore committed, and that nothing touches the owner doucko stack."
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": null,
+    "budgetPerAgentUsd": 2,
+    "maxTotalUsd": 10,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "failed",
+  "stoppedBecause": "--max-total-usd 10 reached ($10.06)",
+  "error": null,
+  "totalCostUsd": 10.7512,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 738,
+      "durationMs": 136864,
+      "sessionId": "5257cc11-17c4-4369-b6d3-27f2e815101d",
+      "costUsd": 0.6163316000000001,
+      "numTurns": 7,
+      "result": {
+        "findings": [
+          {
+            "title": "Unguarded JSON.parse in the health wait can crash with a stack trace after the restore has committed",
+            "file": "tools/restore.mjs",
+            "line": 118,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`backendHealthy()` runs `.flatMap((line) => JSON.parse(line))` on `docker compose ps --format json` stdout and nothing catches it. If one line is not JSON (a partial line, a plugin notice on stdout, or a compose release with another format), Node exits with an uncaught SyntaxError. The operator then sees a stack trace instead of the designed message saying the data is restored, followed by the manual `docker compose restart backend` step. Design decision 3 says every failure after the commit should print that message.",
+            "suggestion": "Wrap the parse in try/catch. On a parse error, either `continue` (retry until the deadline) or return false so the existing `fail(...)` path prints the data-is-restored message and the manual step."
+          },
+          {
+            "title": "Reading the checkout's migrations is not guarded and can throw after the commit",
+            "file": "tools/restore.mjs",
+            "line": 136,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`const latest = latestMigration();` calls `readdirSync(MIGRATIONS_DIR)` only after `restore complete` has been printed. If that directory is missing or unreadable (a sparse or partial checkout, or a moved tools/ copy), ENOENT is thrown uncaught. The exit code is non-zero, but the output is a stack trace, not the message that the data is restored and the backend may need a restart.",
+            "suggestion": "Read `latestMigration()` before the destructive step so a broken checkout fails with \"nothing was changed\". Or catch the error and call `fail()` with the manual-restart hint."
+          },
+          {
+            "title": "Message for a schema that is still behind after the restart can name the wrong cause",
+            "file": "tools/restore.mjs",
+            "line": 167,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`const migrated = schemaVersion(); if (!migrated || compareVersions(migrated, latest) < 0) fail(`...schema is at ${label(migrated)}...: its image is older than this checkout. Rebuild...`)`. `schemaVersion()` returns `undefined` when psql fails (for example, a db hiccup right after the restart). The message would then say \"schema is at an unreadable version ... its image is older than this checkout\" and send the operator to rebuild the image for what is really a read failure.",
+            "suggestion": "Handle `migrated === undefined` separately: say the version could not be read and print the manual check or restart hint. Keep the \"image older than this checkout\" text for a version that was read and is still behind."
+          },
+          {
+            "title": "Logs hint on restart failure leaves out the compose project",
+            "file": "tools/restore.mjs",
+            "line": 162,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "The failure text says \"Check `docker compose logs backend`, fix the cause and run `${manualRestart}`\". `manualRestart` includes `-p <project>` when `--project` is set, but the logs command does not. With a non-default project, running that logs command as printed (and without `-f` to the repo's compose file) targets the default `doucko` project. That is the owner's stack, not the one that failed.",
+            "suggestion": "Build the logs hint the same way as `manualRestart`, e.g. `docker compose${opts.project ? ` -p ${opts.project}` : \"\"} logs backend`, and share that prefix between both hints."
+          },
+          {
+            "title": "Health wait retries silently when `docker compose ps` keeps failing",
+            "file": "tools/restore.mjs",
+            "line": 112,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`if (r.status !== 0) continue;` retries every 2 s for up to 300 s without any output. If compose cannot list the service (daemon gone, wrong project), the operator waits 5 minutes with no feedback. The final message then says the backend \"did not come back healthy\", which hides the real cause: compose could not be queried.",
+            "suggestion": "Count consecutive `ps` failures and fail early with a specific message (\"docker compose could not report the backend's state\") plus the manual-restart hint. Or print a short progress line while waiting."
+          },
+          {
+            "title": "Migration IT builds a full backend image inside the IT run, so the test is heavy and slow",
+            "file": "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+            "line": 163,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`run(\"docker\", \"compose\", \"-p\", project, \"build\", \"backend\", timeoutSec = 1200)` builds the backend image from the Dockerfile on every run, and `--rmi local` removes it in tearDown. Isolation from the owner's image holds: the image is named `<project>-backend` and only that project's local images are removed. The cost is up to 20 minutes per `verify`, and a docker build failure (e.g. a network problem fetching Maven dependencies) fails NFR-10 for reasons that have nothing to do with restore.",
+            "suggestion": "Consider building the image once per test class, or tagging it per run and reusing it, or putting this scenario behind an opt-in profile. Keep the separate project and `--rmi local` cleanup as they are."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 766,
+      "durationMs": 109259,
+      "sessionId": "ea7f68f6-1ca1-4556-a8b0-2991652ac17e",
+      "costUsd": 0.526761,
+      "numTurns": 9,
+      "result": {
+        "findings": [
+          {
+            "title": "A dump with tables but no flyway_schema_history counts as 'behind' and restarts a working backend into a crash loop",
+            "file": "tools/restore.mjs",
+            "line": 143,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`behind` is true when `restored === null` (no flyway_schema_history), so if the backend is running, restore.mjs:158 restarts it. application.yaml has no `baseline-on-migrate`, so Flyway refuses a non-empty schema that has no history table. The backend then fails at startup and `restart: unless-stopped` keeps restarting it. The operator ends up with a restarted backend in a crash loop where before there was a running one. The tool does exit 1 (via backendHealthy → 'restarting'/'unhealthy'), but the restart already happened. Trigger: restoring a hand-made or foreign pg_dump that has tables but no Flyway history.",
+            "suggestion": "Restart only when there is a Flyway history (`restored !== null`), or when the public schema is empty. If the database has tables but no history, warn and don't restart: Flyway can't adopt that schema without a baseline."
+          },
+          {
+            "title": "The target version comes from the checkout, not the running image, so a checkout older than the image leaves a mismatched schema and exits 0",
+            "file": "tools/restore.mjs",
+            "line": 136,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`latestMigration()` reads src/main/resources/db/migration in the working tree. Example: the image was built at V5, then the operator checked out an older branch whose migrations end at V4, and the dump is at V4. `behind` is false, so nothing restarts, and the tool prints success with exit 0. The running V5 backend then serves a V4 schema, and requests that touch V5 tables return 500s. That is exactly the failure this change is meant to prevent. The post-restart check at line 166 covers the opposite case (image older than checkout) but not this one.",
+            "suggestion": "Read the expected version from the running backend instead of the checkout, for example with `docker compose exec backend` to list the migrations in the jar, or from an actuator/flyway or info endpoint. At minimum, when the backend is running, restart it whenever the restored version differs from the version that was there before the restore."
+          },
+          {
+            "title": "An uncaught JSON.parse in the health wait prints a stack trace after the restore has committed and loses the 'data is restored' message",
+            "file": "tools/restore.mjs",
+            "line": 121,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "backendHealthy() calls `JSON.parse(line)` on each stdout line of `docker compose ps --format json` with no try/catch. If a compose release or plugin writes non-JSON to stdout, Node throws, prints a stack trace and exits 1 after the single-transaction restore has already committed. The operator never sees the `fail()` text saying the data is restored and that they should run `docker compose restart backend`. That is the guidance this change adds, and the 'usage, not a stack trace' style is what OperatorToolGuardTest enforces for this tool elsewhere.",
+            "suggestion": "Wrap the parse in try/catch and treat unparseable output like a failed `ps` (continue polling). Or run the whole post-commit section inside one try/catch that calls `fail()` with the manual-restart message."
+          },
+          {
+            "title": "Checklist coverage for this diff: the security areas are clean (informational)",
+            "file": "tools/restore.mjs",
+            "line": 40,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "Each checklist item, checked against this diff:\n(1) Authz/IDOR/tenant scoping: no HTTP endpoints changed. The IT only reads GET /api/child/hq inside its own project. Clean.\n(2) Auth/sessions: untouched. The IT passwords are throwaway test values ('it-only-*'). Clean.\n(3) Injection: every docker/psql call uses spawnSync argv with no shell. `--project` goes in as a single argv element (compose.mjs composeArgs). The SQL strings are constants. The dump reaches the container as an fd on stdin. `manualRestart` is only printed, never executed. Clean.\n(4) Exposure: compose.yaml is unchanged. The backend and db are still unpublished. Clean.\n(5) Privacy/legal: the IT uses the fictional name 'Hrdinka' and overrides the owner's .env DOUCKO_CHILD_DISPLAY_NAME. No workbook content was added. Clean.\n(6) Secrets: no secrets in the diff or in the tool output. The psql queries print only Flyway versions. Clean.\n(7) Dependencies: no package.json or pom.xml changes, and tools/lib/migrations.mjs has no dependencies. npm audit was not run, because no dependencies changed.\n(8) Abuse resistance/rate limits: not applicable (local operator CLI).\nOwner-stack isolation holds: the IT always passes `-p doucko-it-<uuid>`. Because compose.yaml sets `build: .` with no `image:` and no explicit volume `name:`, the image and volumes are project-scoped. `down -v --rmi local` therefore removes only `<project>-backend` and the IT volumes, never `doucko-backend`, doucko-pgdata or doucko-storage.\nRestart/health-wait logic: `continue` still runs the sleep in the update expression, the 300 s deadline outlasts the container healthcheck's 150 s to unhealthy, a 'restarting' state is treated as failure, and every exit after the commit goes through `fail()` with the manual step (except the JSON.parse case above).",
+            "suggestion": "Nothing to change beyond the three findings above."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 709,
+      "durationMs": 156620,
+      "sessionId": "a36ee797-1ab9-4dd1-bd50-5d2ce347d014",
+      "costUsd": 0.7365459999999999,
+      "numTurns": 17,
+      "result": {
+        "findings": [
+          {
+            "title": "Coverage summary: 6 scenarios: 5 implemented, 1 partial, 0 missing, 0 contradicted (plus one clause in the requirement text that the code contradicts, see below)",
+            "file": "openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md",
+            "line": 1,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "Scenarios 1-4 (backup survives volume loss, broken dump changes nothing, older dump over newer schema, unsafe backup targets) are covered by the existing BackupRestoreIT/OperatorToolGuardTest. 'A dump from before the newest migration under a running backend' is implemented (tools/restore.mjs:686-703) and tested (BackupRestoreIT.kt:442-461). 'Restored schema and checkout disagree without a restart' is implemented (restore.mjs:674-685), but the test only partly asserts it. NFR-10 traces to the plan's platform-foundation/backend row. There is no OpenAPI impact: tools/ only, no src/main change.",
+            "suggestion": "Informational. Act on the individual findings below."
+          },
+          {
+            "title": "Task 3.5 'Archive; commit' is ticked, but the change is not archived",
+            "file": "openspec/changes/fix-restore-schema-drift/tasks.md",
+            "line": 17,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "tasks.md: '- [x] 3.5 Archive; commit with `Slice: fix-restore-schema-drift` + `Refs: NFR-10`.' Reality: the change still sits at openspec/changes/fix-restore-schema-drift/ with no archive/2026-10-05-fix-restore-schema-drift folder. The diff's own traceability-report.md:110 adds 'active change \"fix-restore-schema-drift\" is not archived', and trace.json has the same warning. Only the commit trailer part is done (HEAD has Slice/Refs).",
+            "suggestion": "Run `openspec archive fix-restore-schema-drift` so the MODIFIED 'Data volume and backup' requirement lands in the spec, or untick 3.5 until that is done."
+          },
+          {
+            "title": "Task 3.3 is ticked, but review-findings.json does not exist",
+            "file": "openspec/changes/fix-restore-schema-drift/tasks.md",
+            "line": 16,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "tasks.md: '- [x] 3.3 Review (fresh reviewer); every finding dispositioned in `review-findings.json`.' The change folder holds only proposal.md, design.md, tasks.md and specs/. There is no review-findings.json, while every archived change (e.g. archive/2026-10-05-implement-practice-flow-api/review-findings.json) has one.",
+            "suggestion": "Untick 3.3 until the review has run and its findings are dispositioned in openspec/changes/fix-restore-schema-drift/review-findings.json."
+          },
+          {
+            "title": "Task 3.1 'qa:verify green' points at verification evidence this change did not regenerate",
+            "file": "docs/qa/automated-verification-latest.md",
+            "line": 5,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "tasks.md 3.1: '[x] `npm run qa:verify` green. Evidence: `docs/qa/automated-verification-latest.md`.' The file is not in `git diff 394ed08..HEAD --stat`, and it says 'Started: 2026-10-05T07:19:49Z' (09:19 Prague). The replay evidence in the same change has dump timestamp 20261005-172607, so the battery output does not clearly cover the final tools/restore.mjs. Per the done-claims-need-evidence lesson, the pointer must be fresh.",
+            "suggestion": "Re-run `npm run qa:verify` on HEAD and commit the regenerated docs/qa/automated-verification-latest.md, or untick 3.1."
+          },
+          {
+            "title": "The 'schema still behind after restart' failure path omits the manual restart step and the 'data is restored' message",
+            "file": "tools/restore.mjs",
+            "line": 696,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "Spec: '...it SHALL restart the backend, wait until it is healthy and confirm the schema reached the newest version, or else print the manual restart step and exit non-zero'. Design decision 3: 'Every failure after the restore committed (... schema still behind) prints that the data IS restored plus the manual `docker compose [-p <project>] restart backend` step'. Code: fail(`the backend restarted, but the schema is at ${label(migrated)}, not V${latest}: its image is older than this checkout. Rebuild and start it with npm run stack:up.`). It contains neither manualRestart nor 'the data is restored'. Also, when --project is set, `npm run stack:up` would act on the default (owner) stack, not that project.",
+            "suggestion": "Prefix the message with 'the data is restored, but'. Either amend the spec/design to say this branch prints the rebuild step instead of the restart step, or include a project-aware rebuild command such as `docker compose -p <project> up -d --build backend`."
+          },
+          {
+            "title": "The post-commit failure branches (exit 1 + manual step) have no test",
+            "file": "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+            "line": 440,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "Spec clause: 'or else print the manual restart step and exit non-zero'. The evidence file admits: 'The failure branches after the restore committed (restart fails, healthcheck turns unhealthy or the container crash-loops, schema still behind because the image is older than the checkout, version unreadable) print the manual `docker compose restart backend` step and exit 1; they are reviewed, not exercised by a test.' No IT or unit test asserts a non-zero exit or the manual-step text.",
+            "suggestion": "Add at least one IT for a post-commit failure. Example: start a backend image built without V4 (or `docker compose stop` after the restart starts) and assert exit 1 plus 'restart backend' and 'data is restored' in the output. Alternatively, extract the decision and health parsing into tools/lib and unit-test them from OperatorToolGuardTest."
+          },
+          {
+            "title": "The tests for scenario 'Restored schema and checkout disagree without a restart' do not check that nothing was restarted",
+            "file": "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+            "line": 479,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "Scenario THEN: '...warns that the dump is newer, and restarts nothing'. The newer-dump test only starts `db` (no backend service exists) and asserts `output shouldContain \"V999\"` and `\"newer\"`, so 'restarts nothing' holds trivially. The design's reason for not restarting (a running backend would ignore future migrations) is never exercised against a running backend.",
+            "suggestion": "Run the newer-dump case with the backend up and assert the output lacks 'restarted' and the backend container's StartedAt is unchanged. Or narrow the scenario to 'no backend running'."
+          },
+          {
+            "title": "The health-wait loop's JSON.parse can throw, which exits with a stack trace and skips the 'data is restored' message",
+            "file": "tools/restore.mjs",
+            "line": 647,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "Design decision 3: every failure after commit 'prints that the data IS restored plus the manual ... step, and exits 1'. backendHealthy() calls `.flatMap((line) => JSON.parse(line))` on `docker compose ps --format json` stdout without a try/catch. Any non-JSON line (a compose warning on stdout, or a format change) throws an uncaught SyntaxError after the restore has committed, so the operator sees a stack trace instead of the manual step. OperatorToolGuardTest already enforces 'usage, not a stack trace' for other inputs.",
+            "suggestion": "Wrap the parse in try/catch and treat a failed parse like `r.status !== 0` (retry, then fall through to fail(...) with the manual step)."
+          },
+          {
+            "title": "The printed manual restart command leaves out the compose file that the tool itself uses",
+            "file": "tools/restore.mjs",
+            "line": 660,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The tool runs `docker compose -f <ROOT>/compose.yaml [-p project] ...` (lib/compose.mjs composeArgs). The fallback it prints is `docker compose${opts.project ? ` -p ${opts.project}` : \"\"} restart backend`, with no -f. Run outside the backend checkout, that fails or targets a different compose project, which is exactly when the operator relies on it.",
+            "suggestion": "Build manualRestart from composeArgs(opts.project) (quote the path), or say 'run from the backend checkout'."
+          },
+          {
+            "title": "Undocumented drift: the tool exits 1 on an unreadable version or an unknown backend state even when no restart may be needed",
+            "file": "tools/restore.mjs",
+            "line": 670,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The spec defines only three outcomes: older+running → restart or exit non-zero; older+stopped → note; newer → warn. The code adds two more exit-1 paths: `if (restored === undefined) fail(...)` (psql version read failed) and `running === undefined` → fail(...) (compose ps failed). Both are only in design.md decision 3, not in the requirement or any scenario.",
+            "suggestion": "Amend the 'Data volume and backup' requirement (or add a scenario) to cover these exit-1 outcomes, or keep them and note them in the delta so the store spec does not silently diverge."
+          },
+          {
+            "title": "The MODIFIED requirement exists only in this repo's change delta; its presence in the docs-store spec could not be verified",
+            "file": "openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md",
+            "line": 3,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "The delta rewrites the product requirement 'Data volume and backup' (store spec platform-foundation) with new SHALLs: Flyway version comparison, restart, and the storage note. contract/ has no matching text (a grep for 'Data volume and backup' under contract/ found nothing), and `openspec show platform-foundation --store doucko` could not be run here. AGENTS.md: product truth lives in the docs store.",
+            "suggestion": "Make sure the docs-store platform-foundation spec gets the same MODIFIED requirement (docs-store change, then bump contract/), or confirm that archiving the backend change is the agreed route for operator-tooling requirements."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 978,
+      "durationMs": 33803,
+      "sessionId": "a0e033ae-234c-484e-a683-8e87e8e7439a",
+      "costUsd": 0.08234799999999999,
+      "numTurns": 2,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1351,
+      "durationMs": 21095,
+      "sessionId": "75abb257-37fe-4acd-b7d6-9bdb4f3b2762",
+      "costUsd": 0.2435976,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism in the code, but the trigger is less likely than the finding says.\n\n**What the code does:** The parse is at `tools/restore.mjs:121`, not 118, inside `backendHealthy()`. `JSON.parse(line)` runs on every non-empty line of `docker compose ps --all --format json backend` stdout, and nothing catches it:\n- There is no try/catch inside the loop.\n- The caller at line 159, `if (restart.status !== 0 || !backendHealthy())`, has no try/catch either.\n- There is no `process.on('uncaughtException')` handler.\n\nA SyntaxError would therefore end the script with a Node stack trace. That skips `fail(...)` (lines 160-163), which is the path that prints \"the data is restored … run `docker compose restart backend`\". The script already committed the restore at line 75, so this does break the intent stated in the header comment (lines 18-19): a failed restart should print the manual step. The other failure paths are all guarded with status checks:\n- `r.status !== 0` leads to `continue`.\n- `query()` returns null on failure.\n- `backendRunning()` returns undefined when compose cannot answer.\n\nThe parse is the only unguarded step in the post-commit path.\n\n**Where the finding overstates it:**\n- **Partial lines:** not possible. `spawnSync` returns stdout only after the process exits, so there are no partial reads.\n- **Warnings:** Compose writes its warnings (for example \"version is obsolete\") to stderr, which this script passes straight through to the terminal (`stdio: [..., 'pipe', 'inherit']`). They never reach stdout.\n- **Older array format:** handled by the `flatMap`.\n\n**What can still trigger it:** a compose or plugin build that writes a non-JSON line to stdout with exit code 0, or a future format change. That is unlikely but possible, and the cost when it happens is the exact failure the design meant to prevent.\n\n**Verdict:** the mechanism is real and unguarded; only the likelihood is overstated. The severity stays minor.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1384,
+      "durationMs": 21882,
+      "sessionId": "2ed84863-971c-4fa9-be0e-8806146c3428",
+      "costUsd": 0.2448376,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "I refuted this one. The code matches the description, but none of the triggers it names can actually happen.\n\n**What is true.** At `tools/restore.mjs:117-121`, `backendHealthy()` calls `JSON.parse(line)` on each line of stdout from `docker compose ps --all --format json backend`, with no try/catch. Nothing up the call chain catches it either: line 159, the top-level module code. So a non-JSON line would crash with an uncaught SyntaxError.\n\n**Why the triggers don't occur:**\n1. **Partial line: impossible.** `compose()` (line 40) uses `spawnSync` with stdout piped. `spawnSync` waits for the process to exit and returns the whole buffered stdout, so `r.stdout` can never hold a partly written line. Also, a non-zero exit is skipped by `continue` before any parsing (line 115).\n2. **Plugin notices or warnings on stdout: not real.** Docker compose v2 writes warnings to stderr, and stderr is set to `inherit`, not piped. That covers \"version is obsolete\", missing env vars and pull/hint messages. Docker's \"What's next\" hints are not shown for `compose ps` and also go to stderr. With `--format json`, stdout carries only the JSON.\n3. **A compose release with another format: already handled.** v2 before 2.21 prints one JSON array on a single line. v2.21 and later print one JSON object per line. The `.flatMap(JSON.parse)` handles both, as the comment on line 116 says. Empty output is filtered out by `.filter(Boolean)` and then returns false through `!c`. Compose v1 (`docker-compose`) is not reached through `docker compose`, and it has no `--format json` anyway.\n\n**Impact even if it did fire.** By this point the script has already printed `restore complete: <file>` (line 80) and the restart-in-progress line (line 157). A crash would still exit non-zero. The operator would lose only the tailored manual-restart hint, not the knowledge that the data was restored.\n\n**Conclusion.** Calling `JSON.parse` without a guard on external output is a fair robustness nit. But the finding gives no realistic way for a user to hit it, and the reasons it gives are wrong or already handled. I could not confirm a reproducible failure, so I'm marking it refuted.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1166,
+      "durationMs": 17694,
+      "sessionId": "b5dbb4cd-ae8f-4e18-a145-58f93ac281f0",
+      "costUsd": 0.2473892,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. In `tools/restore.mjs`, the destructive restore commits at lines 75–79, and `restore complete` is printed at line 80. Only after that, at line 136, does `const latest = latestMigration();` run. `latestMigration()` in `tools/lib/migrations.mjs:32-34` calls `readdirSync(dir)` on `MIGRATIONS_DIR` (`ROOT/src/main/resources/db/migration`), and nothing guards the call: no try/catch, no `throwIfNoEntry`, no existence check. Nothing in `restore.mjs` wraps it either. If the directory is missing or unreadable, Node throws ENOENT/EACCES as an uncaught exception. The process exits non-zero with a stack trace instead of going through `fail()`, so the operator never sees the manual-restart hint (`docker compose restart backend`), which the script gives for every other post-commit failure (lines 141, 153, 160, 167). Nothing earlier in the flow reads that directory, so it is not validated before the destructive step.\n\nThe path is hard to reach. The tool and the migrations live in the same repo, so the directory is missing only in odd setups such as a sparse checkout or a copied tools/ folder. That fits the reviewer's severity of minor and confidence of low. Still, the mechanism exists as described and does not fit the script's own error handling, so the finding is not refuted. The suggested fix is cheap and correct: compute `latestMigration()` before the pg_restore/psql step (it does not depend on the database), or wrap it and call `fail()`.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1199,
+      "durationMs": 23104,
+      "sessionId": "ed03aa00-61cf-4cd8-83e0-1eb4e89ca311",
+      "costUsd": 0.2673484,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding says: `latestMigration()` (tools/lib/migrations.mjs:32-34) calls `readdirSync(MIGRATIONS_DIR)` with no guard, and restore.mjs:136 calls it after the commit and the \"restore complete\" output. But no real user can reach the trigger.\n\n1. ROOT (tools/lib/compose.mjs:8) is the repo root, two levels above tools/lib. MIGRATIONS_DIR is `src/main/resources/db/migration` in that same repo. The same ROOT also locates `compose.yaml` (line 9), and every docker call before the commit depends on it.\n\n2. A \"moved tools/ copy\" therefore has no compose.yaml next to it. The first docker step, `pg_restore --list` at line 52, fails and prints \"nothing was changed\" before anything destructive happens. So that case never reaches line 136.\n\n3. The only remaining trigger is a checkout that has `compose.yaml` and a running stack but no migration directory. That is a hand-crafted sparse checkout of a single-developer repo where the directory is tracked. The backend can't even be built from such a checkout.\n\n4. Even if it were hit, the impact is small. The data has already been restored and \"restore complete\" has been printed. The exit code is non-zero (an uncaught throw). The only loss is the friendlier restart hint.\n\nThe mechanism is real, but under an exploitability/reproducibility lens the path is effectively unreachable for a real operator. This is a hardening nit, not a correctness defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1315,
+      "durationMs": 13156,
+      "sessionId": "f137ab3e-1484-4607-b515-66ec929fdba3",
+      "costUsd": 0.1947392,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds up against the code. In tools/restore.mjs, `schemaVersion()` (lines 95-101) explicitly returns `undefined` when either psql query fails, because `query()` returns null on a non-zero exit (line 91). After the restart, line 165 calls `schemaVersion()` again. Line 166's `!migrated` is true for `undefined`, so it calls fail() with `label(undefined)`, which is \"an unreadable version\" (line 138), and the text then says \"its image is older than this checkout. Rebuild and start it with npm run stack:up.\" So a failed read is reported as a stale image.\n\nNothing else catches this case. The earlier `undefined` check (lines 140-142) covers only the first read (`restored`), not the read after the restart. `backendHealthy()` only checks the backend container's healthcheck, not whether `docker compose exec db psql` works.\n\nThe path can happen: a transient compose/exec failure, or the db container restarting between the health check and the query. It is unlikely, though, because the db was used successfully moments earlier. Even so, the message is internally contradictory (\"unreadable version … image is older\") and sends the operator to rebuild the image when the real problem is a failed read.\n\nThe code is also inconsistent with itself: the first read handles `undefined` on its own path with the manual-restart hint, and the read after the restart doesn't.\n\nImpact is limited. The data is already restored and the script exits 1 either way, so this is only a misleading diagnostic. Minor is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1348,
+      "durationMs": 14373,
+      "sessionId": "18719f58-167a-43d3-b7dd-05d8f2ce5515",
+      "costUsd": 0.1961152,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. In tools/restore.mjs, `schemaVersion()` (lines 95-101) returns `undefined` whenever `query()` gets a non-zero psql or `docker exec` exit. The pre-restart call at line 140 handles `undefined` separately and prints the \"could not be read\" message. The post-restart call at line 165 does not. Since `!undefined` is true, line 166 sends it into the same branch as a version that was read and is behind. With `label(undefined)`, the message at lines 167-169 reads \"schema is at an unreadable version, not V<latest>: its image is older than this checkout. Rebuild and start it with npm run stack:up.\" That points the operator at an image rebuild when the real problem is a failed read. Nothing else guards against this: the `backendHealthy()` check before it only polls the backend container's state and never queries the db through psql.\n\nReachability is real but unlikely. It needs `docker exec ... psql` to fail just after the backend reported healthy, which usually means the db is reachable. It can still happen, for example through a transient exec or daemon error, a db container restart, or a connection limit being hit. Even then, the effect is only a misleading diagnostic plus exit 1. The data is already restored and the step that follows (stack:up) is harmless. So this is a real correctness bug in the error message, with low impact. 'Minor' fits.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1165,
+      "durationMs": 12980,
+      "sessionId": "1aae7cad-9636-4d26-842b-4d5c68b02c61",
+      "costUsd": 0.21030600000000002,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the finding against the code. In tools/restore.mjs, line 130 adds `-p ${opts.project}` to `manualRestart` when `--project` is set. The logs hint at line 162 is a hard-coded string, `docker compose logs backend`, with no `-p`. The actual restart at line 158 uses `composeArgs(opts.project)`, which passes `-f COMPOSE_FILE -p project` (tools/lib/compose.mjs:12-14). So with a non-default `--project`, a user who runs the printed logs command gets the logs of the default project's backend, not the stack that failed. The two hints in the same message are also inconsistent with each other. Nothing else in the file fixes this: `fail()` just prints the message. The path can be reached whenever `--project` is given and the restart or healthcheck fails. Severity stays minor because `--project` is mainly used by tests (\"tests use their own\" in compose.mjs), and the problem is a misleading diagnostic message, not wrong behaviour. The `-f` point is a smaller side issue and also applies to `manualRestart`, but the main claim about the missing `-p` holds.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1198,
+      "durationMs": 14987,
+      "sessionId": "d2582f28-1994-4b43-a0b3-6bc59e5804ff",
+      "costUsd": 0.211204,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed. tools/restore.mjs:130 builds manualRestart with `-p ${opts.project}` when --project is set. The failure message at lines 161-162 prints a hard-coded `docker compose logs backend` with no project flag. --project is a documented, user-facing option (usage at line 4/32, passed to parseArgs). compose.mjs notes that tests use their own project. So the path is reachable: run restore with --project X, the dump is behind the schema, the backend is running, and the restart fails or never becomes healthy. The printed logs command then resolves to the default project (named after the directory, here presumably the main `doucko` stack), not project X. The operator either sees another stack's logs or gets \"no such service\". Nothing guards against this elsewhere. The impact is limited to a misleading diagnostic hint: `logs` is read-only and the restart hint itself is correct. Neither hint includes `-f compose.yaml`, so both depend on cwd equally. That partial point in the finding is a shared limitation, not a difference between the two hints. Minor severity is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1125,
+      "durationMs": 15406,
+      "sessionId": "27ba8d75-7ac7-4f01-a7f9-e9958d1a4112",
+      "costUsd": 0.19864720000000002,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "Two things in the code contradict the claimed mechanism.\n\n1. **The wait is not silent.** `compose()` (tools/restore.mjs:40) spawns docker with `stdio: [\"ignore\", \"pipe\", \"inherit\"]`, so stderr goes to the operator's terminal. A `docker compose ps` that exits non-zero always writes its reason there (\"Cannot connect to the Docker daemon…\", \"no such service\", \"project not found\"). Each failed retry at line 115 therefore prints the real cause every 2 s. The operator does not wait 5 minutes with no feedback, and the cause is not hidden. It is on screen, just above the final \"did not come back healthy\" line, which also tells them to check `docker compose logs backend`.\n\n2. **The \"wrong project\" case cannot reach this loop, and the others are unlikely.** `backendHealthy()` has one caller (line 159). It only runs after two things already worked with the same `composeArgs(opts.project)`: `backendRunning()` returned true from `compose ps --status running --services` with exit 0 and the backend listed, and `docker compose restart backend` exited 0 (`restart.status !== 0 ||` short-circuits otherwise). So the project resolves and compose can see the backend service. Sustained `ps` failure here needs the daemon to die within seconds of a successful restart. Even then the inherited stderr shows that, and the restore still exits 1 with the manual-restart hint, which is what the suggestion asks for.\n\nWhat remains is at most a UX nicety: fail fast instead of retrying for 300 s, in a narrow race window. It is not a correctness defect: the result (exit 1, data restored, manual step printed) is right, and the stated mechanism (no output, cause hidden) is false.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1158,
+      "durationMs": 17122,
+      "sessionId": "4ecaea2c-e1a8-4196-9dfd-4d1186d24e44",
+      "costUsd": 0.1984512,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding is refuted. Its two central claims don't hold up against the code.\n\n1. **\"Without any output\" is wrong.** `compose()` (tools/restore.mjs:40) spawns docker with `stdio: [\"ignore\", \"pipe\", \"inherit\"]`, so stderr goes straight to the terminal. Whenever `docker compose ps` fails, docker prints its own error on every retry. Examples are \"Cannot connect to the Docker daemon…\" and \"no configuration file provided\". The operator sees the real cause about every 2 s and is not left waiting in silence. The final \"did not come back healthy\" message comes after those stderr lines, so it doesn't hide the cause.\n\n2. **The trigger paths can't reasonably be reached.** `backendHealthy()` only runs after `restart.status !== 0 ||` short-circuits (line 159). That means `docker compose … restart backend` with the same `composeArgs(opts.project)` succeeded a moment earlier. Before that, `backendRunning()` must have returned true through a successful `compose ps` (line 150). So by this point compose has just been queried successfully twice with this exact project.\n   - **\"Wrong project\":** can't happen at this point. Even if it could, `compose ps` on a project with no matching container usually exits 0 with empty output. Then `containers[0]` is undefined and the function returns false right away (line 123), not after 300 s.\n   - **\"Daemon gone\":** this needs the Docker daemon to die within seconds of a successful restart. Even then, docker writes the error to the inherited stderr on every retry.\n\nAt most, a vanished daemon costs up to 5 minutes of repeated, visible docker errors before the script exits 1 with the manual-restart hint. That's a cosmetic UX point, not a correctness defect in a realistic scenario.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1361,
+      "durationMs": 28457,
+      "sessionId": "5dc7eb21-a32e-42fd-832f-28bda633a0a6",
+      "costUsd": 0.24748760000000003,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The facts in the finding are correct. At BackupRestoreIT.kt:162 the test runs `docker compose -p <project> build backend` with a 1200 s timeout. tearDown at line 86 then runs `down -v --rmi local`, which removes that project's built image. The pom has no failsafe excludes or groups, so this IT runs on every `verify`. The Dockerfile has no dependency-only layer: it copies `src/main` before `RUN mvn ... package`, so any change under `src/main` re-runs the whole Maven step. That includes downloading dependencies again unless the BuildKit cache still holds the layer. The cost and the network-flakiness risk are therefore real.\n\nIt is not a correctness defect, though:\n1. The test does what NFR-10 needs. It checks that a restored older dump is migrated again by a backend built from *this checkout's* migrations. Building from the checkout is required. Reusing a tagged image across runs (one of the suggestions) risks testing stale migrations, which would weaken the test's correctness.\n2. \"Build once per test class\" changes nothing. Only this one test (line 160) builds the image; the other six start only `db`.\n3. \"Up to 20 minutes\" is the timeout ceiling, not the usual cost. `--rmi local` removes the image but not the BuildKit layer cache, so an unchanged checkout rebuilds mostly from cache.\n\nWhat is left is a performance and CI-flakiness concern: a docker build or network failure is reported as an NFR-10 failure. That is worth noting at nit or performance level, not as a correctness finding. One improvement in its spirit would be a dependency-cache layer in the Dockerfile (`COPY pom.xml` + `mvn dependency:go-offline` before `COPY src/main`), or an opt-in profile."
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1394,
+      "durationMs": 29720,
+      "sessionId": "2c9352f8-b60f-4725-9551-36f7dc77aed3",
+      "costUsd": 0.23832399999999998,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "keep",
+        "reasoning": "I confirmed the mechanism, with some corrections.\n\nWhat the code shows:\n- In BackupRestoreIT.kt the build call is at line 162, not 163: `run(\"docker\",\"compose\",\"-p\",project,\"build\",\"backend\", timeoutSec = 1200)`. Line 163 is the `up --no-build`.\n- `tearDown` runs `down -v --rmi local`, which removes the image each project built.\n- Failsafe picks up `*IT.kt`, and the pom excludes only `cz/doucko/api/**`. So this test runs on every `verify` (and `qa:verify`).\n- The Dockerfile has no layer that caches dependencies on its own. It copies `pom.xml`, `.mvn`, `contract/api` and `src/main`, then runs one `mvn package`. Any change under `src/main` (the normal case during development) invalidates that layer, so Maven downloads every dependency from the network inside the build.\n- So the cost is real. A network or registry failure while fetching Maven dependencies, or while pulling `maven:3.9-eclipse-temurin-21` or `temurin-21-jre-alpine`, fails an NFR-10 test for reasons unrelated to restore.\n\nWhere the finding overstates or is wrong:\n1. \"Up to 20 minutes per verify\": 1200 s is only the timeout, not a typical duration. When nothing changed, BuildKit's layer cache survives `--rmi local`, so a repeat build is fast.\n2. \"Build the image once per test class\": only one test in the class builds, so it already happens once per class. That suggestion does nothing. The other options (reuse a tagged image, opt-in profile, a dependency-cache layer in the Dockerfile) are still valid.\n3. The finding is filed under the \"correctness\" dimension, but no real user or attacker can trigger anything from it. Production behaviour, data and security are untouched. It is a cost and flakiness trade-off in the test suite, chosen on purpose so the test exercises the real built backend restarting and migrating.\n\nVerdict: the claimed mechanism (heavy, network-dependent image build inside the IT run on every verify) is accurate and reproducible, so it is not refuted. It is a minor test-infrastructure concern, not a correctness defect. Keeping the severity at minor is right."
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1480,
+      "durationMs": 24420,
+      "sessionId": "c26e6917-7613-4948-95d7-fa485250e258",
+      "costUsd": 0.24398480000000003,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism holds up against the code.\n\n1. **Restart trigger.** `schemaVersion()` (restore.mjs:95-101) returns `null` when `to_regclass('public.flyway_schema_history')` is absent. The restore drops `public`, so this checks only what the dump contained. At line 143, `behind = latest !== null && (restored === null || …)`, so a dump without a history table counts as behind. If `backendRunning()` is true, line 158 runs `docker compose restart backend`. Nothing checks whether the schema actually has tables.\n\n2. **Flyway refuses the schema.** `application.yaml` sets only `spring.flyway.locations` (no `baseline-on-migrate`, no `baseline-version`). Spring Boot's Flyway defaults to baselineOnMigrate=false, so a non-empty `public` schema without a history table fails startup with \"Found non-empty schema(s) \\\"public\\\" but no schema history table\". The backend never becomes healthy.\n\n3. **Crash loop.** `compose.yaml:60` sets `restart: unless-stopped` on the backend, so it keeps restarting. `backendHealthy()` sees `restarting`, `exited` or `unhealthy`, returns false, and the tool exits 1 with the manual-restart hint. As the finding says, the restart has already happened by then.\n\n**Mitigating points (they don't refute it):**\n- Before the restart, the running backend was already serving a foreign schema. Requests would fail anyway, though Hibernate `validate` runs only at startup. So the change is from \"running but broken\" to \"crash loop\", not from working to broken.\n- The tool says it restores \"a dump written by `npm run backup`\". This stack's backups always carry `flyway_schema_history` once the backend has started; a backup from a never-started database has no tables, and then the restart correctly migrates from scratch. So the trigger needs a hand-made or foreign dump, which is off the intended path.\n- The script exits non-zero and points to the logs, so it doesn't fail silently.\n\nThe path is reachable and the claimed behavior is accurate, but impact is low and the scenario is out of contract. Minor severity fits. The \"security\" dimension label is wrong; this is a correctness or operability issue.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1513,
+      "durationMs": 26026,
+      "sessionId": "d075fa90-97e9-4b2a-badf-66741e6b4e64",
+      "costUsd": 0.21772960000000002,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code path does exist. When `restored === null`, `behind` is true (restore.mjs:143). If the backend is running, it gets restarted (line 158). application.yaml has a `flyway:` block, and the grep found no `baseline` setting, so Flyway would refuse to start against a non-empty schema with no history table. With `restart: unless-stopped`, the backend would then keep restarting.\n\nThe claimed harm doesn't hold up, though:\n\n1. **Nothing working is lost.** Lines 68–75 run `DROP SCHEMA public CASCADE` and replay the foreign dump in one transaction. That happens before the restart decision. By then the \"running backend\" is serving a schema that has none of its tables, so every child or admin request already fails. A crash-looping backend and a backend that 500s on every request are equally down. The restart only makes the failure visible.\n\n2. **It fails loudly with a recovery path.** `backendHealthy()` sees `restarting` or `unhealthy`, and the tool exits 1, telling the operator to check `docker compose logs backend`. A safety backup of the previous good data was taken before anything was dropped (lines 57–66). The data is recoverable by restoring that backup.\n\n3. **The trigger is unrealistic and self-inflicted.** The tool is documented to restore dumps \"written by `npm run backup`\". Those come from a backend that ran Flyway, so they always include `flyway_schema_history`. A DB where Flyway never ran has an empty `public` schema, and for that case the restart is correct. To hit this, an operator with Docker access has to pass `--yes` with a hand-made or foreign dump. No attacker can reach this path, so the \"security\" label is wrong.\n\n4. **The suggested fix doesn't improve the outcome.** Warning without restarting still leaves a backend that can't serve the restored schema. It just fails silently instead of with an exit-1 message.\n\nAt most this is a wording nit about the restart message. It is not a real failure for users and not exploitable.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1566,
+      "durationMs": 15120,
+      "sessionId": "57cd7396-d2ab-49e7-b75d-85d9398e00a7",
+      "costUsd": 0.1991312,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism holds. At tools/restore.mjs:136, `latest = latestMigration()` comes from the checkout's migration directory (imported from ./lib/migrations.mjs). The restart decision depends only on `behind`, which is `compareVersions(restored, latest) < 0` (line 143). Nothing asks the running backend image which version it expects.\n\nWalking through the finding's case (image built at V5, checkout ends at V4, dump at V4):\n- `restored` is V4 and `latest` is V4, so `behind` is false.\n- The \"newer than checkout\" warning (line 144) is also false, because the versions are equal.\n- Neither branch runs, so the script exits 0 after printing \"restore complete\".\n\nThe restore SQL (line 73) drops and recreates `public` and replays the V4 dump. The running V5 backend keeps its connections, sees no V5 tables, and Flyway does not run again because it only migrates at startup (the file's header comment says the same). Requests that touch V5 objects then fail with raw 500s. Nothing guards against this elsewhere. The post-restart check at line 166 only runs inside the `behind` branch, and it only catches the opposite mismatch (image older than checkout). The same gap appears when the checkout has no migrations at all (`latest === null`).\n\nThe precondition is an operator whose checkout doesn't match the deployed image. That is plausible on a dev machine where people switch branches (this repo is on a fix branch right now), but it is not the default path. So \"minor\" fits. The finding's dimension says \"security\", but this is really a correctness or availability problem.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1599,
+      "durationMs": 16465,
+      "sessionId": "0afd4fe7-9707-4b0c-a579-64aa83b1d977",
+      "costUsd": 0.2129032,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism in the code. `latestMigration()` (tools/lib/migrations.mjs:32) reads `src/main/resources/db/migration` from the working tree, and tools/restore.mjs:136 uses that value as the target. The tool restarts the backend only when `behind` is true, meaning the restored version is lower than the checkout's newest migration (lines 143–173). The post-restart check at line 166 runs only inside that branch.\n\nHere is the scenario. The backend image was built at V5, the checkout is at V4, and the dump is at V4. Then `behind` is false and the 'newer' warning at line 144 does not fire, because restored equals latest. No restart happens, and the script falls through with exit 0 after printing 'restore complete'. Flyway migrates only at startup (the file header says so too), so the running V5 backend keeps serving a V4 schema. Requests that touch V5 tables then fail with 500s. That is the failure this change set out to prevent.\n\nNothing elsewhere guards against this. The script never asks the running image which migration it is at.\n\nReproducibility: it requires the operator to switch to an older branch or commit without rebuilding the stack, then run restore. That is plausible on this single-developer Windows machine, for example when checking out main after testing a feature-branch image. It is still an unusual sequence of operator steps.\n\nIt is not a security issue, because no attacker controls this path. It is an operational correctness gap in a local tool. Minor severity is right.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1420,
+      "durationMs": 16331,
+      "sessionId": "61535213-ac69-412b-b414-c26065ad4b00",
+      "costUsd": 0.20363520000000002,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "keep",
+        "reasoning": "The finding holds: the code really works the way it describes. In `tools/restore.mjs:117-121`, `backendHealthy()` calls `.flatMap((line) => JSON.parse(line))` on the stdout of `docker compose ps --all --format json backend`, and nothing catches an error there. The function runs at line 159 (`restart.status !== 0 || !backendHealthy()`), which is after the single-transaction restore has committed (lines 75-80). There is no try/catch at that call or higher up, and no `process.on('uncaughtException')` handler. So if `JSON.parse` throws, Node prints a SyntaxError stack trace and exits 1, and the `fail()` message with the `docker compose restart backend` step at lines 160-163 never prints. The guard at line 115 only skips the case where `ps` exits non-zero. It does nothing for a run that exits 0 but prints output that isn't JSON.\n\nPoints that weaken it, but don't refute it:\n1. The trigger is unlikely. `compose()` sets stderr to `inherit`, so compose warnings (for example \"version is obsolete\") go to the terminal and never reach the parsed stdout. In normal Compose v2 releases, stdout for `--format json` is pure JSON, either one object per line or one array, and the code handles both. Empty stdout gives `[]` and the function returns false cleanly.\n2. The damage is partial. \"restore complete: <file>\" was already printed at line 80, so the operator knows the data was restored. What they lose is the manual-restart guidance.\n\nOverall, the throw-after-commit path is real and unguarded, but only an unusual compose stdout can trigger it. Minor severity with low confidence fits; I'm keeping it as is."
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1453,
+      "durationMs": 16500,
+      "sessionId": "86a233fb-5778-494c-81d0-96f558a6649c",
+      "costUsd": 0.2025152,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding says: `tools/restore.mjs:117-121` calls `JSON.parse(line)` on each stdout line from `docker compose ps --all --format json backend` without a try/catch. But I could not find a realistic way for that parse to fail.\n\n1. **Stdout is JSON.** With `--format json`, Compose v2 prints JSON on stdout: either one object per line (v2.21 and later) or a single array (older releases). The code handles both, because `flatMap` flattens the array. Compose sends its warnings and notices (obsolete `version` attribute, missing env vars, plugin hints) to stderr. `compose()` sets stdio to `['ignore','pipe','inherit']`, so stderr goes straight to the terminal and never reaches the parser.\n2. **Errors are skipped.** A broken or unknown setup (the legacy v1 binary, an unsupported flag, a missing service) exits non-zero, and line 115 (`if (r.status !== 0) continue;`) skips the parse. Empty output is removed by `.filter(Boolean)` and leads to `return false`.\n3. **No attacker path.** Only the local operator runs this tool, and the input is Docker's own output. Nobody else can inject anything into it.\n4. **The operator still learns the data is restored.** Line 80 has already printed `restore complete: <file>` before this code runs, and line 157 has said the backend is being restarted. Even if the parse threw, the output would show the restore committed. The only loss would be the hint to run `docker compose restart backend`.\n\nThe finding itself only says \"if a compose release or plugin writes non-JSON to stdout\", and names no release or plugin that does this. That makes it a hypothetical hardening note, not a reproducible defect. Wrapping the parse in a try/catch would be cheap defensive code, but I can't confirm that the claimed failure actually happens.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2459,
+      "durationMs": 11043,
+      "sessionId": "46dfd574-31b3-4b72-ab14-c16b2c10db04",
+      "costUsd": 0.18337920000000002,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "This finding reports no defect. It is an informational checklist that calls the security areas \"clean\" and suggests nothing to change, so there is no wrong mechanism to confirm. The code agrees with the claims I checked. tools/restore.mjs:40 calls `spawnSync(\"docker\", [...composeArgs(opts.project), ...args])` without a shell. `inDb` at :43-50 passes the dump as an fd on stdin. The RESTORE shell script at :68-74 is built only from constants; the file path never enters the `sh -c` string. I found nothing incorrect at the cited line. Because the finding raises no actionable issue, it should not stand as a \"minor\" finding. Treat it as refuted (no defect) rather than as a confirmed issue.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2492,
+      "durationMs": 6862,
+      "sessionId": "859dfd29-691a-4c30-9182-fd8039301b48",
+      "costUsd": 0.0483056,
+      "numTurns": 2,
+      "result": {
+        "refuted": true,
+        "reasoning": "This finding reports no defect. It is an informational summary saying every security checklist area for the diff is clean, and its suggestion is \"Nothing to change.\" Seen through exploitability and reproducibility, nothing here could happen to a real user or attacker, so there is no mechanism to confirm. It describes an absence of problems, not a vulnerability. Filing it as a \"minor\" issue would overstate it. I'm marking it refuted because it isn't an actionable finding. Its sub-claims (spawnSync argv with no shell, project-scoped IT volumes and images) actually argue that the code is safe.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1399,
+      "durationMs": 23605,
+      "sessionId": "95780d87-0b98-4083-b7a5-c475bcce5a3b",
+      "costUsd": 0.24558699999999997,
+      "numTurns": 9,
+      "result": {
+        "refuted": true,
+        "reasoning": "This finding is a coverage roll-up, not a defect. It names no code path that behaves wrongly, so there's no correctness mechanism to confirm. Its specific citations are also wrong:\n\n- tools/restore.mjs is only 175 lines, so the cited ranges 674-685 and 686-703 don't exist. The schema-version and restart logic is at tools/restore.mjs:136-174.\n- The running-backend restart test is at BackupRestoreIT.kt:158-179, not 442-461.\n- The header says one clause in the requirement text is contradicted by the code, but the finding never identifies it. Nothing in this finding substantiates it.\n\nSome of the summary does hold up:\n- Scenarios 1-4 are covered.\n- The restart path is implemented (restore.mjs:149-173) and tested; that test also checks the child area is served.\n- Scenario 6 is implemented: the not-running branch is at line 154 and the newer-dump warning at lines 144-148.\n- \"Partial\" test coverage of scenario 6 is roughly fair. The tests at BackupRestoreIT.kt:183-206 check the output text but never assert that nothing was restarted.\n\nSo the substance is a mild test-coverage observation, which other findings presumably cover. Taken by itself it shows no correctness defect, and its location claims are wrong.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1432,
+      "durationMs": 11052,
+      "sessionId": "11b5cb9b-87cd-442c-840e-473e07276ae3",
+      "costUsd": 0.1631632,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "This finding is a coverage roll-up, not a defect. Its own suggestion reads \"Informational. Act on the individual findings below.\" It names no failure that a user or attacker could trigger. The \"partial\" scenario (a test that only partly asserts schema/checkout disagreement) and the \"contradicted clause\" are each deferred to separate findings, and those findings should stand or fall on their own. Line 1 of the spec file is just the file header, so nothing at the cited spot can be reproduced. The summary also says the code is correctly implemented (restore.mjs:674-703, BackupRestoreIT.kt:442-461) and that the change touches only tools/, with no src/main or OpenAPI impact. Viewed for exploitability or reproducibility, this finding claims no mechanism to confirm, so it cannot be positively confirmed as a real problem.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/fix-restore-schema-drift/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1223,
+      "durationMs": 13710,
+      "sessionId": "b9b404a5-9c19-4a98-be7e-ab128a99dbea",
+      "costUsd": 0.177376,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed. tasks.md:18 (the finding cites line 17) marks '- [x] 3.5 Archive; commit …' as done. But the change still lives in openspec/changes/fix-restore-schema-drift/ (proposal, design, tasks, specs/platform-foundation/spec.md), and openspec/changes/archive/ has no folder matching *restore*. docs/qa/traceability-report.md:110 records 'active change \"fix-restore-schema-drift\" is not archived'. So the archive step was never done and the checkbox claims something false. This breaks the repo's done-claims-need-evidence rule. The spec delta has also not been merged. Only the commit-trailer half of the task is met. Severity 'major' is fair: it is a process and traceability problem, not a runtime bug.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/fix-restore-schema-drift/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1256,
+      "durationMs": 25492,
+      "sessionId": "6c65b688-8e68-4d5c-adf1-a64ad5a3e8e7",
+      "costUsd": 0.217322,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed. Line 18 of tasks.md (the finding says 17) reads `- [x] 3.5 Archive; commit with Slice: fix-restore-schema-drift + Refs: NFR-10`. The change is still active at openspec/changes/fix-restore-schema-drift/ (proposal, design, tasks, specs/platform-foundation/spec.md). openspec/changes/archive/ has seven dated folders, the latest being 2026-10-05-implement-practice-flow-api, but none for fix-restore-schema-drift. The git status snapshot shows only trace/ledger.jsonl modified, so the change wasn't archived in the working tree either. The repo's own docs/qa/traceability-report.md:110 says 'active change \"fix-restore-schema-drift\" is not archived'. So the box was ticked without the work being done, which is the kind of unbacked done-claim AGENTS.md forbids. Severity: this is a process and traceability problem, not something a user or attacker can trigger. The restore code works either way, and the gate tooling already flags the missing archive. I recommend downgrading from major to minor/moderate.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/fix-restore-schema-drift/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1082,
+      "durationMs": 16977,
+      "sessionId": "89559773-482f-4744-8098-741eff079479",
+      "costUsd": 0.204407,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the finding. At `openspec/changes/fix-restore-schema-drift/tasks.md:16`, task 3.3 is ticked `[x]` and says every review finding is dispositioned in `review-findings.json`. That file does not exist. A glob of the change folder, including any archived copy, finds only `proposal.md`, `design.md`, `tasks.md` and `specs/platform-foundation/spec.md`.\n\nNone of the files under `trace/workflow-runs/` mentions this change. The only file in `trace/` that does is `trace/trace.json`. `docs/current-state.md` cites a `review-findings.json` as evidence for every earlier slice but has no review entry for this change.\n\nThe tick is a done-claim with no evidence behind it, which breaks the AGENTS.md rule that done-claims need evidence pointers. Task 3.5 (Archive) is ticked too, but the change is still sitting unarchived under `openspec/changes/`, so the tasks were ticked ahead of the work. The review that is running now may be the one 3.3 refers to, but until its findings are written down and dispositioned, the checkbox is false.\n\nSeverity stays major: this is a correctness problem in the process record, not a runtime bug.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/fix-restore-schema-drift/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1115,
+      "durationMs": 17034,
+      "sessionId": "b711405e-91fc-47a0-8c8a-7bc41e3d3e6a",
+      "costUsd": 0.1936664,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "I couldn't refute this; the finding holds. `tasks.md:16` ticks \"3.3 Review (fresh reviewer); every finding dispositioned in `review-findings.json`\". A glob of `openspec/changes/fix-restore-schema-drift/**` finds only proposal.md, design.md, tasks.md and specs/platform-foundation/spec.md. No review-findings.json exists for this change anywhere in the repo, while every archived backend change has one.\n\nNothing else covers the missing file. The harness checks for it directly: `scripts/check-trajectory.mjs:84-96` gates \"review-evidence\" (the review must run and its findings be dispositioned before archive), and `scripts/check-process-ratchet.mjs:279-288` marks a missing file NOT-EARNED under --release. So the gates will flag it, and the ticked box is a false completion claim. AGENTS.md forbids exactly this (\"done-claims need evidence pointers\"). The same pattern shows up in 3.5: \"Archive\" is ticked, but the change is still in `openspec/changes/`, not in the archive.\n\nThis doesn't affect runtime: no end user or attacker can trigger anything through it. It's a process and spec-compliance integrity problem that the release gates will catch. That fits \"major\" in this repo's process model, so I'm keeping the severity. One caveat: this review may itself be the pending 3.3 step, which would explain why the file doesn't exist yet. Even so, the box was ticked before the evidence existed.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:docs/qa/automated-verification-latest.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1193,
+      "durationMs": 29163,
+      "sessionId": "665510f0-930b-40b3-bcf8-bf99dd3ace81",
+      "costUsd": 0.2827146,
+      "numTurns": 12,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed. The committed `docs/qa/automated-verification-latest.md` comes from a run that predates this change, so it can't be the evidence for task 3.1:\n- The header says it started at 2026-10-05T07:19:49Z, which is 09:19 in Prague. The change's replay dump is stamped 17:26.\n- In the run log, `OperatorToolGuardTest` reports \"Tests run: 4\" (line 545). At HEAD that file has 5 `@Test` methods. The fifth, \"restore compares migration versions numerically, as Flyway orders them\" (OperatorToolGuardTest.kt:77), is the test task 1.2 added in this change. The run never executed it.\n- The `openspec-active-list` section (line 12839) says \"No active changes found\". If the battery had run while `fix-restore-schema-drift` was an active change, that change would be listed.\nSo the pointer in tasks.md 3.1 resolves to a file that exists but is stale. It doesn't cover the change's new test or the final `tools/restore.mjs`. That breaks the done-claims-need-evidence rule: the pointer must be fresh. Severity stays minor. This is a process and evidence problem, not a product defect, and the replay and IT evidence elsewhere may still show the code works.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:docs/qa/automated-verification-latest.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1226,
+      "durationMs": 31074,
+      "sessionId": "c2a0752e-ca5b-459f-9774-79cd0ca32176",
+      "costUsd": 0.32928040000000003,
+      "numTurns": 13,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed, and the evidence is stronger than the finding claims. docs/qa/automated-verification-latest.md started at 2026-10-05T07:19:49Z (09:19 Prague). Its Maven output shows `OperatorToolGuardTest` with 4 tests (line 545) and `BackupRestoreIT` with 4 tests (line 10532). The current tree has 5 `@Test` methods in OperatorToolGuardTest.kt and 7 in BackupRestoreIT.kt. This change's own evidence file (docs/qa/evidence/fix-restore-schema-drift.md) also records \"BackupRestoreIT 7 run\" and \"OperatorToolGuardTest 5 run\" after the fix, plus a replay dump stamped 20261005-172607. So the battery ran before the new RED/GREEN tests and the new tools/restore.mjs existed. It doesn't cover this change at all.\n\nTask 3.1 says \"qa:verify green\" and points to evidence from before the change, which is exactly the stale-pointer case the done-claims-need-evidence lesson forbids. git status shows only trace/ledger.jsonl modified, so no newer battery output is sitting uncommitted either.\n\nNo product defect follows from this: there's no runtime impact and nothing an attacker could exploit. It's a process/evidence-integrity problem, so minor severity is right.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1618,
+      "durationMs": 26064,
+      "sessionId": "a76c0ef1-b8fa-4c68-aab5-a92db7cd2ef4",
+      "costUsd": 0.26256880000000005,
+      "numTurns": 10,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds, but it cites the wrong line. The message is at tools/restore.mjs:166-170, not line 696; the file has only 175 lines.\n\n**What the code does**\n- When the schema is still behind after the restart, the tool calls `fail(\"the backend restarted, but the schema is at …, not V${latest}: its image is older than this checkout. Rebuild and start it with npm run stack:up.\")`.\n- That message never uses `manualRestart` (defined at line 130) and never says \"the data is restored\".\n- Every other failure after the commit (lines 141, 153 and 161-162) begins with \"the data is restored, but\" and includes `${manualRestart}`.\n\n**Why it misses the spec and design**\n- Design decision 3 lists \"schema still behind\" among the failures that must print that the data IS restored, plus the `docker compose [-p <project>] restart backend` step.\n- The spec says \"...or else print the manual restart step and exit non-zero\".\n\n**Mitigation I checked**\n- Design decision 2 says this branch should \"say to rebuild with `npm run stack:up` and exit 1\", so the design contradicts itself here.\n- Recommending a rebuild instead of a restart is reasonable: restarting an old image would not help.\n- That weakens the \"missing restart step\" half of the finding. It does not excuse leaving out \"the data is restored\", which decision 3 still requires and which the other messages all include.\n\n**The `--project` point is also real**\n- `stack:up` runs `node tools/stack.mjs up`, and tools/stack.mjs has no project handling (a grep found none).\n- So a user who ran with `--project` would be told to rebuild the default (owner) stack, not the one they restored into.\n\n**Severity**\nThis is wrong operator text on one rare failure path. The exit code is still non-zero and no data is at risk, so \"minor\" fits better than \"major\".",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1651,
+      "durationMs": 26929,
+      "sessionId": "4138df58-c343-4c20-ac7f-115a3d77b7dd",
+      "costUsd": 0.23841160000000003,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding is real, but it cites the wrong line and overstates the severity. tools/restore.mjs has only 175 lines, so line 696 does not exist. The message is at tools/restore.mjs:166-170.\n\nHow to reach it: the dump's schema is older than the checkout, the backend is running, it restarts and becomes healthy, but `schemaVersion()` still returns a version older than `latest`. This happens whenever the running image was built before the newest migrations, which the design itself expects. In that case `fail()` prints \"the backend restarted, but the schema is at …: its image is older than this checkout. Rebuild and start it with npm run stack:up.\" That message:\n\n(a) does not say the data is restored. Every other post-commit failure says so (lines 141, 153, 161). Design decision 3 lists \"schema still behind\" among the failures that must say it. That part of the finding is confirmed.\n\n(b) does not include `manualRestart`. Two things weaken this point. Design decision 2 (design.md:19-21) says that for this exact case the tool tells the user to rebuild with `npm run stack:up`, so the code follows decision 2 and the design contradicts itself. Also, telling the user to `restart backend` would be wrong here, because restarting the same old image cannot migrate the schema. The real fix is to make the spec and design agree, not to print the restart step.\n\n(c) The `--project` point holds. `stack:up` runs `node tools/stack.mjs up`, and tools/stack.mjs has no `-p`/project handling. So when someone restores into `--project X`, the advice rebuilds the default stack, not X.\n\nImpact: the exit code is still 1, nothing is lost, and the data is restored. The harm is a misleading message: the user may think the restore failed, or may run the rebuild against the wrong stack. That is a real but minor operator-UX and spec-wording problem, not a major defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1466,
+      "durationMs": 20955,
+      "sessionId": "8723a67e-46f5-4a47-accd-d5b38f9dd1bd",
+      "costUsd": 0.301238,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds, though its line number is wrong: BackupRestoreIT.kt has only 216 lines, so line 440 doesn't exist. The gap itself is real.\n\nRestore tests in BackupRestoreIT:\n- line 160: the success path, which checks for 'restarted'.\n- line 183: no backend running.\n- line 197: the dump is newer than the checkout, so nothing is restarted.\n- line 210: --yes is missing, so the tool exits 1 before doing anything. This is a pre-commit refusal, not a post-commit failure.\n\nThe `restore()` helper wraps `run()`. `run()` checks for exit 0 (line 46), so every restore call in these tests expects success. None of the tests makes the restart fail, makes the healthcheck turn unhealthy, uses a backend image older than the checkout, or makes the version unreadable. None checks for a non-zero exit or the manual `docker compose restart backend` text after the restore has committed.\n\nOperatorToolGuardTest only covers backup directory guards, numeric version comparison and directory usage. It has nothing on the post-commit decision logic either.\n\nThe evidence file (docs/qa/evidence/fix-restore-schema-drift.md:63) says outright that these branches are 'reviewed, not exercised by a test'. AGENTS.md requires test-first work, with each spec clause covered by a RED-then-GREEN test. So a spec clause ('print the manual restart step and exit non-zero') has no executable check, and the finding is correct. Severity: keep it as filed. This is the path an operator relies on to learn that a restore is only half finished.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1499,
+      "durationMs": 21620,
+      "sessionId": "b064df8e-1b50-44e8-85c8-058f3d5b5825",
+      "costUsd": 0.2455662,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds, though the cited line is wrong: BackupRestoreIT.kt has only 217 lines, so line 440 does not exist.\n\nThe code confirms the gap. In tools/restore.mjs, every failure after the restore has committed goes through `fail()`, which prints the message and exits 1:\n- version unreadable (line 141)\n- docker compose cannot say whether the backend runs (line 153)\n- restart fails or the backend does not come back healthy (lines 159-163)\n- schema still behind because the image is older than the checkout (lines 166-170)\n\nNo test exercises any of these branches. The BackupRestoreIT tests cover only:\n- the happy round-trip\n- a truncated dump (exits non-zero, but before the commit)\n- removal of newer-schema objects\n- a successful restart and migrate\n- backend not running\n- a dump newer than the checkout\n- the missing `--yes` refusal\n\nOperatorToolGuardTest calls restore.mjs once, at line 107, for a guard case. A grep for \"data is restored\" or \"restart backend\" in src/test finds nothing. docs/qa/evidence/fix-restore-schema-drift.md:63 states that these branches are \"reviewed, not exercised by a test\".\n\nThe branches can really happen. A stale backend image is enough to trigger the \"image older than checkout\" branch, and a crash-looping container triggers the unhealthy branch. So the spec clause \"print the manual restart step and exit non-zero\" is implemented but has no test behind it. The project's test-first rules expect spec clauses to be backed by tests.\n\nDowngrade to minor:\n- This is a coverage gap in an operator CLI, not a defect. The code exists, is simple, and exits non-zero as specified.\n- A test alone would not fix any user-facing data-loss risk. In every branch the data is already restored.\n- The evidence file discloses the gap openly rather than claiming it is covered.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1244,
+      "durationMs": 24057,
+      "sessionId": "09766cbb-ada1-4e31-bd4e-9cc29cfa2ffe",
+      "costUsd": 0.2675386,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The finding holds, though the line number is wrong. BackupRestoreIT.kt has only 217 lines. The cited test is at lines 196-206 (`restoring a dump newer than this checkout warns and restarts nothing`). It runs only `compose(\"up\", \"-d\", \"--wait\", \"db\")`, writes a V999 history and restores. It then asserts only `shouldContain \"V999\"` and `shouldContain \"newer\"`. No backend service exists in that test, so \"restarts nothing\" (spec.md:57, design.md:29-31) is true by default and nothing tests it.\n\nI could not find anything that covers it elsewhere. The older-dump test with the backend running (lines 158-179) uses the `behind` branch, not the newer branch. The no-backend test (182-193) uses the `!running` branch.\n\nWhy I downgraded: the gap is real but the risk is very low. In tools/restore.mjs:144-148, the newer-dump branch only calls console.warn. The restart call (spawnSync ... restart backend, line 158) is only inside the `else if (behind)` branch, and `behind` cannot be true when restored > latest. So the code structurally cannot restart in this case. Only a later refactor could break this, and nothing currently tests against that.\n\nThe suggested assertion is also flawed. The warning itself ends with \"Nothing was restarted.\" (line 147), so `output shouldNotContain \"restarted\"` would fail. A correct check would compare the backend container's StartedAt before and after the restore, or assert that the output lacks \"backend restarted\". The other option is to narrow the scenario wording."
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1277,
+      "durationMs": 19547,
+      "sessionId": "826fdba7-fc1a-4e2b-8dcc-cf3bc8898760",
+      "costUsd": 0.25601360000000006,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The line reference is wrong: BackupRestoreIT.kt has 217 lines, not 479. The test in question is at lines 196–206. The finding is right that the test only starts `db` and asserts only \"V999\" and \"newer\", so the \"restarts nothing\" part is never checked against a running backend. Through the reproducibility lens, though, no real user can hit a wrong restart here. In tools/restore.mjs:144–174 the newer-dump case is the `if` branch: it only prints a warning, which itself says \"Nothing was restarted.\" The only `restart backend` spawn (line 158) sits in the mutually exclusive `else if (behind)` branch, and `behind` needs restored < latest, which a newer dump never satisfies. Code structure guarantees that a newer dump never triggers a restart, whether or not a backend is running, so there is no defect for the missing check to miss. Adding a running backend to the test would only re-check an if/else that cannot go the other way. At most this is a nit: the test could cheaply assert `output shouldContain \"Nothing was restarted\"` and `shouldNotContain \"restarted now\"`. It is not a reachable spec violation. Refuted as a real-impact finding; at most a nit-level coverage note with a wrong line number.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1312,
+      "durationMs": 36227,
+      "sessionId": "c7516b62-1b48-4915-8097-33abd74c274d",
+      "costUsd": 0.2245608,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code exists, but the line number is wrong: the parse is at tools/restore.mjs:121, not 647. I couldn't find a realistic way to reach the failure the finding describes.\n\n1. **Compose warnings never reach the parser.** `compose()` (line 40) runs with `stdio: [\"ignore\", \"pipe\", \"inherit\"]`, so only stdout is captured. Docker compose writes its warnings (`WARN[...]`, obsolete `version`, missing env vars) to stderr. That stream is inherited and shown to the operator, never passed to `JSON.parse`. With `--format json`, stdout holds only JSON. Both output shapes are handled: one object per line (compose v2.21+) and one array (older releases). An empty result is handled too: `[]` or empty stdout leads to `containers[0]` being undefined, which returns false and reaches `fail(...)` with the manual step.\n2. **Errors are already caught.** An unknown service, a stopped daemon or a bad project makes compose exit non-zero. Line 115 retries on that, and line 127 returns false after the timeout, which reaches `fail(...)` with the manual restart. The loop never parses stdout from a failed call.\n3. **The \"data is restored\" message is printed before the parse can run.** Lines 80–84 print `restore complete: <file>` before the schema check starts. Even in a made-up case where compose put non-JSON on stdout, the operator would already have seen that the restore committed. What they would miss is only the tailored restart hint, not the fact that the data is restored. So the finding's claim that the stack trace \"skips the 'data is restored' message\" is wrong as written.\n\nThe only remaining trigger is a future compose release changing its JSON output format. That is speculative and not a defect in this code as it stands. The idea of wrapping the parse in try/catch is cheap hardening, not a correctness bug.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1345,
+      "durationMs": 21812,
+      "sessionId": "b3dfc229-a41c-42c5-9c62-2cede419f113",
+      "costUsd": 0.2766482,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding cites line 647, but tools/restore.mjs has only 175 lines. The code it describes is real: `backendHealthy()` at tools/restore.mjs:112-128 calls `.flatMap((line) => JSON.parse(line))` at line 121 with no try/catch, and its caller (line 159) runs after the restore has committed. If that parse threw, Node would print an uncaught SyntaxError and the `fail(...)` manual-step message on line 160 would never print.\n\nThe trigger the finding proposes does not actually happen, though:\n1. **Warnings don't reach the parsed text.** `compose()` (line 40) uses `stdio: [\"ignore\", \"pipe\", \"inherit\"]`, so only stdout is captured. Compose prints its warnings (obsolete `version` attribute, unset env vars, orphan containers) to stderr, which goes straight to the terminal and is never parsed.\n2. **Both known output shapes parse.** With `--format json`, stdout holds one JSON object per line (compose v2.21+) or a single JSON array (older v2). `flatMap` handles both, and `.filter(Boolean)` removes blank lines and empty output. Classic `docker-compose` v1 isn't used: the tool always runs `docker compose`.\n3. **\"A format change\" is a guess.** Nothing in the repo or the Compose CLI shows non-JSON output on stdout under `--format json`.\n4. **The operator still learns the data is restored.** Before `backendHealthy()` runs, the script has already printed \"restore complete: <file>\" (line 80) and \"... so it is restarted now.\" (line 157). In the unlikely case of a throw, only the copy-paste `docker compose restart backend` hint would be missing.\n\nSo this is a theoretical hardening point (adding a try/catch is cheap). There is no reproducible path for a real operator, and the cited line number is wrong.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1084,
+      "durationMs": 21762,
+      "sessionId": "147b3d75-87fc-4aa6-bd50-fe4b37970cf1",
+      "costUsd": 0.22339320000000001,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The finding cites the wrong line. The code is at `tools/restore.mjs:130`, not 660, but the mechanism is real. Every docker call the tool makes goes through `composeArgs(opts.project)` (`tools/lib/compose.mjs:12-13`), which expands to `compose -f <ROOT>/compose.yaml [-p project]`. That covers `tools/restore.mjs:40`, `:46` and the automatic restart at `:158`. The printed fallback (`manualRestart`, `:130`) leaves out `-f`. It is shown in three failure messages (`:141`, `:153`, `:162`). So the command the operator is told to copy is not the command the tool runs.\n\nImpact is smaller than the finding says. The documented entry point is `npm run restore`, which an operator runs from inside the backend checkout. From that shell, a bare `docker compose` finds `compose.yaml` in the current directory (or a parent). It also gets the same default project name, the compose file's directory. In the normal workflow the printed command therefore works. It only breaks if someone runs `node <abs-path>/tools/restore.mjs` or `npm --prefix` from another directory. Then compose finds no file, or a different one with a different project. That is an edge case, but it is the \"manual recovery\" path, so the inconsistency is worth fixing cheaply: build the string from `composeArgs` with the path quoted, or add \"from the backend checkout\".\n\nConfirmed as an inconsistency, downgraded from minor to a nit because the usual invocation works. The line number in the finding is wrong."
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1117,
+      "durationMs": 23984,
+      "sessionId": "0402153a-8d8f-487b-99bb-957012ffeda6",
+      "costUsd": 0.23733419999999997,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code is at tools/restore.mjs:130, not line 660. The string itself is quoted correctly: `docker compose${opts.project ? ` -p ...` : \"\"} restart backend` has no `-f`, while the tool's own calls go through composeArgs(), which adds `-f <ROOT>/compose.yaml` (tools/lib/compose.mjs:12-13). The claimed harm does not hold up for the real usage path, though.\n\n1. **How it is run.** The documented and only scripted entry point is `npm run restore` (package.json:26 → `node tools/restore.mjs`). npm only finds that script when the operator's shell is inside the backend checkout. That same shell is where the operator would paste the printed command.\n2. **Docker finds the file on its own.** Without `-f`, `docker compose` looks for compose.yaml in the current directory and then each parent directory. Anywhere in the checkout it finds the same `<ROOT>/compose.yaml` the tool uses.\n3. **Same project.** compose.yaml sets `name: doucko` (line 14), so without `-p` the project name matches the tool's default. When `--project` is passed, the printed command includes the same `-p`. The \"targets a different compose project\" scenario does not happen from the checkout.\n4. **Outside the checkout it fails loudly.** The bad case needs someone to run `node <abs path>/tools/restore.mjs` from another directory, which is not a documented workflow. Even then, the printed command errors with \"no configuration file provided\" or \"no such service: backend\". It does not quietly restart the wrong thing.\n5. **Rare branches.** The command is only printed after the restore has already committed, and only when the schema version can't be read, docker can't tell whether the backend is running, or the restart fails.\n\nWhat's left is a cosmetic hardening point. Building the hint from composeArgs() would be slightly more robust. But for the documented workflow, there is no realistic user path where the printed command reaches the wrong target or fails.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1201,
+      "durationMs": 23749,
+      "sessionId": "b3a38d67-e056-4a6f-88eb-87f0fdddd67b",
+      "costUsd": 0.2323632,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The cited line is wrong: tools/restore.mjs has only 175 lines. The behaviour itself is real, though. At restore.mjs:140-142, `restored === undefined` (psql could not read flyway_schema_history) calls fail(...), which exits 1. At restore.mjs:150-153, `backendRunning()` returns undefined when `compose ps` fails, and that also calls fail(...) with exit 1. Both are reached only after the restore has committed. The store delta (openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md) covers only four cases: older dump with the backend running (restart, or exit non-zero if that fails), older dump with it stopped (note), newer dump (warn), and the storage-volume notice. No requirement text or scenario mentions what happens when the version or the backend state cannot be determined. So the finding's facts hold: there are two exit-1 paths the spec does not describe.\n\nOn correctness, the code is not wrong. When the tool cannot tell whether a restart is needed, failing loudly and printing the manual restart step is the safe choice. Exiting 0 in that situation would bring back the original bug: a running backend left serving a stale schema. The phrase \"even when no restart may be needed\" is true but does not point to a defect, because the tool cannot know either way and exit 1 is the right signal. The spec is silent here rather than contradicted. It says \"SHALL compare\", and if the comparison cannot be made, a failure exit is a reasonable reading. design.md decision 3 already documents both paths.\n\nNot refuted, because the documentation gap does exist. Downgrade it to a nit: it is about spec completeness, not a correctness or behaviour bug. Adding one sentence to the requirement (\"if the restored version or the backend state cannot be determined, it prints the manual step and exits non-zero\") would close the gap."
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.06)"
+    },
+    {
+      "label": "verify:openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.06)"
+    },
+    {
+      "label": "verify:openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.06)"
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "21 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 11, contested: 6, rejected: 4"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/fix-restore-schema-drift/review-findings.json"
+  ],
+  "returned": {
+    "scope": "fix-restore-schema-drift backend (tools/restore.mjs: Flyway version check, backend restart after restore, storage note)",
+    "summary": "Review gate for fix-restore-schema-drift backend (tools/restore.mjs: Flyway version check, backend restart after restore, storage note): 11 confirmed, 6 contested (treat as confirmed unless trivially wrong), 4 rejected.",
+    "confirmed": [
+      {
+        "title": "Message for a schema that is still behind after the restart can name the wrong cause",
+        "file": "tools/restore.mjs",
+        "line": 167,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`const migrated = schemaVersion(); if (!migrated || compareVersions(migrated, latest) < 0) fail(`...schema is at ${label(migrated)}...: its image is older than this checkout. Rebuild...`)`. `schemaVersion()` returns `undefined` when psql fails (for example, a db hiccup right after the restart). The message would then say \"schema is at an unreadable version ... its image is older than this checkout\" and send the operator to rebuild the image for what is really a read failure.",
+        "suggestion": "Handle `migrated === undefined` separately: say the version could not be read and print the manual check or restart hint. Keep the \"image older than this checkout\" text for a version that was read and is still behind.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds up against the code. In tools/restore.mjs, `schemaVersion()` (lines 95-101) explicitly returns `undefined` when either psql query fails, because `query()` returns null on a non-zero exit (line 91). After the restart, line 165 calls `schemaVersion()` again. Line 166's `!migrated` is true for `undefined`, so it calls fail() with `label(undefined)`, which is \"an unreadable version\" (line 138), and the text then says \"its image is older than this checkout. Rebuild and start it with npm run stack:up.\" So a failed read is reported as a stale image.\n\nNothing else catches this case. The earlier `undefined` check (lines 140-142) covers only the first read (`restored`), not the read after the restart. `backendHealthy()` only checks the backend container's healthcheck, not whether `docker compose exec db psql` works.\n\nThe path can happen: a transient compose/exec failure, or the db container restarting between the health check and the query. It is unlikely, though, because the db was used successfully moments earlier. Even so, the message is internally contradictory (\"unreadable version … image is older\") and sends the operator to rebuild the image when the real problem is a failed read.\n\nThe code is also inconsistent with itself: the first read handles `undefined` on its own path with the manual-restart hint, and the read after the restart doesn't.\n\nImpact is limited. The data is already restored and the script exits 1 either way, so this is only a misleading diagnostic. Minor is the right severity.",
+          "The mechanism is real. In tools/restore.mjs, `schemaVersion()` (lines 95-101) returns `undefined` whenever `query()` gets a non-zero psql or `docker exec` exit. The pre-restart call at line 140 handles `undefined` separately and prints the \"could not be read\" message. The post-restart call at line 165 does not. Since `!undefined` is true, line 166 sends it into the same branch as a version that was read and is behind. With `label(undefined)`, the message at lines 167-169 reads \"schema is at an unreadable version, not V<latest>: its image is older than this checkout. Rebuild and start it with npm run stack:up.\" That points the operator at an image rebuild when the real problem is a failed read. Nothing else guards against this: the `backendHealthy()` check before it only polls the backend container's state and never queries the db through psql.\n\nReachability is real but unlikely. It needs `docker exec ... psql` to fail just after the backend reported healthy, which usually means the db is reachable. It can still happen, for example through a transient exec or daemon error, a db container restart, or a connection limit being hit. Even then, the effect is only a misleading diagnostic plus exit 1. The data is already restored and the step that follows (stack:up) is harmless. So this is a real correctness bug in the error message, with low impact. 'Minor' fits."
+        ]
+      },
+      {
+        "title": "Logs hint on restart failure leaves out the compose project",
+        "file": "tools/restore.mjs",
+        "line": 162,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "The failure text says \"Check `docker compose logs backend`, fix the cause and run `${manualRestart}`\". `manualRestart` includes `-p <project>` when `--project` is set, but the logs command does not. With a non-default project, running that logs command as printed (and without `-f` to the repo's compose file) targets the default `doucko` project. That is the owner's stack, not the one that failed.",
+        "suggestion": "Build the logs hint the same way as `manualRestart`, e.g. `docker compose${opts.project ? ` -p ${opts.project}` : \"\"} logs backend`, and share that prefix between both hints.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the finding against the code. In tools/restore.mjs, line 130 adds `-p ${opts.project}` to `manualRestart` when `--project` is set. The logs hint at line 162 is a hard-coded string, `docker compose logs backend`, with no `-p`. The actual restart at line 158 uses `composeArgs(opts.project)`, which passes `-f COMPOSE_FILE -p project` (tools/lib/compose.mjs:12-14). So with a non-default `--project`, a user who runs the printed logs command gets the logs of the default project's backend, not the stack that failed. The two hints in the same message are also inconsistent with each other. Nothing else in the file fixes this: `fail()` just prints the message. The path can be reached whenever `--project` is given and the restart or healthcheck fails. Severity stays minor because `--project` is mainly used by tests (\"tests use their own\" in compose.mjs), and the problem is a misleading diagnostic message, not wrong behaviour. The `-f` point is a smaller side issue and also applies to `manualRestart`, but the main claim about the missing `-p` holds.",
+          "Confirmed. tools/restore.mjs:130 builds manualRestart with `-p ${opts.project}` when --project is set. The failure message at lines 161-162 prints a hard-coded `docker compose logs backend` with no project flag. --project is a documented, user-facing option (usage at line 4/32, passed to parseArgs). compose.mjs notes that tests use their own project. So the path is reachable: run restore with --project X, the dump is behind the schema, the backend is running, and the restart fails or never becomes healthy. The printed logs command then resolves to the default project (named after the directory, here presumably the main `doucko` stack), not project X. The operator either sees another stack's logs or gets \"no such service\". Nothing guards against this elsewhere. The impact is limited to a misleading diagnostic hint: `logs` is read-only and the restart hint itself is correct. Neither hint includes `-f compose.yaml`, so both depend on cwd equally. That partial point in the finding is a shared limitation, not a difference between the two hints. Minor severity is appropriate."
+        ]
+      },
+      {
+        "title": "Migration IT builds a full backend image inside the IT run, so the test is heavy and slow",
+        "file": "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+        "line": 163,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`run(\"docker\", \"compose\", \"-p\", project, \"build\", \"backend\", timeoutSec = 1200)` builds the backend image from the Dockerfile on every run, and `--rmi local` removes it in tearDown. Isolation from the owner's image holds: the image is named `<project>-backend` and only that project's local images are removed. The cost is up to 20 minutes per `verify`, and a docker build failure (e.g. a network problem fetching Maven dependencies) fails NFR-10 for reasons that have nothing to do with restore.",
+        "suggestion": "Consider building the image once per test class, or tagging it per run and reusing it, or putting this scenario behind an opt-in profile. Keep the separate project and `--rmi local` cleanup as they are.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The facts in the finding are correct. At BackupRestoreIT.kt:162 the test runs `docker compose -p <project> build backend` with a 1200 s timeout. tearDown at line 86 then runs `down -v --rmi local`, which removes that project's built image. The pom has no failsafe excludes or groups, so this IT runs on every `verify`. The Dockerfile has no dependency-only layer: it copies `src/main` before `RUN mvn ... package`, so any change under `src/main` re-runs the whole Maven step. That includes downloading dependencies again unless the BuildKit cache still holds the layer. The cost and the network-flakiness risk are therefore real.\n\nIt is not a correctness defect, though:\n1. The test does what NFR-10 needs. It checks that a restored older dump is migrated again by a backend built from *this checkout's* migrations. Building from the checkout is required. Reusing a tagged image across runs (one of the suggestions) risks testing stale migrations, which would weaken the test's correctness.\n2. \"Build once per test class\" changes nothing. Only this one test (line 160) builds the image; the other six start only `db`.\n3. \"Up to 20 minutes\" is the timeout ceiling, not the usual cost. `--rmi local` removes the image but not the BuildKit layer cache, so an unchanged checkout rebuilds mostly from cache.\n\nWhat is left is a performance and CI-flakiness concern: a docker build or network failure is reported as an NFR-10 failure. That is worth noting at nit or performance level, not as a correctness finding. One improvement in its spirit would be a dependency-cache layer in the Dockerfile (`COPY pom.xml` + `mvn dependency:go-offline` before `COPY src/main`), or an opt-in profile.",
+          "I confirmed the mechanism, with some corrections.\n\nWhat the code shows:\n- In BackupRestoreIT.kt the build call is at line 162, not 163: `run(\"docker\",\"compose\",\"-p\",project,\"build\",\"backend\", timeoutSec = 1200)`. Line 163 is the `up --no-build`.\n- `tearDown` runs `down -v --rmi local`, which removes the image each project built.\n- Failsafe picks up `*IT.kt`, and the pom excludes only `cz/doucko/api/**`. So this test runs on every `verify` (and `qa:verify`).\n- The Dockerfile has no layer that caches dependencies on its own. It copies `pom.xml`, `.mvn`, `contract/api` and `src/main`, then runs one `mvn package`. Any change under `src/main` (the normal case during development) invalidates that layer, so Maven downloads every dependency from the network inside the build.\n- So the cost is real. A network or registry failure while fetching Maven dependencies, or while pulling `maven:3.9-eclipse-temurin-21` or `temurin-21-jre-alpine`, fails an NFR-10 test for reasons unrelated to restore.\n\nWhere the finding overstates or is wrong:\n1. \"Up to 20 minutes per verify\": 1200 s is only the timeout, not a typical duration. When nothing changed, BuildKit's layer cache survives `--rmi local`, so a repeat build is fast.\n2. \"Build the image once per test class\": only one test in the class builds, so it already happens once per class. That suggestion does nothing. The other options (reuse a tagged image, opt-in profile, a dependency-cache layer in the Dockerfile) are still valid.\n3. The finding is filed under the \"correctness\" dimension, but no real user or attacker can trigger anything from it. Production behaviour, data and security are untouched. It is a cost and flakiness trade-off in the test suite, chosen on purpose so the test exercises the real built backend restarting and migrating.\n\nVerdict: the claimed mechanism (heavy, network-dependent image build inside the IT run on every verify) is accurate and reproducible, so it is not refuted. It is a minor test-infrastructure concern, not a correctness defect. Keeping the severity at minor is right."
+        ]
+      },
+      {
+        "title": "The target version comes from the checkout, not the running image, so a checkout older than the image leaves a mismatched schema and exits 0",
+        "file": "tools/restore.mjs",
+        "line": 136,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`latestMigration()` reads src/main/resources/db/migration in the working tree. Example: the image was built at V5, then the operator checked out an older branch whose migrations end at V4, and the dump is at V4. `behind` is false, so nothing restarts, and the tool prints success with exit 0. The running V5 backend then serves a V4 schema, and requests that touch V5 tables return 500s. That is exactly the failure this change is meant to prevent. The post-restart check at line 166 covers the opposite case (image older than checkout) but not this one.",
+        "suggestion": "Read the expected version from the running backend instead of the checkout, for example with `docker compose exec backend` to list the migrations in the jar, or from an actuator/flyway or info endpoint. At minimum, when the backend is running, restart it whenever the restored version differs from the version that was there before the restore.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism holds. At tools/restore.mjs:136, `latest = latestMigration()` comes from the checkout's migration directory (imported from ./lib/migrations.mjs). The restart decision depends only on `behind`, which is `compareVersions(restored, latest) < 0` (line 143). Nothing asks the running backend image which version it expects.\n\nWalking through the finding's case (image built at V5, checkout ends at V4, dump at V4):\n- `restored` is V4 and `latest` is V4, so `behind` is false.\n- The \"newer than checkout\" warning (line 144) is also false, because the versions are equal.\n- Neither branch runs, so the script exits 0 after printing \"restore complete\".\n\nThe restore SQL (line 73) drops and recreates `public` and replays the V4 dump. The running V5 backend keeps its connections, sees no V5 tables, and Flyway does not run again because it only migrates at startup (the file's header comment says the same). Requests that touch V5 objects then fail with raw 500s. Nothing guards against this elsewhere. The post-restart check at line 166 only runs inside the `behind` branch, and it only catches the opposite mismatch (image older than checkout). The same gap appears when the checkout has no migrations at all (`latest === null`).\n\nThe precondition is an operator whose checkout doesn't match the deployed image. That is plausible on a dev machine where people switch branches (this repo is on a fix branch right now), but it is not the default path. So \"minor\" fits. The finding's dimension says \"security\", but this is really a correctness or availability problem.",
+          "I confirmed the mechanism in the code. `latestMigration()` (tools/lib/migrations.mjs:32) reads `src/main/resources/db/migration` from the working tree, and tools/restore.mjs:136 uses that value as the target. The tool restarts the backend only when `behind` is true, meaning the restored version is lower than the checkout's newest migration (lines 143–173). The post-restart check at line 166 runs only inside that branch.\n\nHere is the scenario. The backend image was built at V5, the checkout is at V4, and the dump is at V4. Then `behind` is false and the 'newer' warning at line 144 does not fire, because restored equals latest. No restart happens, and the script falls through with exit 0 after printing 'restore complete'. Flyway migrates only at startup (the file header says so too), so the running V5 backend keeps serving a V4 schema. Requests that touch V5 tables then fail with 500s. That is the failure this change set out to prevent.\n\nNothing elsewhere guards against this. The script never asks the running image which migration it is at.\n\nReproducibility: it requires the operator to switch to an older branch or commit without rebuilding the stack, then run restore. That is plausible on this single-developer Windows machine, for example when checking out main after testing a feature-branch image. It is still an unusual sequence of operator steps.\n\nIt is not a security issue, because no attacker controls this path. It is an operational correctness gap in a local tool. Minor severity is right."
+        ]
+      },
+      {
+        "title": "Task 3.5 'Archive; commit' is ticked, but the change is not archived",
+        "file": "openspec/changes/fix-restore-schema-drift/tasks.md",
+        "line": 17,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "tasks.md: '- [x] 3.5 Archive; commit with `Slice: fix-restore-schema-drift` + `Refs: NFR-10`.' Reality: the change still sits at openspec/changes/fix-restore-schema-drift/ with no archive/2026-10-05-fix-restore-schema-drift folder. The diff's own traceability-report.md:110 adds 'active change \"fix-restore-schema-drift\" is not archived', and trace.json has the same warning. Only the commit trailer part is done (HEAD has Slice/Refs).",
+        "suggestion": "Run `openspec archive fix-restore-schema-drift` so the MODIFIED 'Data volume and backup' requirement lands in the spec, or untick 3.5 until that is done.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Confirmed. tasks.md:18 (the finding cites line 17) marks '- [x] 3.5 Archive; commit …' as done. But the change still lives in openspec/changes/fix-restore-schema-drift/ (proposal, design, tasks, specs/platform-foundation/spec.md), and openspec/changes/archive/ has no folder matching *restore*. docs/qa/traceability-report.md:110 records 'active change \"fix-restore-schema-drift\" is not archived'. So the archive step was never done and the checkbox claims something false. This breaks the repo's done-claims-need-evidence rule. The spec delta has also not been merged. Only the commit-trailer half of the task is met. Severity 'major' is fair: it is a process and traceability problem, not a runtime bug.",
+          "Confirmed. Line 18 of tasks.md (the finding says 17) reads `- [x] 3.5 Archive; commit with Slice: fix-restore-schema-drift + Refs: NFR-10`. The change is still active at openspec/changes/fix-restore-schema-drift/ (proposal, design, tasks, specs/platform-foundation/spec.md). openspec/changes/archive/ has seven dated folders, the latest being 2026-10-05-implement-practice-flow-api, but none for fix-restore-schema-drift. The git status snapshot shows only trace/ledger.jsonl modified, so the change wasn't archived in the working tree either. The repo's own docs/qa/traceability-report.md:110 says 'active change \"fix-restore-schema-drift\" is not archived'. So the box was ticked without the work being done, which is the kind of unbacked done-claim AGENTS.md forbids. Severity: this is a process and traceability problem, not something a user or attacker can trigger. The restore code works either way, and the gate tooling already flags the missing archive. I recommend downgrading from major to minor/moderate."
+        ]
+      },
+      {
+        "title": "Task 3.3 is ticked, but review-findings.json does not exist",
+        "file": "openspec/changes/fix-restore-schema-drift/tasks.md",
+        "line": 16,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "tasks.md: '- [x] 3.3 Review (fresh reviewer); every finding dispositioned in `review-findings.json`.' The change folder holds only proposal.md, design.md, tasks.md and specs/. There is no review-findings.json, while every archived change (e.g. archive/2026-10-05-implement-practice-flow-api/review-findings.json) has one.",
+        "suggestion": "Untick 3.3 until the review has run and its findings are dispositioned in openspec/changes/fix-restore-schema-drift/review-findings.json.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the finding. At `openspec/changes/fix-restore-schema-drift/tasks.md:16`, task 3.3 is ticked `[x]` and says every review finding is dispositioned in `review-findings.json`. That file does not exist. A glob of the change folder, including any archived copy, finds only `proposal.md`, `design.md`, `tasks.md` and `specs/platform-foundation/spec.md`.\n\nNone of the files under `trace/workflow-runs/` mentions this change. The only file in `trace/` that does is `trace/trace.json`. `docs/current-state.md` cites a `review-findings.json` as evidence for every earlier slice but has no review entry for this change.\n\nThe tick is a done-claim with no evidence behind it, which breaks the AGENTS.md rule that done-claims need evidence pointers. Task 3.5 (Archive) is ticked too, but the change is still sitting unarchived under `openspec/changes/`, so the tasks were ticked ahead of the work. The review that is running now may be the one 3.3 refers to, but until its findings are written down and dispositioned, the checkbox is false.\n\nSeverity stays major: this is a correctness problem in the process record, not a runtime bug.",
+          "I couldn't refute this; the finding holds. `tasks.md:16` ticks \"3.3 Review (fresh reviewer); every finding dispositioned in `review-findings.json`\". A glob of `openspec/changes/fix-restore-schema-drift/**` finds only proposal.md, design.md, tasks.md and specs/platform-foundation/spec.md. No review-findings.json exists for this change anywhere in the repo, while every archived backend change has one.\n\nNothing else covers the missing file. The harness checks for it directly: `scripts/check-trajectory.mjs:84-96` gates \"review-evidence\" (the review must run and its findings be dispositioned before archive), and `scripts/check-process-ratchet.mjs:279-288` marks a missing file NOT-EARNED under --release. So the gates will flag it, and the ticked box is a false completion claim. AGENTS.md forbids exactly this (\"done-claims need evidence pointers\"). The same pattern shows up in 3.5: \"Archive\" is ticked, but the change is still in `openspec/changes/`, not in the archive.\n\nThis doesn't affect runtime: no end user or attacker can trigger anything through it. It's a process and spec-compliance integrity problem that the release gates will catch. That fits \"major\" in this repo's process model, so I'm keeping the severity. One caveat: this review may itself be the pending 3.3 step, which would explain why the file doesn't exist yet. Even so, the box was ticked before the evidence existed."
+        ]
+      },
+      {
+        "title": "Task 3.1 'qa:verify green' points at verification evidence this change did not regenerate",
+        "file": "docs/qa/automated-verification-latest.md",
+        "line": 5,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "tasks.md 3.1: '[x] `npm run qa:verify` green. Evidence: `docs/qa/automated-verification-latest.md`.' The file is not in `git diff 394ed08..HEAD --stat`, and it says 'Started: 2026-10-05T07:19:49Z' (09:19 Prague). The replay evidence in the same change has dump timestamp 20261005-172607, so the battery output does not clearly cover the final tools/restore.mjs. Per the done-claims-need-evidence lesson, the pointer must be fresh.",
+        "suggestion": "Re-run `npm run qa:verify` on HEAD and commit the regenerated docs/qa/automated-verification-latest.md, or untick 3.1.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Confirmed. The committed `docs/qa/automated-verification-latest.md` comes from a run that predates this change, so it can't be the evidence for task 3.1:\n- The header says it started at 2026-10-05T07:19:49Z, which is 09:19 in Prague. The change's replay dump is stamped 17:26.\n- In the run log, `OperatorToolGuardTest` reports \"Tests run: 4\" (line 545). At HEAD that file has 5 `@Test` methods. The fifth, \"restore compares migration versions numerically, as Flyway orders them\" (OperatorToolGuardTest.kt:77), is the test task 1.2 added in this change. The run never executed it.\n- The `openspec-active-list` section (line 12839) says \"No active changes found\". If the battery had run while `fix-restore-schema-drift` was an active change, that change would be listed.\nSo the pointer in tasks.md 3.1 resolves to a file that exists but is stale. It doesn't cover the change's new test or the final `tools/restore.mjs`. That breaks the done-claims-need-evidence rule: the pointer must be fresh. Severity stays minor. This is a process and evidence problem, not a product defect, and the replay and IT evidence elsewhere may still show the code works.",
+          "Confirmed, and the evidence is stronger than the finding claims. docs/qa/automated-verification-latest.md started at 2026-10-05T07:19:49Z (09:19 Prague). Its Maven output shows `OperatorToolGuardTest` with 4 tests (line 545) and `BackupRestoreIT` with 4 tests (line 10532). The current tree has 5 `@Test` methods in OperatorToolGuardTest.kt and 7 in BackupRestoreIT.kt. This change's own evidence file (docs/qa/evidence/fix-restore-schema-drift.md) also records \"BackupRestoreIT 7 run\" and \"OperatorToolGuardTest 5 run\" after the fix, plus a replay dump stamped 20261005-172607. So the battery ran before the new RED/GREEN tests and the new tools/restore.mjs existed. It doesn't cover this change at all.\n\nTask 3.1 says \"qa:verify green\" and points to evidence from before the change, which is exactly the stale-pointer case the done-claims-need-evidence lesson forbids. git status shows only trace/ledger.jsonl modified, so no newer battery output is sitting uncommitted either.\n\nNo product defect follows from this: there's no runtime impact and nothing an attacker could exploit. It's a process/evidence-integrity problem, so minor severity is right."
+        ]
+      },
+      {
+        "title": "The 'schema still behind after restart' failure path omits the manual restart step and the 'data is restored' message",
+        "file": "tools/restore.mjs",
+        "line": 696,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "Spec: '...it SHALL restart the backend, wait until it is healthy and confirm the schema reached the newest version, or else print the manual restart step and exit non-zero'. Design decision 3: 'Every failure after the restore committed (... schema still behind) prints that the data IS restored plus the manual `docker compose [-p <project>] restart backend` step'. Code: fail(`the backend restarted, but the schema is at ${label(migrated)}, not V${latest}: its image is older than this checkout. Rebuild and start it with npm run stack:up.`). It contains neither manualRestart nor 'the data is restored'. Also, when --project is set, `npm run stack:up` would act on the default (owner) stack, not that project.",
+        "suggestion": "Prefix the message with 'the data is restored, but'. Either amend the spec/design to say this branch prints the rebuild step instead of the restart step, or include a project-aware rebuild command such as `docker compose -p <project> up -d --build backend`.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds, but it cites the wrong line. The message is at tools/restore.mjs:166-170, not line 696; the file has only 175 lines.\n\n**What the code does**\n- When the schema is still behind after the restart, the tool calls `fail(\"the backend restarted, but the schema is at …, not V${latest}: its image is older than this checkout. Rebuild and start it with npm run stack:up.\")`.\n- That message never uses `manualRestart` (defined at line 130) and never says \"the data is restored\".\n- Every other failure after the commit (lines 141, 153 and 161-162) begins with \"the data is restored, but\" and includes `${manualRestart}`.\n\n**Why it misses the spec and design**\n- Design decision 3 lists \"schema still behind\" among the failures that must print that the data IS restored, plus the `docker compose [-p <project>] restart backend` step.\n- The spec says \"...or else print the manual restart step and exit non-zero\".\n\n**Mitigation I checked**\n- Design decision 2 says this branch should \"say to rebuild with `npm run stack:up` and exit 1\", so the design contradicts itself here.\n- Recommending a rebuild instead of a restart is reasonable: restarting an old image would not help.\n- That weakens the \"missing restart step\" half of the finding. It does not excuse leaving out \"the data is restored\", which decision 3 still requires and which the other messages all include.\n\n**The `--project` point is also real**\n- `stack:up` runs `node tools/stack.mjs up`, and tools/stack.mjs has no project handling (a grep found none).\n- So a user who ran with `--project` would be told to rebuild the default (owner) stack, not the one they restored into.\n\n**Severity**\nThis is wrong operator text on one rare failure path. The exit code is still non-zero and no data is at risk, so \"minor\" fits better than \"major\".",
+          "The finding is real, but it cites the wrong line and overstates the severity. tools/restore.mjs has only 175 lines, so line 696 does not exist. The message is at tools/restore.mjs:166-170.\n\nHow to reach it: the dump's schema is older than the checkout, the backend is running, it restarts and becomes healthy, but `schemaVersion()` still returns a version older than `latest`. This happens whenever the running image was built before the newest migrations, which the design itself expects. In that case `fail()` prints \"the backend restarted, but the schema is at …: its image is older than this checkout. Rebuild and start it with npm run stack:up.\" That message:\n\n(a) does not say the data is restored. Every other post-commit failure says so (lines 141, 153, 161). Design decision 3 lists \"schema still behind\" among the failures that must say it. That part of the finding is confirmed.\n\n(b) does not include `manualRestart`. Two things weaken this point. Design decision 2 (design.md:19-21) says that for this exact case the tool tells the user to rebuild with `npm run stack:up`, so the code follows decision 2 and the design contradicts itself. Also, telling the user to `restart backend` would be wrong here, because restarting the same old image cannot migrate the schema. The real fix is to make the spec and design agree, not to print the restart step.\n\n(c) The `--project` point holds. `stack:up` runs `node tools/stack.mjs up`, and tools/stack.mjs has no `-p`/project handling. So when someone restores into `--project X`, the advice rebuilds the default stack, not X.\n\nImpact: the exit code is still 1, nothing is lost, and the data is restored. The harm is a misleading message: the user may think the restore failed, or may run the rebuild against the wrong stack. That is a real but minor operator-UX and spec-wording problem, not a major defect."
+        ]
+      },
+      {
+        "title": "The post-commit failure branches (exit 1 + manual step) have no test",
+        "file": "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+        "line": 440,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "Spec clause: 'or else print the manual restart step and exit non-zero'. The evidence file admits: 'The failure branches after the restore committed (restart fails, healthcheck turns unhealthy or the container crash-loops, schema still behind because the image is older than the checkout, version unreadable) print the manual `docker compose restart backend` step and exit 1; they are reviewed, not exercised by a test.' No IT or unit test asserts a non-zero exit or the manual-step text.",
+        "suggestion": "Add at least one IT for a post-commit failure. Example: start a backend image built without V4 (or `docker compose stop` after the restart starts) and assert exit 1 plus 'restart backend' and 'data is restored' in the output. Alternatively, extract the decision and health parsing into tools/lib and unit-test them from OperatorToolGuardTest.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds, though its line number is wrong: BackupRestoreIT.kt has only 216 lines, so line 440 doesn't exist. The gap itself is real.\n\nRestore tests in BackupRestoreIT:\n- line 160: the success path, which checks for 'restarted'.\n- line 183: no backend running.\n- line 197: the dump is newer than the checkout, so nothing is restarted.\n- line 210: --yes is missing, so the tool exits 1 before doing anything. This is a pre-commit refusal, not a post-commit failure.\n\nThe `restore()` helper wraps `run()`. `run()` checks for exit 0 (line 46), so every restore call in these tests expects success. None of the tests makes the restart fail, makes the healthcheck turn unhealthy, uses a backend image older than the checkout, or makes the version unreadable. None checks for a non-zero exit or the manual `docker compose restart backend` text after the restore has committed.\n\nOperatorToolGuardTest only covers backup directory guards, numeric version comparison and directory usage. It has nothing on the post-commit decision logic either.\n\nThe evidence file (docs/qa/evidence/fix-restore-schema-drift.md:63) says outright that these branches are 'reviewed, not exercised by a test'. AGENTS.md requires test-first work, with each spec clause covered by a RED-then-GREEN test. So a spec clause ('print the manual restart step and exit non-zero') has no executable check, and the finding is correct. Severity: keep it as filed. This is the path an operator relies on to learn that a restore is only half finished.",
+          "The finding holds, though the cited line is wrong: BackupRestoreIT.kt has only 217 lines, so line 440 does not exist.\n\nThe code confirms the gap. In tools/restore.mjs, every failure after the restore has committed goes through `fail()`, which prints the message and exits 1:\n- version unreadable (line 141)\n- docker compose cannot say whether the backend runs (line 153)\n- restart fails or the backend does not come back healthy (lines 159-163)\n- schema still behind because the image is older than the checkout (lines 166-170)\n\nNo test exercises any of these branches. The BackupRestoreIT tests cover only:\n- the happy round-trip\n- a truncated dump (exits non-zero, but before the commit)\n- removal of newer-schema objects\n- a successful restart and migrate\n- backend not running\n- a dump newer than the checkout\n- the missing `--yes` refusal\n\nOperatorToolGuardTest calls restore.mjs once, at line 107, for a guard case. A grep for \"data is restored\" or \"restart backend\" in src/test finds nothing. docs/qa/evidence/fix-restore-schema-drift.md:63 states that these branches are \"reviewed, not exercised by a test\".\n\nThe branches can really happen. A stale backend image is enough to trigger the \"image older than checkout\" branch, and a crash-looping container triggers the unhealthy branch. So the spec clause \"print the manual restart step and exit non-zero\" is implemented but has no test behind it. The project's test-first rules expect spec clauses to be backed by tests.\n\nDowngrade to minor:\n- This is a coverage gap in an operator CLI, not a defect. The code exists, is simple, and exits non-zero as specified.\n- A test alone would not fix any user-facing data-loss risk. In every branch the data is already restored.\n- The evidence file discloses the gap openly rather than claiming it is covered."
+        ]
+      },
+      {
+        "title": "Undocumented drift: the tool exits 1 on an unreadable version or an unknown backend state even when no restart may be needed",
+        "file": "tools/restore.mjs",
+        "line": 670,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The spec defines only three outcomes: older+running → restart or exit non-zero; older+stopped → note; newer → warn. The code adds two more exit-1 paths: `if (restored === undefined) fail(...)` (psql version read failed) and `running === undefined` → fail(...) (compose ps failed). Both are only in design.md decision 3, not in the requirement or any scenario.",
+        "suggestion": "Amend the 'Data volume and backup' requirement (or add a scenario) to cover these exit-1 outcomes, or keep them and note them in the delta so the store spec does not silently diverge.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The cited line is wrong: tools/restore.mjs has only 175 lines. The behaviour itself is real, though. At restore.mjs:140-142, `restored === undefined` (psql could not read flyway_schema_history) calls fail(...), which exits 1. At restore.mjs:150-153, `backendRunning()` returns undefined when `compose ps` fails, and that also calls fail(...) with exit 1. Both are reached only after the restore has committed. The store delta (openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md) covers only four cases: older dump with the backend running (restart, or exit non-zero if that fails), older dump with it stopped (note), newer dump (warn), and the storage-volume notice. No requirement text or scenario mentions what happens when the version or the backend state cannot be determined. So the finding's facts hold: there are two exit-1 paths the spec does not describe.\n\nOn correctness, the code is not wrong. When the tool cannot tell whether a restart is needed, failing loudly and printing the manual restart step is the safe choice. Exiting 0 in that situation would bring back the original bug: a running backend left serving a stale schema. The phrase \"even when no restart may be needed\" is true but does not point to a defect, because the tool cannot know either way and exit 1 is the right signal. The spec is silent here rather than contradicted. It says \"SHALL compare\", and if the comparison cannot be made, a failure exit is a reasonable reading. design.md decision 3 already documents both paths.\n\nNot refuted, because the documentation gap does exist. Downgrade it to a nit: it is about spec completeness, not a correctness or behaviour bug. Adding one sentence to the requirement (\"if the restored version or the backend state cannot be determined, it prints the manual step and exits non-zero\") would close the gap."
+        ]
+      },
+      {
+        "title": "The MODIFIED requirement exists only in this repo's change delta; its presence in the docs-store spec could not be verified",
+        "file": "openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md",
+        "line": 3,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "The delta rewrites the product requirement 'Data volume and backup' (store spec platform-foundation) with new SHALLs: Flyway version comparison, restart, and the storage note. contract/ has no matching text (a grep for 'Data volume and backup' under contract/ found nothing), and `openspec show platform-foundation --store doucko` could not be run here. AGENTS.md: product truth lives in the docs store.",
+        "suggestion": "Make sure the docs-store platform-foundation spec gets the same MODIFIED requirement (docs-store change, then bump contract/), or confirm that archiving the backend change is the agreed route for operator-tooling requirements.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": []
+      }
+    ],
+    "contested": [
+      {
+        "title": "Unguarded JSON.parse in the health wait can crash with a stack trace after the restore has committed",
+        "file": "tools/restore.mjs",
+        "line": 118,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`backendHealthy()` runs `.flatMap((line) => JSON.parse(line))` on `docker compose ps --format json` stdout and nothing catches it. If one line is not JSON (a partial line, a plugin notice on stdout, or a compose release with another format), Node exits with an uncaught SyntaxError. The operator then sees a stack trace instead of the designed message saying the data is restored, followed by the manual `docker compose restart backend` step. Design decision 3 says every failure after the commit should print that message.",
+        "suggestion": "Wrap the parse in try/catch. On a parse error, either `continue` (retry until the deadline) or return false so the existing `fail(...)` path prints the data-is-restored message and the manual step.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "I confirmed the mechanism in the code, but the trigger is less likely than the finding says.\n\n**What the code does:** The parse is at `tools/restore.mjs:121`, not 118, inside `backendHealthy()`. `JSON.parse(line)` runs on every non-empty line of `docker compose ps --all --format json backend` stdout, and nothing catches it:\n- There is no try/catch inside the loop.\n- The caller at line 159, `if (restart.status !== 0 || !backendHealthy())`, has no try/catch either.\n- There is no `process.on('uncaughtException')` handler.\n\nA SyntaxError would therefore end the script with a Node stack trace. That skips `fail(...)` (lines 160-163), which is the path that prints \"the data is restored … run `docker compose restart backend`\". The script already committed the restore at line 75, so this does break the intent stated in the header comment (lines 18-19): a failed restart should print the manual step. The other failure paths are all guarded with status checks:\n- `r.status !== 0` leads to `continue`.\n- `query()` returns null on failure.\n- `backendRunning()` returns undefined when compose cannot answer.\n\nThe parse is the only unguarded step in the post-commit path.\n\n**Where the finding overstates it:**\n- **Partial lines:** not possible. `spawnSync` returns stdout only after the process exits, so there are no partial reads.\n- **Warnings:** Compose writes its warnings (for example \"version is obsolete\") to stderr, which this script passes straight through to the terminal (`stdio: [..., 'pipe', 'inherit']`). They never reach stdout.\n- **Older array format:** handled by the `flatMap`.\n\n**What can still trigger it:** a compose or plugin build that writes a non-JSON line to stdout with exit code 0, or a future format change. That is unlikely but possible, and the cost when it happens is the exact failure the design meant to prevent.\n\n**Verdict:** the mechanism is real and unguarded; only the likelihood is overstated. The severity stays minor.",
+          "I refuted this one. The code matches the description, but none of the triggers it names can actually happen.\n\n**What is true.** At `tools/restore.mjs:117-121`, `backendHealthy()` calls `JSON.parse(line)` on each line of stdout from `docker compose ps --all --format json backend`, with no try/catch. Nothing up the call chain catches it either: line 159, the top-level module code. So a non-JSON line would crash with an uncaught SyntaxError.\n\n**Why the triggers don't occur:**\n1. **Partial line: impossible.** `compose()` (line 40) uses `spawnSync` with stdout piped. `spawnSync` waits for the process to exit and returns the whole buffered stdout, so `r.stdout` can never hold a partly written line. Also, a non-zero exit is skipped by `continue` before any parsing (line 115).\n2. **Plugin notices or warnings on stdout: not real.** Docker compose v2 writes warnings to stderr, and stderr is set to `inherit`, not piped. That covers \"version is obsolete\", missing env vars and pull/hint messages. Docker's \"What's next\" hints are not shown for `compose ps` and also go to stderr. With `--format json`, stdout carries only the JSON.\n3. **A compose release with another format: already handled.** v2 before 2.21 prints one JSON array on a single line. v2.21 and later print one JSON object per line. The `.flatMap(JSON.parse)` handles both, as the comment on line 116 says. Empty output is filtered out by `.filter(Boolean)` and then returns false through `!c`. Compose v1 (`docker-compose`) is not reached through `docker compose`, and it has no `--format json` anyway.\n\n**Impact even if it did fire.** By this point the script has already printed `restore complete: <file>` (line 80) and the restart-in-progress line (line 157). A crash would still exit non-zero. The operator would lose only the tailored manual-restart hint, not the knowledge that the data was restored.\n\n**Conclusion.** Calling `JSON.parse` without a guard on external output is a fair robustness nit. But the finding gives no realistic way for a user to hit it, and the reasons it gives are wrong or already handled. I could not confirm a reproducible failure, so I'm marking it refuted."
+        ]
+      },
+      {
+        "title": "Reading the checkout's migrations is not guarded and can throw after the commit",
+        "file": "tools/restore.mjs",
+        "line": 136,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`const latest = latestMigration();` calls `readdirSync(MIGRATIONS_DIR)` only after `restore complete` has been printed. If that directory is missing or unreadable (a sparse or partial checkout, or a moved tools/ copy), ENOENT is thrown uncaught. The exit code is non-zero, but the output is a stack trace, not the message that the data is restored and the backend may need a restart.",
+        "suggestion": "Read `latestMigration()` before the destructive step so a broken checkout fails with \"nothing was changed\". Or catch the error and call `fail()` with the manual-restart hint.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The finding holds. In `tools/restore.mjs`, the destructive restore commits at lines 75–79, and `restore complete` is printed at line 80. Only after that, at line 136, does `const latest = latestMigration();` run. `latestMigration()` in `tools/lib/migrations.mjs:32-34` calls `readdirSync(dir)` on `MIGRATIONS_DIR` (`ROOT/src/main/resources/db/migration`), and nothing guards the call: no try/catch, no `throwIfNoEntry`, no existence check. Nothing in `restore.mjs` wraps it either. If the directory is missing or unreadable, Node throws ENOENT/EACCES as an uncaught exception. The process exits non-zero with a stack trace instead of going through `fail()`, so the operator never sees the manual-restart hint (`docker compose restart backend`), which the script gives for every other post-commit failure (lines 141, 153, 160, 167). Nothing earlier in the flow reads that directory, so it is not validated before the destructive step.\n\nThe path is hard to reach. The tool and the migrations live in the same repo, so the directory is missing only in odd setups such as a sparse checkout or a copied tools/ folder. That fits the reviewer's severity of minor and confidence of low. Still, the mechanism exists as described and does not fit the script's own error handling, so the finding is not refuted. The suggested fix is cheap and correct: compute `latestMigration()` before the pg_restore/psql step (it does not depend on the database), or wrap it and call `fail()`.",
+          "The code does what the finding says: `latestMigration()` (tools/lib/migrations.mjs:32-34) calls `readdirSync(MIGRATIONS_DIR)` with no guard, and restore.mjs:136 calls it after the commit and the \"restore complete\" output. But no real user can reach the trigger.\n\n1. ROOT (tools/lib/compose.mjs:8) is the repo root, two levels above tools/lib. MIGRATIONS_DIR is `src/main/resources/db/migration` in that same repo. The same ROOT also locates `compose.yaml` (line 9), and every docker call before the commit depends on it.\n\n2. A \"moved tools/ copy\" therefore has no compose.yaml next to it. The first docker step, `pg_restore --list` at line 52, fails and prints \"nothing was changed\" before anything destructive happens. So that case never reaches line 136.\n\n3. The only remaining trigger is a checkout that has `compose.yaml` and a running stack but no migration directory. That is a hand-crafted sparse checkout of a single-developer repo where the directory is tracked. The backend can't even be built from such a checkout.\n\n4. Even if it were hit, the impact is small. The data has already been restored and \"restore complete\" has been printed. The exit code is non-zero (an uncaught throw). The only loss is the friendlier restart hint.\n\nThe mechanism is real, but under an exploitability/reproducibility lens the path is effectively unreachable for a real operator. This is a hardening nit, not a correctness defect."
+        ]
+      },
+      {
+        "title": "A dump with tables but no flyway_schema_history counts as 'behind' and restarts a working backend into a crash loop",
+        "file": "tools/restore.mjs",
+        "line": 143,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`behind` is true when `restored === null` (no flyway_schema_history), so if the backend is running, restore.mjs:158 restarts it. application.yaml has no `baseline-on-migrate`, so Flyway refuses a non-empty schema that has no history table. The backend then fails at startup and `restart: unless-stopped` keeps restarting it. The operator ends up with a restarted backend in a crash loop where before there was a running one. The tool does exit 1 (via backendHealthy → 'restarting'/'unhealthy'), but the restart already happened. Trigger: restoring a hand-made or foreign pg_dump that has tables but no Flyway history.",
+        "suggestion": "Restart only when there is a Flyway history (`restored !== null`), or when the public schema is empty. If the database has tables but no history, warn and don't restart: Flyway can't adopt that schema without a baseline.",
+        "dimension": "security",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The mechanism holds up against the code.\n\n1. **Restart trigger.** `schemaVersion()` (restore.mjs:95-101) returns `null` when `to_regclass('public.flyway_schema_history')` is absent. The restore drops `public`, so this checks only what the dump contained. At line 143, `behind = latest !== null && (restored === null || …)`, so a dump without a history table counts as behind. If `backendRunning()` is true, line 158 runs `docker compose restart backend`. Nothing checks whether the schema actually has tables.\n\n2. **Flyway refuses the schema.** `application.yaml` sets only `spring.flyway.locations` (no `baseline-on-migrate`, no `baseline-version`). Spring Boot's Flyway defaults to baselineOnMigrate=false, so a non-empty `public` schema without a history table fails startup with \"Found non-empty schema(s) \\\"public\\\" but no schema history table\". The backend never becomes healthy.\n\n3. **Crash loop.** `compose.yaml:60` sets `restart: unless-stopped` on the backend, so it keeps restarting. `backendHealthy()` sees `restarting`, `exited` or `unhealthy`, returns false, and the tool exits 1 with the manual-restart hint. As the finding says, the restart has already happened by then.\n\n**Mitigating points (they don't refute it):**\n- Before the restart, the running backend was already serving a foreign schema. Requests would fail anyway, though Hibernate `validate` runs only at startup. So the change is from \"running but broken\" to \"crash loop\", not from working to broken.\n- The tool says it restores \"a dump written by `npm run backup`\". This stack's backups always carry `flyway_schema_history` once the backend has started; a backup from a never-started database has no tables, and then the restart correctly migrates from scratch. So the trigger needs a hand-made or foreign dump, which is off the intended path.\n- The script exits non-zero and points to the logs, so it doesn't fail silently.\n\nThe path is reachable and the claimed behavior is accurate, but impact is low and the scenario is out of contract. Minor severity fits. The \"security\" dimension label is wrong; this is a correctness or operability issue.",
+          "The code path does exist. When `restored === null`, `behind` is true (restore.mjs:143). If the backend is running, it gets restarted (line 158). application.yaml has a `flyway:` block, and the grep found no `baseline` setting, so Flyway would refuse to start against a non-empty schema with no history table. With `restart: unless-stopped`, the backend would then keep restarting.\n\nThe claimed harm doesn't hold up, though:\n\n1. **Nothing working is lost.** Lines 68–75 run `DROP SCHEMA public CASCADE` and replay the foreign dump in one transaction. That happens before the restart decision. By then the \"running backend\" is serving a schema that has none of its tables, so every child or admin request already fails. A crash-looping backend and a backend that 500s on every request are equally down. The restart only makes the failure visible.\n\n2. **It fails loudly with a recovery path.** `backendHealthy()` sees `restarting` or `unhealthy`, and the tool exits 1, telling the operator to check `docker compose logs backend`. A safety backup of the previous good data was taken before anything was dropped (lines 57–66). The data is recoverable by restoring that backup.\n\n3. **The trigger is unrealistic and self-inflicted.** The tool is documented to restore dumps \"written by `npm run backup`\". Those come from a backend that ran Flyway, so they always include `flyway_schema_history`. A DB where Flyway never ran has an empty `public` schema, and for that case the restart is correct. To hit this, an operator with Docker access has to pass `--yes` with a hand-made or foreign dump. No attacker can reach this path, so the \"security\" label is wrong.\n\n4. **The suggested fix doesn't improve the outcome.** Warning without restarting still leaves a backend that can't serve the restored schema. It just fails silently instead of with an exit-1 message.\n\nAt most this is a wording nit about the restart message. It is not a real failure for users and not exploitable."
+        ]
+      },
+      {
+        "title": "An uncaught JSON.parse in the health wait prints a stack trace after the restore has committed and loses the 'data is restored' message",
+        "file": "tools/restore.mjs",
+        "line": 121,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "backendHealthy() calls `JSON.parse(line)` on each stdout line of `docker compose ps --format json` with no try/catch. If a compose release or plugin writes non-JSON to stdout, Node throws, prints a stack trace and exits 1 after the single-transaction restore has already committed. The operator never sees the `fail()` text saying the data is restored and that they should run `docker compose restart backend`. That is the guidance this change adds, and the 'usage, not a stack trace' style is what OperatorToolGuardTest enforces for this tool elsewhere.",
+        "suggestion": "Wrap the parse in try/catch and treat unparseable output like a failed `ps` (continue polling). Or run the whole post-commit section inside one try/catch that calls `fail()` with the manual-restart message.",
+        "dimension": "security",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The finding holds: the code really works the way it describes. In `tools/restore.mjs:117-121`, `backendHealthy()` calls `.flatMap((line) => JSON.parse(line))` on the stdout of `docker compose ps --all --format json backend`, and nothing catches an error there. The function runs at line 159 (`restart.status !== 0 || !backendHealthy()`), which is after the single-transaction restore has committed (lines 75-80). There is no try/catch at that call or higher up, and no `process.on('uncaughtException')` handler. So if `JSON.parse` throws, Node prints a SyntaxError stack trace and exits 1, and the `fail()` message with the `docker compose restart backend` step at lines 160-163 never prints. The guard at line 115 only skips the case where `ps` exits non-zero. It does nothing for a run that exits 0 but prints output that isn't JSON.\n\nPoints that weaken it, but don't refute it:\n1. The trigger is unlikely. `compose()` sets stderr to `inherit`, so compose warnings (for example \"version is obsolete\") go to the terminal and never reach the parsed stdout. In normal Compose v2 releases, stdout for `--format json` is pure JSON, either one object per line or one array, and the code handles both. Empty stdout gives `[]` and the function returns false cleanly.\n2. The damage is partial. \"restore complete: <file>\" was already printed at line 80, so the operator knows the data was restored. What they lose is the manual-restart guidance.\n\nOverall, the throw-after-commit path is real and unguarded, but only an unusual compose stdout can trigger it. Minor severity with low confidence fits; I'm keeping it as is.",
+          "The code does what the finding says: `tools/restore.mjs:117-121` calls `JSON.parse(line)` on each stdout line from `docker compose ps --all --format json backend` without a try/catch. But I could not find a realistic way for that parse to fail.\n\n1. **Stdout is JSON.** With `--format json`, Compose v2 prints JSON on stdout: either one object per line (v2.21 and later) or a single array (older releases). The code handles both, because `flatMap` flattens the array. Compose sends its warnings and notices (obsolete `version` attribute, missing env vars, plugin hints) to stderr. `compose()` sets stdio to `['ignore','pipe','inherit']`, so stderr goes straight to the terminal and never reaches the parser.\n2. **Errors are skipped.** A broken or unknown setup (the legacy v1 binary, an unsupported flag, a missing service) exits non-zero, and line 115 (`if (r.status !== 0) continue;`) skips the parse. Empty output is removed by `.filter(Boolean)` and leads to `return false`.\n3. **No attacker path.** Only the local operator runs this tool, and the input is Docker's own output. Nobody else can inject anything into it.\n4. **The operator still learns the data is restored.** Line 80 has already printed `restore complete: <file>` before this code runs, and line 157 has said the backend is being restarted. Even if the parse threw, the output would show the restore committed. The only loss would be the hint to run `docker compose restart backend`.\n\nThe finding itself only says \"if a compose release or plugin writes non-JSON to stdout\", and names no release or plugin that does this. That makes it a hypothetical hardening note, not a reproducible defect. Wrapping the parse in a try/catch would be cheap defensive code, but I can't confirm that the claimed failure actually happens."
+        ]
+      },
+      {
+        "title": "The tests for scenario 'Restored schema and checkout disagree without a restart' do not check that nothing was restarted",
+        "file": "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+        "line": 479,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "Scenario THEN: '...warns that the dump is newer, and restarts nothing'. The newer-dump test only starts `db` (no backend service exists) and asserts `output shouldContain \"V999\"` and `\"newer\"`, so 'restarts nothing' holds trivially. The design's reason for not restarting (a running backend would ignore future migrations) is never exercised against a running backend.",
+        "suggestion": "Run the newer-dump case with the backend up and assert the output lacks 'restarted' and the backend container's StartedAt is unchanged. Or narrow the scenario to 'no backend running'.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The finding holds, though the line number is wrong. BackupRestoreIT.kt has only 217 lines. The cited test is at lines 196-206 (`restoring a dump newer than this checkout warns and restarts nothing`). It runs only `compose(\"up\", \"-d\", \"--wait\", \"db\")`, writes a V999 history and restores. It then asserts only `shouldContain \"V999\"` and `shouldContain \"newer\"`. No backend service exists in that test, so \"restarts nothing\" (spec.md:57, design.md:29-31) is true by default and nothing tests it.\n\nI could not find anything that covers it elsewhere. The older-dump test with the backend running (lines 158-179) uses the `behind` branch, not the newer branch. The no-backend test (182-193) uses the `!running` branch.\n\nWhy I downgraded: the gap is real but the risk is very low. In tools/restore.mjs:144-148, the newer-dump branch only calls console.warn. The restart call (spawnSync ... restart backend, line 158) is only inside the `else if (behind)` branch, and `behind` cannot be true when restored > latest. So the code structurally cannot restart in this case. Only a later refactor could break this, and nothing currently tests against that.\n\nThe suggested assertion is also flawed. The warning itself ends with \"Nothing was restarted.\" (line 147), so `output shouldNotContain \"restarted\"` would fail. A correct check would compare the backend container's StartedAt before and after the restore, or assert that the output lacks \"backend restarted\". The other option is to narrow the scenario wording.",
+          "The line reference is wrong: BackupRestoreIT.kt has 217 lines, not 479. The test in question is at lines 196–206. The finding is right that the test only starts `db` and asserts only \"V999\" and \"newer\", so the \"restarts nothing\" part is never checked against a running backend. Through the reproducibility lens, though, no real user can hit a wrong restart here. In tools/restore.mjs:144–174 the newer-dump case is the `if` branch: it only prints a warning, which itself says \"Nothing was restarted.\" The only `restart backend` spawn (line 158) sits in the mutually exclusive `else if (behind)` branch, and `behind` needs restored < latest, which a newer dump never satisfies. Code structure guarantees that a newer dump never triggers a restart, whether or not a backend is running, so there is no defect for the missing check to miss. Adding a running backend to the test would only re-check an if/else that cannot go the other way. At most this is a nit: the test could cheaply assert `output shouldContain \"Nothing was restarted\"` and `shouldNotContain \"restarted now\"`. It is not a reachable spec violation. Refuted as a real-impact finding; at most a nit-level coverage note with a wrong line number."
+        ]
+      },
+      {
+        "title": "The printed manual restart command leaves out the compose file that the tool itself uses",
+        "file": "tools/restore.mjs",
+        "line": 660,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The tool runs `docker compose -f <ROOT>/compose.yaml [-p project] ...` (lib/compose.mjs composeArgs). The fallback it prints is `docker compose${opts.project ? ` -p ${opts.project}` : \"\"} restart backend`, with no -f. Run outside the backend checkout, that fails or targets a different compose project, which is exactly when the operator relies on it.",
+        "suggestion": "Build manualRestart from composeArgs(opts.project) (quote the path), or say 'run from the backend checkout'.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The finding cites the wrong line. The code is at `tools/restore.mjs:130`, not 660, but the mechanism is real. Every docker call the tool makes goes through `composeArgs(opts.project)` (`tools/lib/compose.mjs:12-13`), which expands to `compose -f <ROOT>/compose.yaml [-p project]`. That covers `tools/restore.mjs:40`, `:46` and the automatic restart at `:158`. The printed fallback (`manualRestart`, `:130`) leaves out `-f`. It is shown in three failure messages (`:141`, `:153`, `:162`). So the command the operator is told to copy is not the command the tool runs.\n\nImpact is smaller than the finding says. The documented entry point is `npm run restore`, which an operator runs from inside the backend checkout. From that shell, a bare `docker compose` finds `compose.yaml` in the current directory (or a parent). It also gets the same default project name, the compose file's directory. In the normal workflow the printed command therefore works. It only breaks if someone runs `node <abs-path>/tools/restore.mjs` or `npm --prefix` from another directory. Then compose finds no file, or a different one with a different project. That is an edge case, but it is the \"manual recovery\" path, so the inconsistency is worth fixing cheaply: build the string from `composeArgs` with the path quoted, or add \"from the backend checkout\".\n\nConfirmed as an inconsistency, downgraded from minor to a nit because the usual invocation works. The line number in the finding is wrong.",
+          "The code is at tools/restore.mjs:130, not line 660. The string itself is quoted correctly: `docker compose${opts.project ? ` -p ...` : \"\"} restart backend` has no `-f`, while the tool's own calls go through composeArgs(), which adds `-f <ROOT>/compose.yaml` (tools/lib/compose.mjs:12-13). The claimed harm does not hold up for the real usage path, though.\n\n1. **How it is run.** The documented and only scripted entry point is `npm run restore` (package.json:26 → `node tools/restore.mjs`). npm only finds that script when the operator's shell is inside the backend checkout. That same shell is where the operator would paste the printed command.\n2. **Docker finds the file on its own.** Without `-f`, `docker compose` looks for compose.yaml in the current directory and then each parent directory. Anywhere in the checkout it finds the same `<ROOT>/compose.yaml` the tool uses.\n3. **Same project.** compose.yaml sets `name: doucko` (line 14), so without `-p` the project name matches the tool's default. When `--project` is passed, the printed command includes the same `-p`. The \"targets a different compose project\" scenario does not happen from the checkout.\n4. **Outside the checkout it fails loudly.** The bad case needs someone to run `node <abs path>/tools/restore.mjs` from another directory, which is not a documented workflow. Even then, the printed command errors with \"no configuration file provided\" or \"no such service: backend\". It does not quietly restart the wrong thing.\n5. **Rare branches.** The command is only printed after the restore has already committed, and only when the schema version can't be read, docker can't tell whether the backend is running, or the restart fails.\n\nWhat's left is a cosmetic hardening point. Building the hint from composeArgs() would be slightly more robust. But for the documented workflow, there is no realistic user path where the printed command reaches the wrong target or fails."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "Health wait retries silently when `docker compose ps` keeps failing",
+        "file": "tools/restore.mjs",
+        "line": 112,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`if (r.status !== 0) continue;` retries every 2 s for up to 300 s without any output. If compose cannot list the service (daemon gone, wrong project), the operator waits 5 minutes with no feedback. The final message then says the backend \"did not come back healthy\", which hides the real cause: compose could not be queried.",
+        "suggestion": "Count consecutive `ps` failures and fail early with a specific message (\"docker compose could not report the backend's state\") plus the manual-restart hint. Or print a short progress line while waiting.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "Two things in the code contradict the claimed mechanism.\n\n1. **The wait is not silent.** `compose()` (tools/restore.mjs:40) spawns docker with `stdio: [\"ignore\", \"pipe\", \"inherit\"]`, so stderr goes to the operator's terminal. A `docker compose ps` that exits non-zero always writes its reason there (\"Cannot connect to the Docker daemon…\", \"no such service\", \"project not found\"). Each failed retry at line 115 therefore prints the real cause every 2 s. The operator does not wait 5 minutes with no feedback, and the cause is not hidden. It is on screen, just above the final \"did not come back healthy\" line, which also tells them to check `docker compose logs backend`.\n\n2. **The \"wrong project\" case cannot reach this loop, and the others are unlikely.** `backendHealthy()` has one caller (line 159). It only runs after two things already worked with the same `composeArgs(opts.project)`: `backendRunning()` returned true from `compose ps --status running --services` with exit 0 and the backend listed, and `docker compose restart backend` exited 0 (`restart.status !== 0 ||` short-circuits otherwise). So the project resolves and compose can see the backend service. Sustained `ps` failure here needs the daemon to die within seconds of a successful restart. Even then the inherited stderr shows that, and the restore still exits 1 with the manual-restart hint, which is what the suggestion asks for.\n\nWhat remains is at most a UX nicety: fail fast instead of retrying for 300 s, in a narrow race window. It is not a correctness defect: the result (exit 1, data restored, manual step printed) is right, and the stated mechanism (no output, cause hidden) is false.",
+          "The finding is refuted. Its two central claims don't hold up against the code.\n\n1. **\"Without any output\" is wrong.** `compose()` (tools/restore.mjs:40) spawns docker with `stdio: [\"ignore\", \"pipe\", \"inherit\"]`, so stderr goes straight to the terminal. Whenever `docker compose ps` fails, docker prints its own error on every retry. Examples are \"Cannot connect to the Docker daemon…\" and \"no configuration file provided\". The operator sees the real cause about every 2 s and is not left waiting in silence. The final \"did not come back healthy\" message comes after those stderr lines, so it doesn't hide the cause.\n\n2. **The trigger paths can't reasonably be reached.** `backendHealthy()` only runs after `restart.status !== 0 ||` short-circuits (line 159). That means `docker compose … restart backend` with the same `composeArgs(opts.project)` succeeded a moment earlier. Before that, `backendRunning()` must have returned true through a successful `compose ps` (line 150). So by this point compose has just been queried successfully twice with this exact project.\n   - **\"Wrong project\":** can't happen at this point. Even if it could, `compose ps` on a project with no matching container usually exits 0 with empty output. Then `containers[0]` is undefined and the function returns false right away (line 123), not after 300 s.\n   - **\"Daemon gone\":** this needs the Docker daemon to die within seconds of a successful restart. Even then, docker writes the error to the inherited stderr on every retry.\n\nAt most, a vanished daemon costs up to 5 minutes of repeated, visible docker errors before the script exits 1 with the manual-restart hint. That's a cosmetic UX point, not a correctness defect in a realistic scenario."
+        ]
+      },
+      {
+        "title": "Checklist coverage for this diff: the security areas are clean (informational)",
+        "file": "tools/restore.mjs",
+        "line": 40,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "Each checklist item, checked against this diff:\n(1) Authz/IDOR/tenant scoping: no HTTP endpoints changed. The IT only reads GET /api/child/hq inside its own project. Clean.\n(2) Auth/sessions: untouched. The IT passwords are throwaway test values ('it-only-*'). Clean.\n(3) Injection: every docker/psql call uses spawnSync argv with no shell. `--project` goes in as a single argv element (compose.mjs composeArgs). The SQL strings are constants. The dump reaches the container as an fd on stdin. `manualRestart` is only printed, never executed. Clean.\n(4) Exposure: compose.yaml is unchanged. The backend and db are still unpublished. Clean.\n(5) Privacy/legal: the IT uses the fictional name 'Hrdinka' and overrides the owner's .env DOUCKO_CHILD_DISPLAY_NAME. No workbook content was added. Clean.\n(6) Secrets: no secrets in the diff or in the tool output. The psql queries print only Flyway versions. Clean.\n(7) Dependencies: no package.json or pom.xml changes, and tools/lib/migrations.mjs has no dependencies. npm audit was not run, because no dependencies changed.\n(8) Abuse resistance/rate limits: not applicable (local operator CLI).\nOwner-stack isolation holds: the IT always passes `-p doucko-it-<uuid>`. Because compose.yaml sets `build: .` with no `image:` and no explicit volume `name:`, the image and volumes are project-scoped. `down -v --rmi local` therefore removes only `<project>-backend` and the IT volumes, never `doucko-backend`, doucko-pgdata or doucko-storage.\nRestart/health-wait logic: `continue` still runs the sleep in the update expression, the 300 s deadline outlasts the container healthcheck's 150 s to unhealthy, a 'restarting' state is treated as failure, and every exit after the commit goes through `fail()` with the manual step (except the JSON.parse case above).",
+        "suggestion": "Nothing to change beyond the three findings above.",
+        "dimension": "security",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "This finding reports no defect. It is an informational checklist that calls the security areas \"clean\" and suggests nothing to change, so there is no wrong mechanism to confirm. The code agrees with the claims I checked. tools/restore.mjs:40 calls `spawnSync(\"docker\", [...composeArgs(opts.project), ...args])` without a shell. `inDb` at :43-50 passes the dump as an fd on stdin. The RESTORE shell script at :68-74 is built only from constants; the file path never enters the `sh -c` string. I found nothing incorrect at the cited line. Because the finding raises no actionable issue, it should not stand as a \"minor\" finding. Treat it as refuted (no defect) rather than as a confirmed issue.",
+          "This finding reports no defect. It is an informational summary saying every security checklist area for the diff is clean, and its suggestion is \"Nothing to change.\" Seen through exploitability and reproducibility, nothing here could happen to a real user or attacker, so there is no mechanism to confirm. It describes an absence of problems, not a vulnerability. Filing it as a \"minor\" issue would overstate it. I'm marking it refuted because it isn't an actionable finding. Its sub-claims (spawnSync argv with no shell, project-scoped IT volumes and images) actually argue that the code is safe."
+        ]
+      },
+      {
+        "title": "Coverage summary: 6 scenarios: 5 implemented, 1 partial, 0 missing, 0 contradicted (plus one clause in the requirement text that the code contradicts, see below)",
+        "file": "openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md",
+        "line": 1,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "Scenarios 1-4 (backup survives volume loss, broken dump changes nothing, older dump over newer schema, unsafe backup targets) are covered by the existing BackupRestoreIT/OperatorToolGuardTest. 'A dump from before the newest migration under a running backend' is implemented (tools/restore.mjs:686-703) and tested (BackupRestoreIT.kt:442-461). 'Restored schema and checkout disagree without a restart' is implemented (restore.mjs:674-685), but the test only partly asserts it. NFR-10 traces to the plan's platform-foundation/backend row. There is no OpenAPI impact: tools/ only, no src/main change.",
+        "suggestion": "Informational. Act on the individual findings below.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "This finding is a coverage roll-up, not a defect. It names no code path that behaves wrongly, so there's no correctness mechanism to confirm. Its specific citations are also wrong:\n\n- tools/restore.mjs is only 175 lines, so the cited ranges 674-685 and 686-703 don't exist. The schema-version and restart logic is at tools/restore.mjs:136-174.\n- The running-backend restart test is at BackupRestoreIT.kt:158-179, not 442-461.\n- The header says one clause in the requirement text is contradicted by the code, but the finding never identifies it. Nothing in this finding substantiates it.\n\nSome of the summary does hold up:\n- Scenarios 1-4 are covered.\n- The restart path is implemented (restore.mjs:149-173) and tested; that test also checks the child area is served.\n- Scenario 6 is implemented: the not-running branch is at line 154 and the newer-dump warning at lines 144-148.\n- \"Partial\" test coverage of scenario 6 is roughly fair. The tests at BackupRestoreIT.kt:183-206 check the output text but never assert that nothing was restarted.\n\nSo the substance is a mild test-coverage observation, which other findings presumably cover. Taken by itself it shows no correctness defect, and its location claims are wrong.",
+          "This finding is a coverage roll-up, not a defect. Its own suggestion reads \"Informational. Act on the individual findings below.\" It names no failure that a user or attacker could trigger. The \"partial\" scenario (a test that only partly asserts schema/checkout disagreement) and the \"contradicted clause\" are each deferred to separate findings, and those findings should stand or fall on their own. Line 1 of the spec file is just the file header, so nothing at the cited spot can be reproduced. The summary also says the code is correctly implemented (restore.mjs:674-703, BackupRestoreIT.kt:442-461) and that the change touches only tools/, with no src/main or OpenAPI impact. Viewed for exploitability or reproducibility, this finding claims no mechanism to confirm, so it cannot be positively confirmed as a real problem."
+        ]
+      },
+      {
+        "title": "The health-wait loop's JSON.parse can throw, which exits with a stack trace and skips the 'data is restored' message",
+        "file": "tools/restore.mjs",
+        "line": 647,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "Design decision 3: every failure after commit 'prints that the data IS restored plus the manual ... step, and exits 1'. backendHealthy() calls `.flatMap((line) => JSON.parse(line))` on `docker compose ps --format json` stdout without a try/catch. Any non-JSON line (a compose warning on stdout, or a format change) throws an uncaught SyntaxError after the restore has committed, so the operator sees a stack trace instead of the manual step. OperatorToolGuardTest already enforces 'usage, not a stack trace' for other inputs.",
+        "suggestion": "Wrap the parse in try/catch and treat a failed parse like `r.status !== 0` (retry, then fall through to fail(...) with the manual step).",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The code exists, but the line number is wrong: the parse is at tools/restore.mjs:121, not 647. I couldn't find a realistic way to reach the failure the finding describes.\n\n1. **Compose warnings never reach the parser.** `compose()` (line 40) runs with `stdio: [\"ignore\", \"pipe\", \"inherit\"]`, so only stdout is captured. Docker compose writes its warnings (`WARN[...]`, obsolete `version`, missing env vars) to stderr. That stream is inherited and shown to the operator, never passed to `JSON.parse`. With `--format json`, stdout holds only JSON. Both output shapes are handled: one object per line (compose v2.21+) and one array (older releases). An empty result is handled too: `[]` or empty stdout leads to `containers[0]` being undefined, which returns false and reaches `fail(...)` with the manual step.\n2. **Errors are already caught.** An unknown service, a stopped daemon or a bad project makes compose exit non-zero. Line 115 retries on that, and line 127 returns false after the timeout, which reaches `fail(...)` with the manual restart. The loop never parses stdout from a failed call.\n3. **The \"data is restored\" message is printed before the parse can run.** Lines 80–84 print `restore complete: <file>` before the schema check starts. Even in a made-up case where compose put non-JSON on stdout, the operator would already have seen that the restore committed. What they would miss is only the tailored restart hint, not the fact that the data is restored. So the finding's claim that the stack trace \"skips the 'data is restored' message\" is wrong as written.\n\nThe only remaining trigger is a future compose release changing its JSON output format. That is speculative and not a defect in this code as it stands. The idea of wrapping the parse in try/catch is cheap hardening, not a correctness bug.",
+          "The finding cites line 647, but tools/restore.mjs has only 175 lines. The code it describes is real: `backendHealthy()` at tools/restore.mjs:112-128 calls `.flatMap((line) => JSON.parse(line))` at line 121 with no try/catch, and its caller (line 159) runs after the restore has committed. If that parse threw, Node would print an uncaught SyntaxError and the `fail(...)` manual-step message on line 160 would never print.\n\nThe trigger the finding proposes does not actually happen, though:\n1. **Warnings don't reach the parsed text.** `compose()` (line 40) uses `stdio: [\"ignore\", \"pipe\", \"inherit\"]`, so only stdout is captured. Compose prints its warnings (obsolete `version` attribute, unset env vars, orphan containers) to stderr, which goes straight to the terminal and is never parsed.\n2. **Both known output shapes parse.** With `--format json`, stdout holds one JSON object per line (compose v2.21+) or a single JSON array (older v2). `flatMap` handles both, and `.filter(Boolean)` removes blank lines and empty output. Classic `docker-compose` v1 isn't used: the tool always runs `docker compose`.\n3. **\"A format change\" is a guess.** Nothing in the repo or the Compose CLI shows non-JSON output on stdout under `--format json`.\n4. **The operator still learns the data is restored.** Before `backendHealthy()` runs, the script has already printed \"restore complete: <file>\" (line 80) and \"... so it is restarted now.\" (line 157). In the unlikely case of a throw, only the copy-paste `docker compose restart backend` hint would be missing.\n\nSo this is a theoretical hardening point (adding a try/catch is cheap). There is no reproducible path for a real operator, and the cited line number is wrong."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/fix-restore-schema-drift/review-findings.json"
+  }
+}

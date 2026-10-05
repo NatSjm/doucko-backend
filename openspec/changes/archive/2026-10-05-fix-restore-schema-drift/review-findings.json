@@ -1,0 +1,236 @@
+{
+  "generatedBy": "review-gate",
+  "scope": "fix-restore-schema-drift backend (tools/restore.mjs: Flyway version check, backend restart after restore, storage note)",
+  "change": "fix-restore-schema-drift",
+  "baseRef": "394ed08",
+  "headRef": "HEAD",
+  "dimensions": {
+    "correctness": {
+      "confirmed": 3,
+      "contested": 2,
+      "rejected": 1
+    },
+    "security": {
+      "confirmed": 1,
+      "contested": 2,
+      "rejected": 1
+    },
+    "spec-compliance": {
+      "confirmed": 7,
+      "contested": 2,
+      "rejected": 2
+    },
+    "visual": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Message for a schema that is still behind after the restart can name the wrong cause",
+      "file": "tools/restore.mjs",
+      "line": 167,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "fail() after the restart reads the version separately: undefined says the version could not be read and points to the logs; only a read version that is behind gets the image-older text."
+    },
+    {
+      "id": "F02",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Logs hint on restart failure leaves out the compose project",
+      "file": "tools/restore.mjs",
+      "line": 162,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "Logs and restart hints share composeHint (-f <compose.yaml> [-p <project>]). BackupRestoreIT asserts \"-p <project> logs backend\"."
+    },
+    {
+      "id": "F03",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Migration IT builds a full backend image inside the IT run, so the test is heavy and slow",
+      "file": "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+      "line": 163,
+      "status": "waived",
+      "reason": "Deliberate: the defect is Flyway-at-startup behaviour of the real backend, so the IT builds the real image from this checkout in a throwaway project (Docker layer cache keeps it to ~1 min); a fake backend would not prove that V4 is re-applied. BackupRestoreIT runs in the Failsafe phase like the other Docker ITs."
+    },
+    {
+      "id": "F04",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "The target version comes from the checkout, not the running image, so a checkout older than the image leaves a mismatched schema and exits 0",
+      "file": "tools/restore.mjs",
+      "line": 136,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "The expected version is the newer of the checkout migrations and the schema version read before the restore, so a running image newer than the checkout is restarted too (design decision 6)."
+    },
+    {
+      "id": "F05",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Task 3.5 'Archive; commit' is ticked, but the change is not archived",
+      "file": "openspec/changes/fix-restore-schema-drift/tasks.md",
+      "line": 17,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "Tasks not yet done were unticked in 13e1f9b; 3.x are ticked only as each completes (archive is task 3.5 in the archive commit)."
+    },
+    {
+      "id": "F06",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Task 3.3 is ticked, but review-findings.json does not exist",
+      "file": "openspec/changes/fix-restore-schema-drift/tasks.md",
+      "line": 16,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "Unticked in 13e1f9b; this file is now persisted and dispositioned before task 3.3 is ticked."
+    },
+    {
+      "id": "F07",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Task 3.1 'qa:verify green' points at verification evidence this change did not regenerate",
+      "file": "docs/qa/automated-verification-latest.md",
+      "line": 5,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "Unticked in 13e1f9b; qa:verify is re-run after the fixes and its regenerated report is committed with the archive."
+    },
+    {
+      "id": "F08",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "The 'schema still behind after restart' failure path omits the manual restart step and the 'data is restored' message",
+      "file": "tools/restore.mjs",
+      "line": 696,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "Every post-commit failure goes through fail(): \"the data is restored, but …\" plus the next step; the still-behind path prints a project-aware rebuild (compose up -d --build --wait backend with --project, npm run stack:up otherwise)."
+    },
+    {
+      "id": "F09",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "The post-commit failure branches (exit 1 + manual step) have no test",
+      "file": "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+      "line": 440,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "New IT \"when the restarted backend cannot migrate the restored schema, restore exits 1 and says the data is restored\" (crash-looping backend: exit 1, data-restored text, restart and logs steps)."
+    },
+    {
+      "id": "F10",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Undocumented drift: the tool exits 1 on an unreadable version or an unknown backend state even when no restart may be needed",
+      "file": "tools/restore.mjs",
+      "line": 670,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "The MODIFIED requirement now states the exit-non-zero outcome whenever the check cannot complete (version or backend state unreadable, restart/healthcheck failed, schema still behind)."
+    },
+    {
+      "id": "F11",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "The MODIFIED requirement exists only in this repo's change delta; its presence in the docs-store spec could not be verified",
+      "file": "openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md",
+      "line": 3,
+      "status": "waived",
+      "reason": "Not applicable: the docs store has no platform-foundation spec (`openspec show platform-foundation --store doucko` → not found); platform-foundation is this repo's own spec (its Purpose: \"this spec covers this repository's part\"). NFR-10 itself is unchanged and no contract operation changes."
+    },
+    {
+      "id": "F12",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "Unguarded JSON.parse in the health wait can crash with a stack trace after the restore has committed",
+      "file": "tools/restore.mjs",
+      "line": 118,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "backendContainer() catches JSON.parse errors and returns null; the wait keeps polling until its deadline."
+    },
+    {
+      "id": "F13",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "Reading the checkout's migrations is not guarded and can throw after the commit",
+      "file": "tools/restore.mjs",
+      "line": 136,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "latestMigration() runs before the safety backup and the restore; a failure there exits 1 with \"nothing was changed\"."
+    },
+    {
+      "id": "F14",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "contested",
+      "title": "A dump with tables but no flyway_schema_history counts as 'behind' and restarts a working backend into a crash loop",
+      "file": "tools/restore.mjs",
+      "line": 143,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "A restored schema with tables but no flyway_schema_history now warns and restarts nothing (design decision 7); an empty schema is still restarted."
+    },
+    {
+      "id": "F15",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "contested",
+      "title": "An uncaught JSON.parse in the health wait prints a stack trace after the restore has committed and loses the 'data is restored' message",
+      "file": "tools/restore.mjs",
+      "line": 121,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "Same fix as F12: no stack trace after the commit; a failed wait ends in fail() with the data-restored message."
+    },
+    {
+      "id": "F16",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "The tests for scenario 'Restored schema and checkout disagree without a restart' do not check that nothing was restarted",
+      "file": "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+      "line": 479,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "Scenario narrowed to \"no backend running\"; both tests assert the output lacks \"restarted now\"."
+    },
+    {
+      "id": "F17",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "The printed manual restart command leaves out the compose file that the tool itself uses",
+      "file": "tools/restore.mjs",
+      "line": 660,
+      "status": "fixed",
+      "fixCommit": "13e1f9b",
+      "resolution": "The printed commands include -f \"<compose.yaml>\" and -p <project>, matching composeArgs()."
+    }
+  ],
+  "clean": true,
+  "generatedAt": "2026-10-05T17:39:19Z",
+  "dispositionNote": "The run stopped at --max-total-usd 10 ($10.75): 3 verify steps were skipped, and 4 findings were rejected by verifiers. Every persisted finding is dispositioned."
+}

@@ -58,6 +58,13 @@
       "processComplete": true
     },
     {
+      "slice": "2026-10-05-fix-restore-schema-drift",
+      "reviewEvidence": "clean",
+      "trailerCommits": 3,
+      "libDomains": [],
+      "processComplete": true
+    },
+    {
       "slice": "2026-10-05-implement-practice-flow-api",
       "reviewEvidence": "clean",
       "trailerCommits": 4,
