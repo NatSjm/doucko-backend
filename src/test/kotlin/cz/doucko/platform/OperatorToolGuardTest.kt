@@ -75,6 +75,34 @@ class OperatorToolGuardTest {
 
     // @trace NFR-10
     @Test
+    fun `restore compares migration versions numerically, as Flyway orders them`() {
+        val newest =
+            File("src/main/resources/db/migration")
+                .list()!!
+                .mapNotNull {
+                    Regex("""^V(\d+)__.+\.sql$""")
+                        .find(it)
+                        ?.groupValues
+                        ?.get(1)
+                        ?.toInt()
+                }.max()
+        // One line, single-quoted: Windows command lines do not carry newlines or double quotes reliably.
+        val script =
+            """
+            import { compareVersions, latestMigration, maxVersion, migrationVersion } from './tools/lib/migrations.mjs';
+            console.log([
+              migrationVersion('V10__a.sql'), migrationVersion('V1_2__b.sql'), migrationVersion('R__c.sql') ?? '-',
+              compareVersions('10', '9'), compareVersions('1.10', '1.9'), compareVersions('4', '4.0'),
+              maxVersion(['9', '10', '2']), latestMigration(),
+            ].join(' '));
+            """.trimIndent().replace("\n", " ")
+        val (exit, output) = node("--input-type=module", "-e", script)
+        exit shouldBe 0
+        output.trim() shouldBe "10 1.2 - 1 1 0 10 $newest"
+    }
+
+    // @trace NFR-10
+    @Test
     fun `restore given a directory prints its usage, not a stack trace`() {
         val (exit, output) = node("tools/restore.mjs", "--yes", tmp.path)
         exit shouldBe 2

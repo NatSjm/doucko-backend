@@ -11,13 +11,20 @@ import java.util.concurrent.TimeUnit
 
 /**
  * NFR-10: `npm run backup` / `npm run restore` round-trip the database through `docker compose exec`,
- * and the backup survives losing the Docker volume. Runs only the `db` service under its own
- * Compose project, so it never touches the real `doucko` stack or volume.
+ * and the backup survives losing the Docker volume. Runs the `db` service (and, for the migration
+ * test, a `backend` built from this checkout) under its own Compose project, so it never touches the
+ * real `doucko` stack, its volumes or its image.
  */
 class BackupRestoreIT {
     private val project = "doucko-it-" + UUID.randomUUID().toString().take(8)
     private val backupDir: File = Files.createTempDirectory("doucko-backup-it").toFile()
-    private val env = mapOf("DOUCKO_DB_PASSWORD" to "it-only-password", "ADMIN_PASSWORD" to "it-only-admin-password")
+    private val env =
+        mapOf(
+            "DOUCKO_DB_PASSWORD" to "it-only-password",
+            "ADMIN_PASSWORD" to "it-only-admin-password",
+            // Fictional (NFR-3); also keeps the owner's .env value out of this project.
+            "DOUCKO_CHILD_DISPLAY_NAME" to "Hrdinka",
+        )
 
     private fun exec(
         vararg command: String,
@@ -31,8 +38,11 @@ class BackupRestoreIT {
         return process.exitValue() to output
     }
 
-    private fun run(vararg command: String): String {
-        val (exit, output) = exec(*command)
+    private fun run(
+        vararg command: String,
+        timeoutSec: Long = 180,
+    ): String {
+        val (exit, output) = exec(*command, timeoutSec = timeoutSec)
         check(exit == 0) { "exit $exit: ${command.joinToString(" ")}\n$output" }
         return output
     }
@@ -41,9 +51,39 @@ class BackupRestoreIT {
 
     private fun sql(statement: String) = compose("exec", "-T", "db", "psql", "-U", "doucko", "-d", "doucko", "-tAc", statement).trim()
 
+    /** A backup of the current data in its own directory; returns the dump file. */
+    private fun backup(): File {
+        val dumpDir = File(backupDir, "dumps").apply { mkdirs() }
+        run("node", "tools/backup.mjs", "--project", project, "--out", dumpDir.path)
+        return dumpDir.listFiles()!!.single()
+    }
+
+    private fun restore(
+        dump: File,
+        timeoutSec: Long = 180,
+    ) = run(
+        "node",
+        "tools/restore.mjs",
+        "--project",
+        project,
+        "--yes",
+        "--backup-dir",
+        File(backupDir, "safety").path,
+        dump.path,
+        timeoutSec = timeoutSec,
+    )
+
+    /** A minimal Flyway history at [version], as a database last migrated by that backend has it. */
+    private fun historyAt(version: String) =
+        sql(
+            "CREATE TABLE flyway_schema_history (installed_rank int PRIMARY KEY, version varchar(50), success boolean NOT NULL); " +
+                "INSERT INTO flyway_schema_history VALUES (1, '$version', true)",
+        )
+
     @AfterEach
     fun tearDown() {
-        runCatching { compose("down", "-v") }
+        // --rmi local: only the backend image this project built, never the owner's doucko-backend.
+        runCatching { compose("down", "-v", "--rmi", "local") }
         backupDir.deleteRecursively()
     }
 
@@ -60,9 +100,11 @@ class BackupRestoreIT {
 
         compose("down", "-v")
         compose("up", "-d", "--wait", "db")
-        run("node", "tools/restore.mjs", "--project", project, "--yes", "--backup-dir", backupDir.path, file.path)
+        val restored = run("node", "tools/restore.mjs", "--project", project, "--yes", "--backup-dir", backupDir.path, file.path)
 
         sql("SELECT label FROM it_probe WHERE id = 1") shouldBe "round-trip"
+        restored shouldContain "doucko-storage"
+        restored shouldContain "not restored"
     }
 
     // @trace NFR-10
@@ -75,9 +117,7 @@ class BackupRestoreIT {
             "CREATE TABLE it_probe (id int PRIMARY KEY, label text NOT NULL); " +
                 "INSERT INTO it_probe SELECT g, CASE WHEN g = 1 THEN 'live' ELSE md5(g::text) END FROM generate_series(1, 20000) g",
         )
-        val dumpDir = File(backupDir, "dumps").apply { mkdirs() }
-        run("node", "tools/backup.mjs", "--project", project, "--out", dumpDir.path)
-        val dump = dumpDir.listFiles()!!.single()
+        val dump = backup()
         val truncated = File(backupDir, "truncated.dump").apply { writeBytes(dump.readBytes().copyOf((dump.length() * 2 / 3).toInt())) }
         val safetyDir = File(backupDir, "safety")
 
@@ -104,17 +144,65 @@ class BackupRestoreIT {
     fun `restoring an older dump leaves no object from the newer schema behind`() {
         compose("up", "-d", "--wait", "db")
         sql("CREATE TABLE it_probe (id int PRIMARY KEY, label text NOT NULL); INSERT INTO it_probe VALUES (1, 'old')")
-        val dumpDir = File(backupDir, "dumps").apply { mkdirs() }
-        run("node", "tools/backup.mjs", "--project", project, "--out", dumpDir.path)
-        val dump = dumpDir.listFiles()!!.single()
+        val dump = backup()
         // A later migration added a table and a column that the dump does not know.
         sql("CREATE TABLE it_newer (id int); ALTER TABLE it_probe ADD COLUMN extra text")
 
-        run("node", "tools/restore.mjs", "--project", project, "--yes", "--backup-dir", File(backupDir, "safety").path, dump.path)
+        restore(dump)
 
         sql("SELECT label FROM it_probe WHERE id = 1") shouldBe "old"
         sql("SELECT count(*) FROM information_schema.tables WHERE table_name = 'it_newer'") shouldBe "0"
         sql("SELECT count(*) FROM information_schema.columns WHERE table_name = 'it_probe' AND column_name = 'extra'") shouldBe "0"
+    }
+
+    // @trace NFR-10
+    @Test
+    fun `restoring a dump from before the newest migration restarts the running backend, which migrates it again`() {
+        compose("up", "-d", "--wait", "db")
+        run("docker", "compose", "-p", project, "build", "backend", timeoutSec = 1200)
+        compose("up", "-d", "--wait", "--no-build", "backend")
+        // The database as it was before V4 (V4__practice.sql; applied migrations never change).
+        sql("DROP TABLE problem_report, opened_hint, attempt, practice_run; DELETE FROM flyway_schema_history WHERE version = '4'")
+        val dump = backup()
+        // Back to the newest schema, as a backend that has been running since V4 has it.
+        compose("restart", "backend")
+        compose("up", "-d", "--wait", "--no-build", "backend")
+        sql("SELECT count(*) FROM information_schema.tables WHERE table_name = 'practice_run'") shouldBe "1"
+
+        val output = restore(dump, timeoutSec = 600)
+
+        output shouldContain "restarted"
+        sql("SELECT count(*) FROM flyway_schema_history WHERE version = '4' AND success") shouldBe "1"
+        sql("SELECT count(*) FROM information_schema.tables WHERE table_name = 'practice_run'") shouldBe "1"
+        // The restarted backend serves the child area.
+        compose("exec", "-T", "backend", "wget", "-qO-", "http://localhost:8080/api/child/hq") shouldContain "\"rank\""
+    }
+
+    // @trace NFR-10
+    @Test
+    fun `restoring an older dump with no backend running says its next start migrates it`() {
+        compose("up", "-d", "--wait", "db")
+        historyAt("1")
+        val dump = backup()
+
+        val output = restore(dump)
+
+        output shouldContain "V1"
+        output shouldContain "not running"
+        output shouldContain "doucko-storage"
+    }
+
+    // @trace NFR-10
+    @Test
+    fun `restoring a dump newer than this checkout warns and restarts nothing`() {
+        compose("up", "-d", "--wait", "db")
+        historyAt("999")
+        val dump = backup()
+
+        val output = restore(dump)
+
+        output shouldContain "V999"
+        output shouldContain "newer"
     }
 
     // @trace NFR-10

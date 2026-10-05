@@ -1273,7 +1273,11 @@
         "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
         "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
         "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+        "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+        "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
+        "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
         "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt",
+        "src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt",
         "src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt",
         "src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt",
         "src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt",
@@ -1496,6 +1500,10 @@
     {
       "check": "test-trace",
       "msg": "FR-41 (owned by backend) has no test annotated \"@trace FR-41\""
+    },
+    {
+      "check": "active-changes",
+      "msg": "active change \"fix-restore-schema-drift\" is not archived"
     }
   ]
 }

@@ -5,7 +5,7 @@ requirements/spec/test/recording change; CI runs `--check-fresh`.
 
 Repo: backend (contract: submodule).
 Scope: 48 MVP functional requirements, 47 owned by backend.
-Result: PASS, 10 warning(s)
+Result: PASS, 11 warning(s)
 
 | FR | Spec | Plan | Owner repo(s) | Test trace here | Recording here |
 |---|---|---|---|---|---|
@@ -71,7 +71,7 @@ Result: PASS, 10 warning(s)
 | NFR-7 | frontend | n/a |
 | NFR-8 | frontend | n/a |
 | NFR-9 | backend, frontend | 4 |
-| NFR-10 | backend | 9 |
+| NFR-10 | backend | 13 |
 | NFR-11 | backend | 2 |
 | NFR-12 | backend, frontend | 3 |
 | NFR-13 | frontend | n/a |
@@ -107,3 +107,4 @@ None.
 - **test-trace**: FR-39 (owned by backend) has no test annotated "@trace FR-39"
 - **test-trace**: FR-40 (owned by backend) has no test annotated "@trace FR-40"
 - **test-trace**: FR-41 (owned by backend) has no test annotated "@trace FR-41"
+- **active-changes**: active change "fix-restore-schema-drift" is not archived

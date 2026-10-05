@@ -74,9 +74,12 @@ npx openspec doctor
 
 ## Agent Rules / Gotchas
 
-- `npm run restore` of a dump taken before a newer migration drops that migration's tables under the
-  running backend (Flyway only migrates at startup). Run `docker compose restart backend` after such a
-  restore. The restore never touches the `doucko-storage` files (seen in the slice 7 smoke, 2026-10-05).
+- `npm run restore` of a dump taken before a newer migration drops that migration's tables (Flyway only
+  migrates at startup; seen in the slice 7 smoke, 2026-10-05). Since `fix-restore-schema-drift` the restore
+  compares the restored Flyway version with `src/main/resources/db/migration` and, if the backend is running,
+  restarts it and waits until it is healthy and migrated. If that fails it exits 1 and prints
+  `docker compose restart backend` — the data is restored either way. The restore never touches the
+  `doucko-storage` files and says so; remove smoke uploads from that volume by hand.
 
 - On a first start against an empty database the backend refuses to start without a valid
   `DOUCKO_CHILD_DISPLAY_NAME` (1–50 characters). Tests use the fictional `Hrdinka`.
