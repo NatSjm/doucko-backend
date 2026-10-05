@@ -11,6 +11,7 @@ import cz.doucko.content.domain.SourceRef
 import cz.doucko.content.domain.Spec
 import cz.doucko.content.domain.Task
 import cz.doucko.content.domain.TaskContent
+import cz.doucko.practice.PracticeWebTestBeans
 import cz.doucko.profile.ProfileWebTestBeans
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import io.kotest.matchers.maps.shouldBeEmpty
@@ -74,6 +75,7 @@ fun storedTask(sourceId: UUID) =
     AdminWebTestBeans::class,
     ProfileWebTestBeans::class,
     ContentWebTestBeans::class,
+    PracticeWebTestBeans::class,
 )
 class SourceApiTest {
     @Autowired
@@ -321,6 +323,7 @@ class SourceApiTest {
         AdminWebTestBeans::class,
         ProfileWebTestBeans::class,
         ContentWebTestBeans::class,
+        PracticeWebTestBeans::class,
     )
     inner class WithGradeSeven {
         @Autowired

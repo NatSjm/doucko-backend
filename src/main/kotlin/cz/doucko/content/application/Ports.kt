@@ -60,6 +60,9 @@ interface TaskStore {
 
     fun find(id: UUID): Task?
 
+    /** The task an image belongs to, or null for an unknown image. */
+    fun imageOwner(imageId: UUID): UUID?
+
     /** Locks the task row until the transaction ends, so image edits of one task run one at a time. */
     fun lock(id: UUID)
 

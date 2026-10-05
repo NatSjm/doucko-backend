@@ -6,6 +6,7 @@ import cz.doucko.admin.AdminWebTestBeans
 import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
 import cz.doucko.admin.signedIn
 import cz.doucko.content.domain.PublishStatus
+import cz.doucko.practice.PracticeWebTestBeans
 import cz.doucko.profile.ProfileWebTestBeans
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import io.kotest.matchers.collections.shouldContainExactly
@@ -40,6 +41,7 @@ import java.util.UUID
     AdminWebTestBeans::class,
     ProfileWebTestBeans::class,
     ContentWebTestBeans::class,
+    PracticeWebTestBeans::class,
 )
 class MissionApiTest {
     @Autowired

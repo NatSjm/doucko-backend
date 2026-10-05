@@ -70,6 +70,14 @@ class JdbcTaskStore(
         return task.copy(images = images(listOf(id))[id].orEmpty())
     }
 
+    override fun imageOwner(imageId: UUID): UUID? =
+        jdbc
+            .sql("SELECT task_id FROM task_image WHERE id = ?")
+            .param(imageId)
+            .query(UUID::class.java)
+            .optional()
+            .orElse(null)
+
     override fun lock(id: UUID) {
         jdbc
             .sql("SELECT id FROM task WHERE id = ? FOR UPDATE")

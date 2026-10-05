@@ -135,8 +135,8 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-23": [
@@ -151,8 +151,8 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/practice/PracticeApiTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-33": [
@@ -207,8 +207,8 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-43": [
@@ -223,8 +223,8 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/practice/PracticeApiTest.kt",
+        "status": "artifact-ok"
       }
     ],
     "NFR-1": [

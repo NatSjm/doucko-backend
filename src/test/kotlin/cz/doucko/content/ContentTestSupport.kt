@@ -183,6 +183,8 @@ class InMemoryTaskStore : TaskStore {
 
     override fun lock(id: UUID) = Unit
 
+    override fun imageOwner(imageId: UUID) = tasks.values.firstOrNull { t -> t.images.any { it.id == imageId } }?.id
+
     override fun insert(task: Task) {
         if (failNextInsert) {
             failNextInsert = false

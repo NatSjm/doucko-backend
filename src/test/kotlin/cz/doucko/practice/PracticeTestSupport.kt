@@ -1,0 +1,85 @@
+package cz.doucko.practice
+
+import cz.doucko.practice.adapter.out.tutor.DeterministicTutor
+import cz.doucko.practice.application.PracticeService
+import cz.doucko.practice.application.PracticeStore
+import cz.doucko.practice.domain.AttemptRecord
+import cz.doucko.practice.domain.HintRecord
+import cz.doucko.practice.domain.ReportRecord
+import cz.doucko.practice.domain.RunRecord
+import org.springframework.boot.logging.LogLevel
+import org.springframework.boot.logging.LoggingSystem
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
+import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
+
+/** [PracticeStore] in memory, for `@WebMvcTest` slices (the child controllers need the practice use case). */
+class InMemoryPracticeStore : PracticeStore {
+    val attempts = CopyOnWriteArrayList<AttemptRecord>()
+    val hints = CopyOnWriteArrayList<HintRecord>()
+    val reports = CopyOnWriteArrayList<ReportRecord>()
+    val runs = CopyOnWriteArrayList<RunRecord>()
+
+    override fun lock() = Unit
+
+    override fun attempts(
+        scope: UUID,
+        taskIds: Collection<UUID>,
+    ) = attempts.filter { it.scope == scope && it.taskId in taskIds }
+
+    override fun hints(
+        scope: UUID,
+        taskIds: Collection<UUID>,
+    ) = hints.filter { it.scope == scope && it.taskId in taskIds }.sortedBy { it.index }
+
+    override fun insertAttempt(attempt: AttemptRecord) {
+        attempts += attempt
+    }
+
+    override fun insertHint(hint: HintRecord) {
+        hints += hint
+    }
+
+    override fun insertReport(report: ReportRecord) {
+        reports += report
+    }
+
+    override fun runs(missionId: UUID) = runs.filter { it.missionId == missionId }.sortedBy { it.startedAt }
+
+    override fun insertRun(run: RunRecord) {
+        runs += run
+    }
+
+    override fun attemptCounts(taskIds: Collection<UUID>) = attempts.filter { it.taskId in taskIds }.groupingBy { it.taskId }.eachCount()
+
+    override fun usedTasks(taskIds: Collection<UUID>) =
+        (attempts.map { it.taskId } + hints.map { it.taskId } + reports.map { it.taskId }).filter { it in taskIds }.toSet()
+}
+
+/** The practice use case over an in-memory store, for `@WebMvcTest` slices (every child controller needs it). */
+@TestConfiguration(proxyBeanMethods = false)
+@Import(PracticeService::class, DeterministicTutor::class)
+class PracticeWebTestBeans {
+    @Bean
+    fun practiceStore() = InMemoryPracticeStore()
+}
+
+/**
+ * Puts the loggers a practice test may raise back to the configured levels. Log levels are JVM-global, so a
+ * TRACE context (PracticeLogCaptureIT) would otherwise slow down every later test in the same JVM.
+ */
+fun configuredLogLevels(loader: ClassLoader) {
+    val logging = LoggingSystem.get(loader)
+    logging.setLogLevel(LoggingSystem.ROOT_LOGGER_NAME, LogLevel.INFO)
+    listOf(
+        "cz.doucko",
+        "org.springframework",
+        "org.springframework.jdbc",
+        "org.springframework.transaction",
+        "org.hibernate",
+        "org.postgresql",
+    ).forEach { logging.setLogLevel(it, null) }
+    listOf("org.springframework.web", "org.springframework.security").forEach { logging.setLogLevel(it, LogLevel.INFO) }
+}

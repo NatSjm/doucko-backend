@@ -25,6 +25,9 @@ class ChildProfileEntity(
     @Column(name = "created_at", nullable = false, updatable = false)
     private val createdAt: Instant = Instant.now(),
 ) {
+    /** The display name; a function, not a property, so no generic dump prints it (NFR-3). */
+    fun name(): String = displayName
+
     override fun toString() = "ChildProfileEntity(id=$id)"
 
     companion object {
