@@ -11,8 +11,8 @@
 
 ## 3. Validation, review, archive
 
-- [ ] 3.1 `npm run qa:verify` green. Evidence: `docs/qa/automated-verification-latest.md`.
-- [ ] 3.2 `npx openspec validate fix-restore-schema-drift --strict`.
-- [ ] 3.3 Review (fresh reviewer); every finding dispositioned in `review-findings.json`.
-- [ ] 3.4 Update `docs/current-state.md` (gotcha replaced).
-- [ ] 3.5 Archive; commit with `Slice: fix-restore-schema-drift` + `Refs: NFR-10`.
+- [x] 3.1 `npm run qa:verify` green after the review fixes (628 unit, 93 integration; 9/9 members PASS). Evidence: `docs/qa/automated-verification-latest.md` (2026-10-05).
+- [x] 3.2 `npx openspec validate fix-restore-schema-drift --strict`.
+- [x] 3.3 review-gate workflow (17 findings: 4 major, 13 minor; 15 fixed in `13e1f9b`, 2 minor waived with reasons; the run stopped at its $10 cap with 3 verify steps skipped); every finding dispositioned in `review-findings.json`. Run record: `trace/workflow-runs/20261005-173309-review-gate.json`.
+- [x] 3.4 Update `docs/current-state.md` (gotcha replaced).
+- [x] 3.5 Archive; commit with `Slice: fix-restore-schema-drift` + `Refs: NFR-10`.

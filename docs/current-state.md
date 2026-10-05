@@ -8,7 +8,7 @@
 - **Date and time:** 2026-10-05 (Europe/Prague)
 - **Current phase:** Phase 4
 - **Last completed gate:** G3
-- **Active change:** none. Slice 7 backend `implement-practice-flow-api` archived 2026-10-05 on branch `slice7-practice-flow` (not pushed, not merged).
+- **Active change:** none. Fix `fix-restore-schema-drift` (NFR-10 restore vs a newer running schema) archived 2026-10-05 and merged into `main`; slice 7 backend `implement-practice-flow-api` merged earlier.
 - **Contract pin:** `contract/` submodule at docs `0168eba`, API 0.5.1
 - **Progress:** Spring Boot 4.1.1 / Kotlin 2.3 / JVM 21 scaffold (ADR-0003) plus slice 1 platform
   foundation: Compose stack (db, backend, frontend; only the frontend's 8081 published, on
@@ -37,6 +37,7 @@
   `xpAvailable`, `MissionSummary` XP and ranks, `ackRankUp`) and own the replay and summary rules (practice runs and
   scopes are in `cz.doucko.practice`, design in `openspec/changes/archive/*implement-practice-flow-api/design.md`).
 - **Claims:**
+  - `fix-restore-schema-drift`: QA battery passes after the review fixes (628 unit, 93 integration incl. `BackupRestoreIT` 8 tests) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-05); RED, GREEN and the smoke replay — evidence: `docs/qa/evidence/fix-restore-schema-drift.md`; review gate dispositioned (17 findings: 15 fixed in `13e1f9b`, 2 minor waived; run capped at $10, 3 verify steps skipped) — evidence: `openspec/changes/archive/2026-10-05-fix-restore-schema-drift/review-findings.json`
   - Slice 7 QA battery passes (627 unit, 89 integration tests incl. `PracticeIT`, `PracticeTimingIT` (NFR-5 attempt round trip p95 173 ms in-process), `PracticeLogCaptureIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-05)
   - Slice 7 review gate clean (9 findings: 4 major, 5 minor; 8 fixed in `6befcf1`, 1 contested minor waived) — evidence: `openspec/changes/archive/2026-10-05-implement-practice-flow-api/review-findings.json`
   - Slice 7 RED run — evidence: `docs/qa/evidence/slice7-red-run.md`; real-stack smoke PASS after the merge (2026-10-05) — evidence: `docs/qa/evidence/slice7-compose-smoke.md`
