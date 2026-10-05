@@ -4,9 +4,11 @@ import cz.doucko.checking.AnswerChecker
 import cz.doucko.checking.AnswerType
 import cz.doucko.checking.CheckResult
 import cz.doucko.checking.RawInput
+import cz.doucko.content.ContentUsage
 import cz.doucko.content.domain.FieldError
 import cz.doucko.content.domain.FileKind
 import cz.doucko.content.domain.Limits
+import cz.doucko.content.domain.MissionRules
 import cz.doucko.content.domain.Modality
 import cz.doucko.content.domain.PublishStatus
 import cz.doucko.content.domain.Source
@@ -18,6 +20,7 @@ import cz.doucko.content.domain.TaskFilter
 import cz.doucko.content.domain.TaskImage
 import cz.doucko.content.domain.TaskRules
 import cz.doucko.content.domain.Validation
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.io.InputStream
@@ -47,6 +50,13 @@ data class PublishOutcome(
     val reason: String?,
 )
 
+/** What other entities know about a task (contract `AdminTask.missionIds`, `attemptCount`, `deletable`). */
+data class TaskFacts(
+    val missionIds: List<UUID>,
+    val attemptCount: Int,
+    val deletable: Boolean,
+)
+
 /** List filters as submitted (FR-11); [query] is the raw `q`. */
 data class TaskQuery(
     val grade: Int?,
@@ -62,7 +72,8 @@ data class TaskQuery(
  * Tasks (store spec content-authoring: create/edit with a source reference, images, modality, parts,
  * answer specs, hints, translations, list filters and search, preview, answer tester, bulk publish;
  * FR-3..FR-8, FR-10, FR-11, FR-13). A refused save stores nothing. The answer tester grades with
- * [AnswerChecker] and records nothing (FR-10).
+ * [AnswerChecker] and records nothing (FR-10). Edits, status changes and deletes keep the missions that
+ * contain the task valid and take the content lock first (FR-56, FR-57, CA-D6, CA-D8, CA-D10, CA-D22).
  */
 @Service
 class TaskService(
@@ -71,7 +82,13 @@ class TaskService(
     private val topics: TopicStore,
     private val storage: FileStoragePort,
     private val properties: ContentProperties,
+    private val missions: MissionStore,
+    private val lock: ContentLock,
+    private val conflicts: Conflicts,
+    private val usageProvider: ObjectProvider<ContentUsage>,
 ) {
+    private val usage: ContentUsage get() = usageProvider.getIfAvailable { ContentUsage.NONE }
+
     fun list(query: TaskQuery): List<Task> {
         val text =
             when (val q = TaskRules.query(query.query)) {
@@ -84,6 +101,17 @@ class TaskService(
     }
 
     fun get(id: UUID): Task = tasks.find(id) ?: throw ContentNotFound()
+
+    /** Missions, attempts and deletability of [task] (FR-56). */
+    fun facts(task: Task): TaskFacts {
+        val containing = missions.containing(task.id)
+        val used = task.id in usage.usedTasks(listOf(task.id))
+        return TaskFacts(
+            missionIds = containing.map { it.id },
+            attemptCount = usage.attemptCounts(listOf(task.id))[task.id] ?: 0,
+            deletable = MissionRules.taskDelete(task.id, containing, used) == null,
+        )
+    }
 
     /** The source of each task (provenance, FR-13). */
     fun sourcesOf(list: List<Task>): Map<UUID, Source> =
@@ -105,15 +133,21 @@ class TaskService(
         id: UUID,
         draft: TaskDraft,
     ): Task {
+        lock.exclusive()
         val current = get(id)
         val updated = current.copy(content = validate(draft))
+        MissionRules.taskEdit(current.content, updated.content, missions.containing(id))?.let { throw conflicts.of(it) }
         tasks.update(updated)
         return updated
     }
 
     @Transactional
     fun delete(id: UUID) {
+        lock.exclusive()
         val current = get(id)
+        val used = id in usage.usedTasks(listOf(id))
+        MissionRules.taskDelete(id, missions.containing(id), used)?.let { throw conflicts.of(it) }
+        missions.removeTask(id)
         tasks.delete(id)
         afterCommit { current.images.forEach { storage.delete(it.storageKey) } }
     }
@@ -123,19 +157,23 @@ class TaskService(
         id: UUID,
         status: PublishStatus,
     ): Task {
+        lock.exclusive()
         val current = get(id)
+        MissionRules.taskStatus(status, missions.containing(id))?.let { throw conflicts.of(it) }
         if (current.status != status) tasks.setStatus(id, status)
         return current.copy(status = status)
     }
 
     /** Publishes each task independently (OQ-32); an unknown id is reported as `not found`. */
     @Transactional
-    fun bulkPublish(ids: List<UUID>): List<PublishOutcome> =
-        ids.map { id ->
+    fun bulkPublish(ids: List<UUID>): List<PublishOutcome> {
+        lock.exclusive()
+        return ids.map { id ->
             val task = tasks.find(id) ?: return@map PublishOutcome(id, false, NOT_FOUND)
             if (task.status != PublishStatus.PUBLISHED) tasks.setStatus(id, PublishStatus.PUBLISHED)
             PublishOutcome(id, true, null)
         }
+    }
 
     @Transactional
     fun addImage(

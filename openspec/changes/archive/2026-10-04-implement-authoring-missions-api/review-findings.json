@@ -1,0 +1,105 @@
+{
+  "generatedBy": "review-gate",
+  "scope": "slice 6 authoring-missions backend (implement-authoring-missions-api)",
+  "change": "implement-authoring-missions-api",
+  "baseRef": "d1d68df",
+  "headRef": "HEAD",
+  "dimensions": {
+    "correctness": {
+      "confirmed": 2,
+      "contested": 1,
+      "rejected": 3
+    },
+    "security": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    },
+    "spec-compliance": {
+      "confirmed": 2,
+      "contested": 1,
+      "rejected": 3
+    },
+    "visual": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Mission reads are not transactional, so mission row and task list come from separate snapshots",
+      "file": "src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+      "line": 647,
+      "status": "fixed",
+      "fixCommit": "07518f9",
+      "resolution": "MissionService.list and get run in one read-only transaction."
+    },
+    {
+      "id": "F02",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Unpublishable conflict lists a task that is both draft and graphic twice in the detail",
+      "file": "src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+      "line": 534,
+      "status": "fixed",
+      "fixCommit": "07518f9",
+      "resolution": "A task that is both draft and graphic is named once, as a draft; test \"a task that is both draft and graphic is named once\"."
+    },
+    {
+      "id": "F03",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "FR-12 child-facing scenarios are unverified, yet the plan closes FR-12 in slice 6 and its acceptance contract is artifact-ok",
+      "file": "trace/acceptance-contracts.json",
+      "line": 46,
+      "status": "fixed",
+      "fixCommit": "07518f9",
+      "resolution": "Carry-over recorded in design.md (\"Carry-over to slice 7\"): slice 7 serves the child only through ServedContent and adds the HTTP 404 / HQ tests with @trace FR-12; docs/current-state.md lists the child-facing FR-12 scenarios under Scope NOT delivered. The plan row is a docs-store change for the owner."
+    },
+    {
+      "id": "F04",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Topic-change refusal is checked before field validation, so a request with field errors can get 409 instead of 400",
+      "file": "src/main/kotlin/cz/doucko/content/application/MissionService.kt",
+      "line": 60,
+      "status": "fixed",
+      "fixCommit": "07518f9",
+      "resolution": "Precedence specified in the spec delta and design.md (topic lock before field rules) and pinned by a test (topic change with position 0 is 409)."
+    },
+    {
+      "id": "F05",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "MissionRules.taskStatus takes a `task` parameter it never reads",
+      "file": "src/main/kotlin/cz/doucko/content/domain/Missions.kt",
+      "line": 1200,
+      "status": "fixed",
+      "fixCommit": "07518f9",
+      "resolution": "MissionRules.taskStatus no longer takes the unused task parameter."
+    },
+    {
+      "id": "F06",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "409 `conflicts` for mission-topic-locked and last-task holds the mission's own id, which the contract defines as the blocking entities",
+      "file": "src/main/kotlin/cz/doucko/content/application/Conflicts.kt",
+      "line": 48,
+      "status": "fixed",
+      "fixCommit": "07518f9",
+      "resolution": "A topic-lock 409 now lists the mission's task ids (the blocking entities); the last-task 409 keeps the published mission id; both stated in the spec delta."
+    }
+  ],
+  "clean": false,
+  "generatedAt": "2026-10-04T20:05:54Z"
+}

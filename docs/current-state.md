@@ -8,7 +8,7 @@
 - **Date and time:** 2026-10-04 (Europe/Prague)
 - **Current phase:** Phase 4
 - **Last completed gate:** G3
-- **Active change:** none. Slice 5 backend `implement-authoring-tasks-api` archived 2026-10-04 on branch `slice5-authoring-tasks` (not pushed, not merged).
+- **Active change:** none. Slice 6 backend `implement-authoring-missions-api` archived 2026-10-04 on branch `slice6-authoring-missions` (not pushed, not merged).
 - **Contract pin:** `contract/` submodule (`url = ../docs`) at docs `4c87d67`, API 0.5.1
 - **Progress:** Spring Boot 4.1.1 / Kotlin 2.3 / JVM 21 scaffold (ADR-0003) plus slice 1 platform
   foundation: Compose stack (db, backend, frontend; only the frontend's 8081 published, on
@@ -24,8 +24,18 @@
   migration `V1__child_profile.sql` (single-row `child_profile`), profile created on first start from
   `DOUCKO_CHILD_DISPLAY_NAME` (validated, startup refusal never echoes it), `getProfileSettings` /
   `updateProfileSettings` login-free with presence-aware PATCH, configured task locales (`uk`).
-- **Next task:** slice 6 (authoring-missions) per the capability plan.
+  Slice 5: sources, tasks, images, preview, tester, bulk publish (`V2__content_authoring.sql`). Slice 6:
+  missions (`AdminMissionsApi`, `V3__missions.sql`) with the FR-57 publishing invariant, the task guards
+  (CA-D6..CA-D10) and the delete rules; public API of `cz.doucko.content`: the `ServedContent` query (FR-12)
+  and the `ContentUsage` port (FR-56, CA-D22; default "unused" until slice 7 implements it).
+- **Next task:** slice 7 (practice-flow) per the capability plan. It must implement `cz.doucko.content.ContentUsage`
+  (attempts, problem reports, opened hints) and serve the child only through `cz.doucko.content.ServedContent`,
+  adding the child-facing FR-12 tests (HTTP 404 for draft-mission and graphic tasks, HQ lists only served
+  missions; carry-over in `openspec/changes/archive/2026-10-04-implement-authoring-missions-api/design.md`).
 - **Claims:**
+  - Slice 6 QA battery passes (605 unit, 52 integration tests incl. `MissionsIT`, `MissionApiTest`, `MissionRulesTest`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
+  - Slice 6 review gate clean (6 findings: 1 major, 5 minor, all fixed in `07518f9`) — evidence: `openspec/changes/archive/2026-10-04-implement-authoring-missions-api/review-findings.json`
+  - Slice 6 RED run — evidence: `docs/qa/evidence/slice6-red-run.md`; real-stack smoke not run yet (owner, after the merge)
   - Slice 5 QA battery passes (548 unit, 44 integration tests incl. `ContentAuthoringIT`, `UploadLimitsIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
   - Slice 5 review gate clean (14 findings: 11 fixed in `3738bfe`, 3 waived) — evidence: `openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/review-findings.json`
   - Slice 5 RED run — evidence: `docs/qa/evidence/slice5-red-run.md`; real-stack smoke PASS after the merge (2026-10-04) — evidence: `docs/qa/evidence/slice5-compose-smoke.md`
@@ -43,7 +53,7 @@
     `openspec/changes/archive/*implement-platform-foundation-api/review-findings.json`
   - G0, G2, G4, G5, G6, G8 PASS (G4 audits the archived slice); G1 and G3 need the owner's sign-off; G7 (release) fails until every
     MVP slice is archived. Evidence: `npm run gate:status`
-- **Scope NOT delivered:** slice 5: missions, publish rules and delete guards (slice 6), child serving (slice 7), backup of the `doucko-storage` volume (NFR-10 covers only Postgres), the real-stack smoke; the answer-checking endpoint rules (FR-22 whole-submission refusal, answer tester, re-evaluation: slices 5, 7, 9); slice 4 parts that need later slices or other repos (HQ `displayName`, XP/resolved tasks surviving a restart, e2e profile count, translation toggle, privacy scan, recordings; see `openspec/changes/archive/2026-10-04-implement-child-profile-api/design.md` Non-goals); the "Child write is limited to its own practice" scenario (needs slice 7 attempts); every product capability after slice 1 (authoring, practice, gamification,
+- **Scope NOT delivered:** slice 6: the real `ContentUsage` adapter (slice 7; until then every task reads as unused, so `attemptCount` is 0 and the usage guard never fires in the running app), the child-facing FR-12 / FR-5 scenarios (HQ, 404 for draft-mission and graphic tasks: slice 7 over `ServedContent`), the real-stack smoke (owner, after the merge with the frontend half); slice 5: child serving (slice 7), backup of the `doucko-storage` volume (NFR-10 covers only Postgres), the real-stack smoke; the answer-checking endpoint rules (FR-22 whole-submission refusal, answer tester, re-evaluation: slices 5, 7, 9); slice 4 parts that need later slices or other repos (HQ `displayName`, XP/resolved tasks surviving a restart, e2e profile count, translation toggle, privacy scan, recordings; see `openspec/changes/archive/2026-10-04-implement-child-profile-api/design.md` Non-goals); the "Child write is limited to its own practice" scenario (needs slice 7 attempts); every product capability after slice 1 (authoring, practice, gamification,
   admin-access, stats); Modulith JPA event registry (deferred, ADR-0003); the round-3 review fixes
   were not re-confirmed by a further review round (owner's choice).
 

@@ -47,6 +47,7 @@ class ContentAuthoringIT {
 
     @BeforeEach
     fun clean() {
+        jdbc.update("DELETE FROM mission")
         jdbc.update("DELETE FROM task_image")
         jdbc.update("DELETE FROM task")
         jdbc.update("DELETE FROM source")
@@ -239,6 +240,32 @@ class ContentAuthoringIT {
             NioFiles.isRegularFile(path) shouldBe true
             for (repository in repositories) path.startsWith(repository) shouldBe false
         }
+    }
+
+    // @trace NFR-3
+    @Test
+    fun `mission requests are not logged`(output: CapturedOutput) {
+        val sentinel = "PII-SENTINEL-mission-${System.nanoTime()}"
+        val id = task(source())
+        val body = """{"topicId":"${Topics.DECIMALS}","position":1,"taskIds":["$id"]}"""
+        val missionId: String =
+            JsonPath.read(
+                mvc
+                    .adminJson("POST", admin, "/api/admin/missions", body)
+                    .andExpect { status { isCreated() } }
+                    .andReturn()
+                    .response.contentAsString,
+                "$.missionId",
+            )
+        mvc.adminJson("PUT", admin, "/api/admin/missions/$missionId", body.replace("1,", quote(sentinel) + ","))
+        mvc.adminJson(
+            "POST",
+            admin,
+            "/api/admin/missions",
+            """{"topicId":${quote(sentinel)},"position":2,"taskIds":[${quote(sentinel)}]}""",
+        )
+        mvc.adminJson("PUT", admin, "/api/admin/missions/$missionId/status", """{"status":${quote(sentinel)}}""")
+        output.all shouldNotContain sentinel
     }
 
     // @trace NFR-3

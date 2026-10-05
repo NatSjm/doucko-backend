@@ -316,10 +316,33 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionsIT.kt",
+        "src/test/kotlin/cz/doucko/content/MissionsIT.kt",
+        "src/test/kotlin/cz/doucko/content/MissionsIT.kt"
+      ],
       "recordings": []
     },
     {
@@ -372,10 +395,15 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionsIT.kt"
+      ],
       "recordings": []
     },
     {
@@ -404,10 +432,15 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionsIT.kt"
+      ],
       "recordings": []
     },
     {
@@ -417,10 +450,24 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionsIT.kt",
+        "src/test/kotlin/cz/doucko/content/MissionsIT.kt"
+      ],
       "recordings": []
     },
     {
@@ -430,10 +477,34 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/content-authoring/spec.md"
+        "contract/openspec/specs/content-authoring/spec.md",
+        "openspec/specs/content-authoring/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/MissionsIT.kt",
+        "src/test/kotlin/cz/doucko/content/MissionsIT.kt"
+      ],
       "recordings": []
     },
     {
@@ -1024,6 +1095,7 @@
       "tests": [
         "src/test/kotlin/cz/doucko/admin/AdminSessionIT.kt",
         "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/platform/DockerContextTest.kt",
@@ -1303,26 +1375,6 @@
   ],
   "failures": [],
   "warnings": [
-    {
-      "check": "test-trace",
-      "msg": "FR-9 (owned by backend) has no test annotated \"@trace FR-9\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-12 (owned by backend) has no test annotated \"@trace FR-12\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-55 (owned by backend) has no test annotated \"@trace FR-55\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-56 (owned by backend) has no test annotated \"@trace FR-56\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-57 (owned by backend) has no test annotated \"@trace FR-57\""
-    },
     {
       "check": "test-trace",
       "msg": "FR-22 (owned by backend) has no test annotated \"@trace FR-22\""

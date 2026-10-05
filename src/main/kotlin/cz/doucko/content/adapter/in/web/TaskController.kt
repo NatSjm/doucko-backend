@@ -140,5 +140,6 @@ class TaskController(
 
     private fun body() = ContentBodyAdvice.body(Requests.current())
 
-    private fun admin(task: Task): AdminTask = ApiMapping.adminTask(task, service.sourcesOf(listOf(task))[task.content.sourceRef.sourceId])
+    private fun admin(task: Task): AdminTask =
+        ApiMapping.adminTask(task, service.sourcesOf(listOf(task))[task.content.sourceRef.sourceId], service.facts(task))
 }

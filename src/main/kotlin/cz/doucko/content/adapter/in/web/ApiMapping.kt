@@ -1,5 +1,6 @@
 package cz.doucko.content.adapter.`in`.web
 
+import cz.doucko.api.model.AdminMission
 import cz.doucko.api.model.AdminTask
 import cz.doucko.api.model.AnswerSpec
 import cz.doucko.api.model.AnswerSpecOptionsInner
@@ -19,6 +20,8 @@ import cz.doucko.api.model.TaskSummary
 import cz.doucko.api.model.TaskView
 import cz.doucko.api.model.TaskViewImagesInner
 import cz.doucko.api.model.Translation
+import cz.doucko.content.application.MissionView
+import cz.doucko.content.application.TaskFacts
 import cz.doucko.content.domain.Source
 import cz.doucko.content.domain.SpecRules
 import cz.doucko.content.domain.Task
@@ -64,6 +67,7 @@ internal object ApiMapping {
     fun adminTask(
         task: Task,
         source: Source?,
+        facts: TaskFacts,
     ): AdminTask {
         val c = task.content
         return AdminTask(
@@ -77,14 +81,27 @@ internal object ApiMapping {
                     .SourceRef(c.sourceRef.sourceId, c.sourceRef.page, c.sourceRef.taskNo, c.sourceRef.subPart),
             parts = c.parts.map(::part),
             hints = c.hints,
-            deletable = true,
+            deletable = facts.deletable,
             taskId = task.id,
             status = PublishStatus.forValue(task.status.name),
             images = task.images.map { image(task.id, it) },
             provenance = provenance(task, source),
-            attemptCount = 0,
-            missionIds = emptyList(),
+            attemptCount = facts.attemptCount,
+            missionIds = facts.missionIds,
             translations = c.translations.mapValues { (_, t) -> Translation(t.prompt, t.partLabels, t.hints, t.options) },
+        )
+    }
+
+    fun adminMission(view: MissionView): AdminMission {
+        val m = view.mission
+        return AdminMission(
+            topicId = m.content.topicId,
+            position = m.content.position,
+            taskIds = m.content.taskIds,
+            deletable = view.deletable,
+            missionId = m.id,
+            status = PublishStatus.forValue(m.status.name),
+            hasAttempts = view.hasAttempts,
         )
     }
 
