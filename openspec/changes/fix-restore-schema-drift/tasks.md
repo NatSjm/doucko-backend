@@ -11,8 +11,8 @@
 
 ## 3. Validation, review, archive
 
-- [x] 3.1 `npm run qa:verify` green. Evidence: `docs/qa/automated-verification-latest.md`.
-- [x] 3.2 `npx openspec validate fix-restore-schema-drift --strict`.
-- [x] 3.3 Review (fresh reviewer); every finding dispositioned in `review-findings.json`.
-- [x] 3.4 Update `docs/current-state.md` (gotcha replaced).
-- [x] 3.5 Archive; commit with `Slice: fix-restore-schema-drift` + `Refs: NFR-10`.
+- [ ] 3.1 `npm run qa:verify` green. Evidence: `docs/qa/automated-verification-latest.md`.
+- [ ] 3.2 `npx openspec validate fix-restore-schema-drift --strict`.
+- [ ] 3.3 Review (fresh reviewer); every finding dispositioned in `review-findings.json`.
+- [ ] 3.4 Update `docs/current-state.md` (gotcha replaced).
+- [ ] 3.5 Archive; commit with `Slice: fix-restore-schema-drift` + `Refs: NFR-10`.

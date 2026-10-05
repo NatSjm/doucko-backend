@@ -56,9 +56,14 @@ exit 0
 restores: with an empty database the HQ does not read the V4 tables, so the replay shows the dropped
 tables rather than the 500s the smoke saw with data in them.
 
-## Not covered by a test
+## After the review gate (review-findings.json)
 
-The failure branches after the restore committed (restart fails, healthcheck turns unhealthy or the
-container crash-loops, schema still behind because the image is older than the checkout, version
-unreadable) print the manual `docker compose restart backend` step and exit 1; they are reviewed, not
-exercised by a test.
+Same command: `BackupRestoreIT` 8 run, 0 failures (5:48 min including two backend image builds in
+throwaway projects). The new failure test (history at V3, V4 tables present, so Flyway fails on restart
+and the backend crash-loops) took 52 s: the health wait stops at the first restart-policy restart, not at
+its 5-minute timeout. It asserts exit 1, "the data is restored, but the backend did not come back
+healthy" and the `-p <project> restart backend` / `logs backend` steps.
+
+Still not exercised by a test: an unreadable version or service list, and a schema still behind after a
+healthy restart (image older than the checkout). They share the same `fail()` path that the crash test
+covers.

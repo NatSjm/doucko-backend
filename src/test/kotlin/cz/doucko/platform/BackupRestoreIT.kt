@@ -2,6 +2,7 @@ package cz.doucko.platform
 
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -79,6 +80,12 @@ class BackupRestoreIT {
             "CREATE TABLE flyway_schema_history (installed_rank int PRIMARY KEY, version varchar(50), success boolean NOT NULL); " +
                 "INSERT INTO flyway_schema_history VALUES (1, '$version', true)",
         )
+
+    /** A backend built from this checkout in this project (its own image), migrated and healthy. */
+    private fun buildAndStartBackend() {
+        run("docker", "compose", "-p", project, "build", "backend", timeoutSec = 1200)
+        compose("up", "-d", "--wait", "--no-build", "backend")
+    }
 
     @AfterEach
     fun tearDown() {
@@ -159,8 +166,7 @@ class BackupRestoreIT {
     @Test
     fun `restoring a dump from before the newest migration restarts the running backend, which migrates it again`() {
         compose("up", "-d", "--wait", "db")
-        run("docker", "compose", "-p", project, "build", "backend", timeoutSec = 1200)
-        compose("up", "-d", "--wait", "--no-build", "backend")
+        buildAndStartBackend()
         // The database as it was before V4 (V4__practice.sql; applied migrations never change).
         sql("DROP TABLE problem_report, opened_hint, attempt, practice_run; DELETE FROM flyway_schema_history WHERE version = '4'")
         val dump = backup()
@@ -190,6 +196,7 @@ class BackupRestoreIT {
         output shouldContain "V1"
         output shouldContain "not running"
         output shouldContain "doucko-storage"
+        output shouldNotContain "restarted now"
     }
 
     // @trace NFR-10
@@ -198,11 +205,42 @@ class BackupRestoreIT {
         compose("up", "-d", "--wait", "db")
         historyAt("999")
         val dump = backup()
+        // The live database is at this checkout's level again before the newer dump comes back.
+        sql("UPDATE flyway_schema_history SET version = '1'")
 
         val output = restore(dump)
 
         output shouldContain "V999"
         output shouldContain "newer"
+        output shouldNotContain "restarted now"
+    }
+
+    // @trace NFR-10
+    @Test
+    fun `when the restarted backend cannot migrate the restored schema, restore exits 1 and says the data is restored`() {
+        compose("up", "-d", "--wait", "db")
+        buildAndStartBackend()
+        // History says V3 but V4's tables exist: Flyway's V4 fails on restart and the backend crash-loops.
+        sql("DELETE FROM flyway_schema_history WHERE version = '4'")
+        val dump = backup()
+
+        val (exit, output) =
+            exec(
+                "node",
+                "tools/restore.mjs",
+                "--project",
+                project,
+                "--yes",
+                "--backup-dir",
+                File(backupDir, "safety").path,
+                dump.path,
+                timeoutSec = 600,
+            )
+
+        exit shouldBe 1
+        output shouldContain "the data is restored, but the backend did not come back healthy"
+        output shouldContain "-p $project restart backend"
+        output shouldContain "-p $project logs backend"
     }
 
     // @trace NFR-10
