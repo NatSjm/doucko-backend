@@ -39,7 +39,7 @@
 - **Claims:**
   - Slice 7 QA battery passes (627 unit, 89 integration tests incl. `PracticeIT`, `PracticeTimingIT` (NFR-5 attempt round trip p95 173 ms in-process), `PracticeLogCaptureIT`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-05)
   - Slice 7 review gate clean (9 findings: 4 major, 5 minor; 8 fixed in `6befcf1`, 1 contested minor waived) — evidence: `openspec/changes/archive/2026-10-05-implement-practice-flow-api/review-findings.json`
-  - Slice 7 RED run — evidence: `docs/qa/evidence/slice7-red-run.md`; real-stack smoke NOT RUN (owner runs it after the merge) — `docs/qa/evidence/slice7-compose-smoke.md`
+  - Slice 7 RED run — evidence: `docs/qa/evidence/slice7-red-run.md`; real-stack smoke PASS after the merge (2026-10-05) — evidence: `docs/qa/evidence/slice7-compose-smoke.md`
   - Slice 6 QA battery passes (605 unit, 52 integration tests incl. `MissionsIT`, `MissionApiTest`, `MissionRulesTest`) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-04)
   - Slice 6 review gate clean (6 findings: 1 major, 5 minor, all fixed in `07518f9`) — evidence: `openspec/changes/archive/2026-10-04-implement-authoring-missions-api/review-findings.json`
   - Slice 6 RED run — evidence: `docs/qa/evidence/slice6-red-run.md`; real-stack smoke PASS after the merge (2026-10-05) — evidence: `docs/qa/evidence/slice6-compose-smoke.md`
@@ -60,7 +60,7 @@
     `openspec/changes/archive/*implement-platform-foundation-api/review-findings.json`
   - G0, G2, G4, G5, G6, G8 PASS (G4 audits the archived slice); G1 and G3 need the owner's sign-off; G7 (release) fails until every
     MVP slice is archived. Evidence: `npm run gate:status`
-- **Scope NOT delivered:** slice 7: XP, ranks, rank-ups, mission summary XP and the gamification rules of replay (slice 8; the contract fields are placeholders: 0 / [] / null, first rank of a placeholder ladder); the Compose-stack NFR-5 measurement and task-screen load time, NFR-7 and the UI scenarios (frontend half); stats, flag queue and re-evaluation over the stored reports and attempt log (slice 9); the real-stack smoke of slice 7 (NOT RUN); slice 5: child serving (slice 7), backup of the `doucko-storage` volume (NFR-10 covers only Postgres), the real-stack smoke; the answer-checking endpoint rules (FR-22 whole-submission refusal, answer tester, re-evaluation: slices 5, 7, 9); slice 4 parts that need later slices or other repos (HQ `displayName`, XP/resolved tasks surviving a restart, e2e profile count, translation toggle, privacy scan, recordings; see `openspec/changes/archive/2026-10-04-implement-child-profile-api/design.md` Non-goals); the product capabilities still open (gamification,
+- **Scope NOT delivered:** slice 7: XP, ranks, rank-ups, mission summary XP and the gamification rules of replay (slice 8; the contract fields are placeholders: 0 / [] / null, first rank of a placeholder ladder); the Compose-stack NFR-5 measurement and task-screen load time, NFR-7 and the UI scenarios (frontend half); stats, flag queue and re-evaluation over the stored reports and attempt log (slice 9); slice 5: child serving (slice 7), backup of the `doucko-storage` volume (NFR-10 covers only Postgres), the real-stack smoke; the answer-checking endpoint rules (FR-22 whole-submission refusal, answer tester, re-evaluation: slices 5, 7, 9); slice 4 parts that need later slices or other repos (HQ `displayName`, XP/resolved tasks surviving a restart, e2e profile count, translation toggle, privacy scan, recordings; see `openspec/changes/archive/2026-10-04-implement-child-profile-api/design.md` Non-goals); the product capabilities still open (gamification,
   admin-access, stats); Modulith JPA event registry (deferred, ADR-0003); the round-3 review fixes
   were not re-confirmed by a further review round (owner's choice).
 
@@ -73,6 +73,10 @@ npx openspec doctor
 ```
 
 ## Agent Rules / Gotchas
+
+- `npm run restore` of a dump taken before a newer migration drops that migration's tables under the
+  running backend (Flyway only migrates at startup). Run `docker compose restart backend` after such a
+  restore. The restore never touches the `doucko-storage` files (seen in the slice 7 smoke, 2026-10-05).
 
 - On a first start against an empty database the backend refuses to start without a valid
   `DOUCKO_CHILD_DISPLAY_NAME` (1–50 characters). Tests use the fictional `Hrdinka`.
