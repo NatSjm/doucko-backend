@@ -1,0 +1,123 @@
+{
+  "generatedBy": "review-gate",
+  "scope": "slice 7 practice-flow backend (implement-practice-flow-api)",
+  "change": "implement-practice-flow-api",
+  "baseRef": "d1843b0",
+  "headRef": "HEAD",
+  "dimensions": {
+    "correctness": {
+      "confirmed": 2,
+      "contested": 0,
+      "rejected": 4
+    },
+    "security": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 3
+    },
+    "spec-compliance": {
+      "confirmed": 5,
+      "contested": 2,
+      "rejected": 3
+    },
+    "visual": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "major",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Task screen returns a raw 500 when an admin removes hints from a published task after the child opened some",
+      "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeMapping.kt",
+      "line": 702,
+      "status": "open"
+    },
+    {
+      "id": "F02",
+      "severity": "major",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "An old replay run comes back to life when a task is added to the mission later, so attempts go into the replay scope instead of the primary one",
+      "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "line": 1645,
+      "status": "open"
+    },
+    {
+      "id": "F03",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "NFR-5 check round-trip test does not follow the scenario's fixture or load shape",
+      "file": "src/test/kotlin/cz/doucko/practice/PracticeTimingIT.kt",
+      "line": 75,
+      "status": "open"
+    },
+    {
+      "id": "F04",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "TC-6 'Feedback never comes from AI' is only half enforced: no network-denied run of the attempt tests",
+      "file": "src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+      "line": 87,
+      "status": "open"
+    },
+    {
+      "id": "F05",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Malformed body on a task that is not served returns 400, not the required 404",
+      "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/ChildControllers.kt",
+      "line": 72,
+      "status": "open"
+    },
+    {
+      "id": "F06",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "'Replay of an unfinished mission is refused' is only tested for a NEW mission, not one in progress",
+      "file": "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+      "line": 812,
+      "status": "open"
+    },
+    {
+      "id": "F07",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "No backend test for the 413 'Request body too large' scenario on rank-up acknowledgement",
+      "file": "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+      "line": 838,
+      "status": "open"
+    },
+    {
+      "id": "F08",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "'Same input, same feedback' is verified only at unit level, not across two fresh runs through the API",
+      "file": "src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+      "line": 64,
+      "status": "open"
+    },
+    {
+      "id": "F09",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "Undocumented 400 for non-UUID path ids on endpoints whose OpenAPI lists only 200/404 (or 200/204/404)",
+      "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+      "line": 49,
+      "status": "open"
+    }
+  ],
+  "clean": false,
+  "generatedAt": "2026-10-05T06:49:24Z"
+}

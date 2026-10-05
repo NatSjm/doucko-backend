@@ -165,7 +165,9 @@ class PracticeService(
                         createdAt = Instant.now(),
                     )
                 store.insertAttempt(record)
-                outcome(mission, task, run, TaskProgress(progress.attempts + record), hintsOpened)
+                val result = outcome(mission, task, run, TaskProgress(progress.attempts + record), hintsOpened)
+                if (run.replay && result.missionComplete) store.finishRun(run.scope, record.createdAt)
+                result
             }
         }
     }
@@ -200,6 +202,17 @@ class PracticeService(
         val run = currentRun(mission)
         val latest = TaskProgress(store.attempts(run.scope, listOf(taskId))).latest
         store.insertReport(ReportRecord(UUID.randomUUID(), taskId, mission.missionId, input.reason, input.note, latest?.id, Instant.now()))
+    }
+
+    /**
+     * 404 unless the mission is served and the task is served in it. The web layer asks this before it
+     * validates a body, so a request for an unserved task is 404 whatever its body (FR-26, FR-30).
+     */
+    fun requireServed(
+        missionId: UUID,
+        taskId: UUID,
+    ) {
+        task(mission(missionId), taskId)
     }
 
     /** The image of a served task (FR-26). */
@@ -256,7 +269,8 @@ class PracticeService(
     }
 
     private fun currentRun(mission: ServedMission): Run {
-        val run = store.runs(mission.missionId).lastOrNull() ?: return Run(Scope.PRIMARY, false)
+        // A finished replay run never comes back, even when the admin later adds a task to the mission.
+        val run = store.runs(mission.missionId).lastOrNull()?.takeIf { it.finishedAt == null } ?: return Run(Scope.PRIMARY, false)
         val states = states(run.id, mission.taskIds)
         return if (mission.taskIds.any { states[it]?.resolved != true }) Run(run.id, true) else Run(Scope.PRIMARY, false)
     }

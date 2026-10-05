@@ -10,7 +10,7 @@ import cz.doucko.practice.domain.TaskState
 import java.util.UUID
 
 /**
- * Where practice is stored (adapter: Postgres). Insert-only: the attempt log, opened hints and reports are
+ * Where practice is stored (adapter: Postgres). Insert-only (a replay run is marked finished once): the attempt log, opened hints and reports are
  * never edited or deleted (FR-42, OQ-20).
  */
 interface PracticeStore {
@@ -39,6 +39,12 @@ interface PracticeStore {
     fun runs(missionId: UUID): List<RunRecord>
 
     fun insertRun(run: RunRecord)
+
+    /** Marks a replay run finished: it never becomes the current run again. */
+    fun finishRun(
+        runId: UUID,
+        at: java.time.Instant,
+    )
 
     /** Stored attempts per task, every scope (FR-56); tasks without attempts may be left out. */
     fun attemptCounts(taskIds: Collection<UUID>): Map<UUID, Int>

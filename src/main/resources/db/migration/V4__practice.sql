@@ -8,7 +8,10 @@
 CREATE TABLE practice_run (
     id          uuid PRIMARY KEY,
     mission_id  uuid NOT NULL REFERENCES mission (id) ON DELETE CASCADE,
-    started_at  timestamptz NOT NULL
+    started_at  timestamptz NOT NULL,
+    -- Set when the run's last task is resolved: a finished run never becomes current again, even when the
+    -- admin later adds a task to the mission (that task belongs to the primary scope).
+    finished_at timestamptz
 );
 
 CREATE INDEX practice_run_mission_idx ON practice_run (mission_id, started_at);

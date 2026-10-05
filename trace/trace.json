@@ -775,6 +775,7 @@
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt",
@@ -795,6 +796,7 @@
       ],
       "planned": true,
       "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt"
       ],
@@ -832,6 +834,7 @@
       "tests": [
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt"
       ],
       "recordings": []
@@ -849,6 +852,7 @@
       ],
       "planned": true,
       "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt"
       ],
@@ -1101,6 +1105,8 @@
       "planned": true,
       "tests": [
         "src/test/kotlin/cz/doucko/practice/PracticeApiTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/TutorSwapTest.kt",
         "src/test/kotlin/cz/doucko/practice/TutorTest.kt",

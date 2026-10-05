@@ -52,6 +52,13 @@ class InMemoryPracticeStore : PracticeStore {
         runs += run
     }
 
+    override fun finishRun(
+        runId: UUID,
+        at: java.time.Instant,
+    ) {
+        runs.replaceAll { if (it.id == runId && it.finishedAt == null) it.copy(finishedAt = at) else it }
+    }
+
     override fun attemptCounts(taskIds: Collection<UUID>) = attempts.filter { it.taskId in taskIds }.groupingBy { it.taskId }.eachCount()
 
     override fun usedTasks(taskIds: Collection<UUID>) =

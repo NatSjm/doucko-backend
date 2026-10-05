@@ -91,6 +91,7 @@ data class RunRecord(
     val id: UUID,
     val missionId: UUID,
     val startedAt: Instant,
+    val finishedAt: Instant? = null,
 )
 
 /** An invalid request field: the contract's dotted path and a catalog code (`practice.error.<code>`). */

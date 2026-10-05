@@ -1,0 +1,1260 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-05T06:42:37.164Z",
+  "finishedAt": "2026-10-05T06:49:24.179Z",
+  "args": {
+    "scope": "slice 7 practice-flow backend (implement-practice-flow-api)",
+    "baseRef": "d1843b0",
+    "headRef": "HEAD",
+    "change": "implement-practice-flow-api"
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": null,
+    "budgetPerAgentUsd": 2,
+    "maxTotalUsd": 25,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 13.2311,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 443,
+      "durationMs": 184725,
+      "sessionId": "791c5314-b543-4b42-a782-9d8a115df1f5",
+      "costUsd": 1.0600498,
+      "numTurns": 14,
+      "result": {
+        "findings": [
+          {
+            "title": "Task screen returns a raw 500 when an admin removes hints from a published task after the child opened some",
+            "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeMapping.kt",
+            "line": 702,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "`TaskView.hints.opened` is built as `(1..screen.hintsOpened).map { hint(task, it, locale) }`, and `hint()` reads `task.hints[index - 1]`. `hintsOpened` comes from the append-only `opened_hint` log, but `task.hints` is the current content. `TaskService.update` / `MissionRules.taskEdit` (Missions.kt:228) let an admin edit the content of a published task, including its hints. Say the child opened 2 hints and the task now has 1: `hints[1]` throws IndexOutOfBoundsException. getTask, getCurrentTask and startReplay then return a raw 500, and `remaining = task.hints.size - index` would go negative.",
+            "suggestion": "Clamp the opened count to the current number of hints: `(1..minOf(screen.hintsOpened, task.hints.size))`. Clamp `remaining` at 0 too. Add an IT that opens hints, removes them in an admin edit, and reloads the task."
+          },
+          {
+            "title": "An old replay run comes back to life when a task is added to the mission later, so attempts go into the replay scope instead of the primary one",
+            "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+            "line": 1645,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "`currentRun` takes the latest `practice_run` and treats it as active if `mission.taskIds.any { states[it]?.resolved != true }`, using the mission's current task list. Suppose a replay finished and the admin then adds a task (missions can be edited). The finished run now has an unresolved task, so it counts as the current replay again. getCurrentTask and submit then write that task's attempts into the replay scope with `replay=true`. The primary scope never sees the task, so HQ shows the mission IN_PROGRESS with a continue target that can't be cleared through the normal flow.",
+            "suggestion": "Mark a run as finished once it is complete: store `completed_at`, or freeze the run's task list when it starts. Or only treat a run as current when the tasks it started with are still unresolved. Then route newly added tasks to the primary scope."
+          },
+          {
+            "title": "Summary first-try count leaves out shared tasks that were solved first try in a different mission",
+            "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+            "line": 1630,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`firstTry = attempts.count { it.attemptNo == 1 && it.correct && it.missionId == mission.missionId }`. In the primary scope one task's state is shared by every mission that contains it (OQ-15), so it can be resolved under another mission. That task counts in `taskCount = mission.taskIds.size` and makes the mission COMPLETE, but the `missionId` filter drops it from `firstTryCount`. The summary then shows something like '3 of 5 first try' even though all 5 were solved first try.",
+            "suggestion": "Count from the task states in the scope instead of filtering attempts by missionId: `states(scope, mission.taskIds).count { it.value == TaskState.CORRECT_FIRST_TRY }`. If the filter is intended, state that in the spec and design doc."
+          },
+          {
+            "title": "Image read failure is not handled, so the child image endpoint can return a raw 500",
+            "file": "src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+            "line": 246,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`storage.open(image.storageKey)?.use { it.readAllBytes() }` handles a missing file (null → 404). It does not handle an IOException from the storage adapter while reading (truncated or unreadable file, permissions). That exception reaches `getChildImage` without a handler in PracticeProblemAdvice and becomes a generic 500. The whole image is also read into memory inside a read-only DB transaction.",
+            "suggestion": "Catch IOException in `image()`: log it without the key contents and return null (404), or map it to a 5xx RFC 7807 problem with a human message. You could also stream the resource outside the transaction."
+          },
+          {
+            "title": "HQ topics are listed in mission-list order instead of a defined order",
+            "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+            "line": 1463,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`missions.groupBy { it.topicId }.map { ... }` keeps topics in the order their first mission appears in `missions.list()`. Missions inside a topic are sorted by position, but topics are never sorted. Topic order on HQ therefore depends on how the store happens to return missions, and can change after edits.",
+            "suggestion": "Sort topics explicitly (topic position or name, whichever the practice-flow spec defines) before mapping them to `TopicView`."
+          },
+          {
+            "title": "ServedContent.missions() runs one topic lookup and per-task lookups for every mission on each HQ load",
+            "file": "src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+            "line": 278,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`served(mission, …)` calls `topics.find(mission.content.topicId)` once per mission. `mission(missionId)` passes `::servable`, which calls `tasks.find(taskId)` for each task. Every child endpoint goes through `mission()`, so each request does N task loads, including images, before running further `store.attempts` queries. `outcome()` re-reads every task's attempts again through `states()`.",
+            "suggestion": "Batch these: load the topics once per `missions()` call, and check servable tasks with a single filtered query, as `servableIds()` already does. That's fine for MVP data sizes, but worth doing before slice 8 adds XP aggregation."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 471,
+      "durationMs": 122901,
+      "sessionId": "2633bbed-887a-4020-afb7-b6b3866b4c92",
+      "costUsd": 0.9599034,
+      "numTurns": 14,
+      "result": {
+        "findings": [
+          {
+            "title": "Unauthenticated, unthrottled child write endpoints let any LAN device burn attempts, force reveals and flood problem reports permanently",
+            "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+            "line": 192,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "The shared chain is `authorize(anyRequest, permitAll)` with CSRF off (SecurityConfiguration.kt:64-66), and the five child writes (attempt, hint, report, replay, ackRankUp) have no rate limit or per-device bound. Any device on the home network can read mission/task UUIDs from `GET /api/child/hq`, then submit two wrong attempts per task to turn every task REVEALED, open every hint, and start replay runs. Because the attempt log, opened hints and runs are append-only (FR-42, `V4__practice.sql`), the admin cannot undo this. The child's progress and stats are corrupted for good. `report()` inserts one `problem_report` row (note up to 1000 code points) per call with no cap, so a loop can grow the table and the admin report queue without limit. Every call also takes the global `pg_advisory_xact_lock` (JdbcPracticeStore.kt:18-24), so a flood blocks the real child too. Login-free child endpoints are by design (NFR-1), so this is limited to the LAN, but the scope asked about abuse resistance.",
+            "suggestion": "Add a simple in-process rate limit on `/api/child/**` POSTs (for example a token bucket keyed by remote address) and a cap on open problem reports per task (for example refuse with 409 once N OPEN reports exist for a task in a short window). Record the decision in design.md. Optionally give the admin a way to see where attempts came from, without logging any payload."
+          },
+          {
+            "title": "400 problem responses echo attacker-chosen JSON keys back in `errors[].field`",
+            "file": "src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+            "line": 88,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "`Grading.shapeErrors` returns `FieldError(\"answers.$key\", \"unknown-part\")` for any submitted key that is not a part key, and `PracticeReaders.answers` builds `val field = \"answers.$key\"` (PracticeReaders.kt:28) for shape and length errors. `PracticeProblemAdvice.invalid` copies `it.field` into the response verbatim. A client can therefore put any string of up to about 16 KB, such as markup or a long text, into the problem JSON. That contradicts the file's own rule \"never quote a submitted value (NFR-3)\". The response is application/problem+json, so there is no direct XSS. The risk is a frontend that renders `field` as HTML, or a future log of problem bodies that captures child-typed content.",
+            "suggestion": "Report only part keys the task actually defines. For unknown keys, emit one generic error with field `answers` and code `unknown-part`, or truncate and sanitise the key to the contract's part-key pattern before echoing it. Add a test that a submitted key with markup or over 64 chars does not appear in the response."
+          },
+          {
+            "title": "Checklist areas reviewed and found clean (informational, no action)",
+            "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/ChildControllers.kt",
+            "line": 1,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "Non-findings, listed so nothing is assumed by silence. (1) AuthZ/IDOR: every child route goes through `PracticeService.mission()` and `task()`. These require a PUBLISHED mission and a task in that mission's served list. `image()` resolves the owner task and requires PUBLISHED, TEXT and membership in a published mission (ServedContentService.kt:42-48). Child endpoints write only practice tables, never content. Answer keys: `ServedPart.spec` is never mapped into `TaskView`/`PartView`. `revealedAnswers` comes only from DeterministicTutor when the state is REVEALED. Format tips are built so they never fall in the accepted region (FormatTips.kt). The PracticeBodyAdvice placeholder binding prevents mass assignment. Single-tenant app, so there is no tenant scoping to check. (2) Auth/session: no change to admin auth; the ContentBodyAdvice narrowing still covers every content controller. (3) Injection: all new SQL in JdbcPracticeStore and JdbcTaskStore.imageOwner uses bound parameters; JSONB uses `?::jsonb` with a serialized tree. Images are served with an allowlisted PNG/JPEG media type and the default Spring Security nosniff header. The 16 KB body cap is enforced before parsing. No CSV/HTML rendering on the server. (4) Exposure: compose and CORS are not changed in this diff, and the Host firewall still blocks DNS rebinding. (5) Privacy: the display name is read through a function (not a dumped property). Spring JDBC and Hibernate ORM bind loggers are now capped at INFO. No PII or workbook content in the new migration or messages. (6) Secrets: none added. (7) Dependencies: pom.xml and package files are unchanged in d1843b0..HEAD, so there are no new advisories to assess for this slice. A full `mvn dependency-check` was not run.",
+            "suggestion": "None. Keep these properties covered by the existing PracticeIT and PracticeLogCaptureIT tests."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 414,
+      "durationMs": 184500,
+      "sessionId": "14148d50-802a-4fa4-8770-df16d44cbb1a",
+      "costUsd": 1.1689504,
+      "numTurns": 26,
+      "result": {
+        "findings": [
+          {
+            "title": "Coverage summary: 47 backend scenarios: 41 implemented, 4 partial, 0 missing, 2 contradicted (both minor ordering/validation edges). XP, rank and mission-summary scenarios are deferred to slice 8 as placeholders, as the proposal declares.",
+            "file": "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md",
+            "line": 1,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "All 7 change-delta scenarios are implemented and tested (PracticeIT, PracticeRulesTest, TutorTest, TutorSwapTest). Of the 40 or so backend-relevant scenarios in contract/openspec/specs/practice-flow/spec.md, 4 are only partly covered: NFR-5 RTT, TC-6 network-denied, replay of an in-progress mission, and same-feedback across two fresh runs. 2 edge cases contradict the spec: 400 is returned before the 404 check, and the note limit is checked after trimming. Every FR the plan assigns to backend for practice-flow (FR-22, 24–31, 42, 44, plus FR-56, NFR-1 and NFR-5) has an @trace'd test.",
+            "suggestion": "No action on its own; see the individual findings."
+          },
+          {
+            "title": "NFR-5 check round-trip test does not follow the scenario's fixture or load shape",
+            "file": "src/test/kotlin/cz/doucko/practice/PracticeTimingIT.kt",
+            "line": 75,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "The scenario says: \"Docker Compose stack seeded with a fixture of at least 10 published tasks that together cover every MVP answer type and include at least one two-part task … each a valid attempt 1 or attempt 2 … (fresh runs come from replays)\". The test seeds a single INTEGER+DECIMAL task, runs `jdbc.update(\"DELETE FROM attempt\")` after every request (line 116), so every submission is attempt 1, and runs against the in-process Spring Boot test server, not the Compose stack. CHOICE/TEXT/FRACTION paths and the attempt-2 lock path are never timed. The reported p95 of 67 ms is real but measures a narrower workload than the spec.",
+            "suggestion": "Seed 10 or more tasks covering every answer type. Alternate attempt 1 and attempt 2 using replays (startReplay) instead of deleting rows. Either run the measurement against the Compose stack (or the e2e job), or amend NFR-5's scenario to accept the in-process measurement as the backend half."
+          },
+          {
+            "title": "TC-6 'Feedback never comes from AI' is only half enforced: no network-denied run of the attempt tests",
+            "file": "src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+            "line": 87,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "The scenario says: \"…and the attempt-checking integration tests run with all outbound network connections from the backend container denied … every attempt-checking test passes with the network denied (TC-6)\". TutorTest only has `no AI or LLM library is a dependency (TC-6)`, which inspects dependencies. Nothing in src/test or the battery denies outbound network during PracticeIT.",
+            "suggestion": "Add a mechanism that denies egress while the attempt ITs run, for example a Testcontainers network with internal=true for an app container, or a SecurityManager/ProxySelector guard that fails on any non-localhost socket. Otherwise record an explicit waiver in the store spec."
+          },
+          {
+            "title": "Malformed body on a task that is not served returns 400, not the required 404",
+            "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/ChildControllers.kt",
+            "line": 72,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "The spec requires: \"Every child request that names a task — … submitting an attempt, … reporting a problem — SHALL be refused with HTTP 404 … when the task does not exist, is not served…\". In the code, `PracticeReaders.answers(body())` and `PracticeReaders.report(body())` run in the controller before `service.submit/report` looks up the mission or task (the PracticeReaders KDoc says \"Checks that need no task run here, before any lookup\"). So a 21-element list or an OTHER report without a note sent for a draft or GRAPHIC task gets 400, which shows the endpoint shape exists for unserved ids. Nothing is stored either way.",
+            "suggestion": "Resolve the mission and task (404) before validating the body, or amend the spec to say body-shape 400 takes precedence over 404. Add an IT that sends an invalid body for a draft task."
+          },
+          {
+            "title": "Report note limit is checked after trimming, so notes over 1000 code points with surrounding whitespace are accepted",
+            "file": "src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+            "line": 207,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "The spec says: \"The API SHALL refuse with HTTP 400 … a report note longer than 1000 code points (the `ReportRequest.note` limit in `api/openapi.yaml`)\". The code does `is JsonText.Value -> note.text.trim().ifEmpty { null }`, then `if (text != null && text.codePointCount(...) > NOTE_MAX)`. A 1001-code-point note padded with whitespace, or 1000 characters plus a trailing space, passes, which is looser than the OpenAPI maxLength. The change delta says \"the trimmed note\" for storage, but not for validation.",
+            "suggestion": "Check the length on the raw note (matching the OpenAPI maxLength) and store the trimmed note. Alternatively, amend the spec/OpenAPI to say the limit applies after trimming. Add a test with a 1001-character note that has trailing whitespace."
+          },
+          {
+            "title": "Locked parts are stored with raw = null on attempt 2, while the delta requires raw input verbatim per part",
+            "file": "src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+            "line": 106,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The change delta says: \"Each graded attempt SHALL be stored … with the raw input verbatim and the normalized input per part\". The code has `records += PartRecord(part.key, null, lockedPart.normalized, Verdict.CORRECT, locked = true)`, so whatever the child sent for a locked part (e.g. `13` in the 'Locked part resent' scenario) is dropped from the attempt log. The store spec says the value is \"ignored and not re-graded\" but says nothing about not logging it, so this is undocumented drift in the attempt-log contents (progress-stats).",
+            "suggestion": "Either store the sent raw value (or explicitly mark it absent) for locked parts, or amend the delta/progress-stats 'Attempt log contents' to say locked parts carry no raw input on attempt 2."
+          },
+          {
+            "title": "'Replay of an unfinished mission is refused' is only tested for a NEW mission, not one in progress",
+            "file": "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+            "line": 812,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "The scenario reads: \"GIVEN a mission in progress / WHEN a replay request … THEN 409 … and the mission's progress is unchanged\". The test calls `mvc.post(\"/api/child/missions/$m/replay\").isProblem(409)` before any activity, so the mission is NEW. The code (PracticeService.kt:221 `if (primaryProgress(mission).state != MissionState.COMPLETE) throw PracticeConflict`) does handle IN_PROGRESS, but that path has no test and nothing asserts the progress is unchanged.",
+            "suggestion": "Add an IT that resolves one task, then requests a replay and asserts 409, that no practice_run row was created, and that resolvedCount is unchanged."
+          },
+          {
+            "title": "'Same input, same feedback' is verified only at unit level, not across two fresh runs through the API",
+            "file": "src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+            "line": 64,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The scenario reads: \"two fresh runs of the same task with the same hints opened … the `feedback` objects … byte-identical after JSON canonicalization, and the `parts` lists are equal in every key, verdict, normalized, formatTip and locked value\". TutorTest `same input, same feedback` calls DeterministicTutor directly. No IT compares two serialized AttemptResults, for example a primary run against a replay run, so mapping or serialization nondeterminism such as RevealedAnswers ordering would not be caught.",
+            "suggestion": "Add an IT: submit the same wrong attempt 1 in two runs (two missions sharing the task, or primary plus replay) with equal hints opened, then compare the canonicalized `feedback` JSON and the `parts` arrays."
+          },
+          {
+            "title": "Undocumented 400 for non-UUID path ids on endpoints whose OpenAPI lists only 200/404 (or 200/204/404)",
+            "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+            "line": 49,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`@ExceptionHandler(MethodArgumentTypeMismatchException::class) fun typeMismatch(...) = invalid(request, listOf(FieldError(exception.name, \"not-uuid\")))` returns 400 for every child controller. contract/api/openapi.yaml declares no 400 for getMissionBriefing, getCurrentTask, startReplay, getMissionSummary, getTask, openNextHint or getChildImage (only 200/204/404/409). The instructions say the implementation must not use undocumented status codes.",
+            "suggestion": "Either map a malformed id to 404 NotFound, which matches \"a mission id that does not exist\", or add `400: BadRequest` to those operations in the docs-store OpenAPI and bump the contract pin."
+          },
+          {
+            "title": "No backend test for the 413 'Request body too large' scenario on rank-up acknowledgement",
+            "file": "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+            "line": 838,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "The scenario reads: \"GIVEN any child endpoint that accepts a body (attempt, report, profile settings, rank-up acknowledgement) … THEN 413\". PracticeIT tests 413 for attempts (line 565) and reports (line 721). ackRankUp is covered by PracticeBodyAdvice's PLACEHOLDERS map in code, but there is no test sending more than 16 KB to `/api/child/hq/rank-up-ack`.",
+            "suggestion": "Add a 17 KB rank-up-ack request to the replay/placeholder test asserting 413 problem+json."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 683,
+      "durationMs": 39633,
+      "sessionId": "58cdca00-6f44-4aad-b494-bc7562cbffad",
+      "costUsd": 0.1689816,
+      "numTurns": 4,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeMapping.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1498,
+      "durationMs": 28259,
+      "sessionId": "353ad7f3-cba6-4bd9-b1f2-cd3a677c6eeb",
+      "costUsd": 0.3705592,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed; the only error is the line number. The code is at PracticeMapping.kt:118 (the file is about 165 lines, so line 702 can't exist), with the hint helper at lines 155-163.\n\nHow it fails:\n1. PracticeService.screen (PracticeService.kt:282) sets hintsOpened = store.hints(run.scope, [taskId]).size. That count comes from the append-only opened-hint log for the current run.\n2. The task comes from served.task(taskId) (PracticeService.kt:255), which returns the task's current content, not a snapshot.\n3. PracticeMapping.kt:118 builds the opened list as (1..screen.hintsOpened).map { hint(task, it, locale) }. Line 161 then reads task.hints[index - 1] without checking bounds (the translation lookup uses getOrNull, but the main list does not). Line 162 computes remaining = task.hints.size - index, which goes negative.\n4. Nothing stops an admin from removing hints. TaskService.update (TaskService.kt:132-142) only runs MissionRules.taskEdit, which (Missions.kt:228-241) only refuses a change of topic or grade while the task is in a mission, or a switch to GRAPHIC while it is in a published mission. It has no \"used\" check and no rule about hints. The \"used\" check (usage.usedTasks) applies only to deletes.\n5. No handler catches IndexOutOfBoundsException. The @ExceptionHandler methods in PracticeProblemAdvice and the other advice classes cover only specific exception types, so the error becomes an unhandled 500. That breaks the AGENTS.md rule that no input may produce a raw 500.\n\nWho is affected: every caller of screen(), which includes getTask, getCurrentTask and replay. Example: a child opens 2 hints, the admin saves the task with 1 hint, and every later load of that task returns a 500 until a new run starts. Opening another hint does not crash: openHint returns a 409 because opened >= task.hints.size. The task screen itself stays broken.\n\nSeverity stays major: an ordinary admin edit leaves a child's task permanently unloadable. The suggested fix is correct: limit the opened count to the current number of hints and keep remaining at 0 or more.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeMapping.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1531,
+      "durationMs": 29515,
+      "sessionId": "b906444a-063e-4e53-8892-46cddacdbf30",
+      "costUsd": 0.317583,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. One correction: the code is at PracticeMapping.kt:118 and :155-163, not line 702.\n\n- **The crash:** line 118 builds `opened = (1..screen.hintsOpened).map { hint(task, it, locale) }`. `hint()` at line 161 reads `task.hints[index - 1]` without a bounds check, and line 162 computes `remaining = task.hints.size - index`.\n- **Where `hintsOpened` comes from:** PracticeService.kt:282 sets it to `store.hints(run.scope, listOf(task.taskId)).size`. That is a count of the append-only opened-hint log, not of the current hints.\n- **Where `task.hints` comes from:** ServedContentService.kt:96 maps it from the task's current content (`hints = c.hints`). There is no per-attempt snapshot.\n- **No guard on edits:** `TaskService.update` (TaskService.kt:132-141) only checks `MissionRules.taskEdit` (Missions.kt:228-241). That refuses only topic/grade changes while the task is in missions, and switching to GRAPHIC while it is in a published mission. Nothing stops an admin from shortening the hints list of a published task the child has already used. The only usage-based guard (`usage.usedTasks`) applies to delete, not update.\n- **Only the opening path is guarded:** PracticeService.kt:184 checks `opened >= task.hints.size` when opening a new hint. The rendering path has no check.\n\nRepro: the child opens 2 hints, then the admin saves the task with 1 hint. The task stays published and servable, so GET of the task screen hits `hints[1]` and throws IndexOutOfBoundsException. That is an unhandled exception, so the child gets a 500, which breaks the \"no raw 500\" rule. Through getCurrentTask it can also block the child's mission until the admin adds the hints back.\n\nIt can't be triggered by an attacker; it needs an ordinary admin edit. But a single admin editing a hint wording or count is a normal authoring action, so a real user can easily reproduce it. Severity stays major, because it blocks the child's practice flow.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1550,
+      "durationMs": 37686,
+      "sessionId": "38990f35-048f-4fa7-85fe-46a964ba28e8",
+      "costUsd": 0.3523404,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "I couldn't refute the core mechanism. One part of the finding goes too far.\n\n**Where the run is chosen.** `PracticeService.currentRun` is at `PracticeService.kt:258-262`, not line 1645. It takes `store.runs(missionId).lastOrNull()` and checks it against the mission's *current* `mission.taskIds`. If any of those tasks is unresolved in that run's scope, it returns `Run(run.id, replay=true)`. Runs have no completion marker and no frozen task list.\n\n**Missions can gain tasks after publishing.** `MissionRules.edit` (`content/domain/Missions.kt:205-215`) lets a published mission take newly added tasks, as long as they are published text tasks. `ServedContentService.served` (`ServedContentService.kt:70-79`) builds `ServedMission.taskIds` straight from the stored mission's current list. So the next `served.mission()` call includes the added task.\n\n**What happens after the edit.** Take a replay that finished, then an admin adds task T:\n- `currentRun` now finds T unresolved in the old run and returns that run as replay.\n- `currentTask`, `task`, `submit`, `openHint`, `report` and `briefing` all route through `currentRun`.\n- `submit` therefore saves T's attempts with `scope=run.id` and `replay=true` (lines 136-167).\n- `primaryProgress` only reads `Scope.PRIMARY`, so HQ shows IN_PROGRESS with T as the continue target.\n- `briefing` mixes the two: task states come from the replay scope, but `state` comes from the primary scope.\n- `replay()` returns the revived run unchanged, because `current.replay` is true.\n\n**What the finding overstates.** It says the continue target \"can't be cleared through the normal flow\". That's wrong. Once the child resolves T in the revived run, every task in that run is resolved. `currentRun` then falls back to PRIMARY, and `currentTask` serves T again in the primary scope. So it does clear, but the child has to do the task twice, and the first attempts are logged as replay attempts. The misrouting is real; the permanent stuck state is not.\n\n**Scope and severity.** The bug needs a published mission edited after a replay finished, which is a plausible admin action. The finding also misses that it happens whenever a replay run exists, even if the primary run had not finished when the task was added. The consequences are wrong attempt scope/flag and HQ inconsistent with what the child is shown, and they correct themselves after the double work. I'm keeping the severity at major for the data-integrity problem (attempts saved with the wrong scope and replay flag), with the caveat about recovery.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1583,
+      "durationMs": 26156,
+      "sessionId": "150442b1-dc48-4815-9307-bce76a629dbc",
+      "costUsd": 0.3108748,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism in the code. It can be reached through normal admin actions.\n\n1. `PracticeService.kt:258-262`: `currentRun` takes the latest `practice_run` row. It decides whether that run is active by checking the mission's current `taskIds` against the run's states. A run has no `completed_at` field and no frozen task list, so a finished run is never marked as finished.\n2. Admins can add tasks to a published mission. `content/domain/Missions.kt:202-203` says a published mission \"stays non-empty and admits only published text tasks. Reordering and removing (while one remains) are always allowed\". Adding a published TEXT task is therefore allowed. `ServedContentService` then serves the longer task list to the child right away.\n3. Here is how to reproduce it. The child completes mission M, starts a replay with `replay()` and finishes it, so the run is complete. The admin then adds a published task T to M. Now `currentRun(M)` sees that T is unresolved in the old run and returns `Run(oldRun, replay=true)`. In `hq()`, which only reads the primary scope, M shows as IN_PROGRESS with `continueTarget` = T. When the child opens T, `task()`, `currentTask()`, `submit()` and `openHint()` all call `currentRun`. They show T in the replay scope and write the attempts and hints to `oldRun` with `replay=true`. `briefing()` mixes the two scopes: the state comes from the primary scope and the per-task states come from the replay scope. `replay()` also returns this revived run instead of starting a fresh one.\n\nOne overstatement: the finding says the continue target \"can't be cleared through the normal flow.\" That is not quite true. Once T is resolved in the revived replay run, every task in the run is resolved again. `currentRun` then falls back to the primary scope. HQ still points at T, and the child can solve it again in the primary scope. So the state isn't stuck forever. What does happen is that the work goes into the wrong scope, the child has to solve the task twice, the replay flag and the summary are wrong, and the briefing shows inconsistent state. The data in the attempt log is also wrong (FR-31 logging is attributed to the wrong scope). The core problem is real and can be reproduced with normal admin and child actions, so I'm keeping the severity at major.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1390,
+      "durationMs": 30508,
+      "sessionId": "4689a2b5-8ca5-4c26-8f98-a95a81b4aaa5",
+      "costUsd": 0.323495,
+      "numTurns": 8,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding is refuted. The code does what it describes, but that behaviour is the specified one, not a bug. In `PracticeService.kt:243-244`, `firstTry` counts only attempts with `missionId == mission.missionId`, so a shared task resolved in another mission is left out. The contract spec requires exactly this. In `contract/openspec/specs/practice-flow/spec.md:571-575`, the scenario \"Shared task earns nothing on the summary\" sets up a 10-task mission where 9 tasks were correct on the first try in this mission and task T was already resolved in another mission. It then requires the screen to show \"9 na první pokus\". The design doc agrees: `openspec/changes/implement-practice-flow-api/design.md:114-115` defines `firstTryCount` as \"tasks resolved first try in that run through this mission\". The finding's own fallback (\"if the filter is intended, state that in the spec and design doc\") is therefore already met. Its suggested fix, counting `CORRECT_FIRST_TRY` states across the whole scope, would break that spec scenario (it would give 10 instead of 9). The finding also cites line 1630, but the code is at line 244.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1423,
+      "durationMs": 25110,
+      "sessionId": "2ae98855-27db-4bab-ba6c-cfd39b7dc547",
+      "costUsd": 0.2959714,
+      "numTurns": 10,
+      "result": {
+        "refuted": true,
+        "reasoning": "The scenario can happen, but the behaviour is documented as intended, so it is not a defect. Evidence: V3__missions.sql:3 allows a task to be in several missions (OQ-15). Model.kt:26 shares the primary scope across those missions. In PracticeService.kt:243-244, a task solved first try under mission A makes mission B COMPLETE, yet the `missionId == mission.missionId` filter leaves it out of B's firstTryCount. However, openspec/changes/implement-practice-flow-api/design.md:114-115 defines it this way on purpose: \"`firstTryCount` = tasks resolved first try in that run through this mission\". It also marks the summary as a slice-7 placeholder that slice 8 replaces with the gamification rules. The finding itself says that if the filter is intended it should be stated in the design doc, and it already is. So the code matches its spec, and at most the finding is a product-level question about the slice-8 rules. Also, the cited line 1630 is wrong; the code is at line 244.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1266,
+      "durationMs": 23678,
+      "sessionId": "e07e7215-407a-4cbe-bed1-2d545900f2cf",
+      "costUsd": 0.28423960000000004,
+      "numTurns": 8,
+      "result": {
+        "refuted": true,
+        "reasoning": "The location is wrong. ServedContentService.kt has only 105 lines, and the cited code is at line 52, not line 246. The narrow mechanism is real: in `image()`, `storage.open(key)?.use { it.readAllBytes() }` does not catch IOException. Neither does `FilesystemFileStorage.open` (`Files.newInputStream`). PracticeProblemAdvice has no handler for it, so a read failure would end in a 500.\n\nThat is not a correctness defect, though:\n1. User input cannot cause it. `imageId` is only used as a lookup key. The storage key comes from the database, and `locate()` enforces the storage root. Missing images and images that cannot be served are already turned into null, then 404. The rule in AGENTS.md is \"No **user input** may produce a raw 500\". An I/O fault on the server's own disk is a real server error, and 5xx is the right class.\n2. application.yaml enables `spring.mvc.problemdetails` and sets `include-stacktrace: never`. So the response is Spring's standard error/problem body, with no driver internals or stack trace leaked. The suggested fix of returning 404 would hide a storage fault behind a misleading \"not found\".\n3. Admin image and source serving (`TaskService` line 221, `SourceService.file`) handle storage I/O the same way. This is consistent design, not a slip specific to slice 7.\n\nThe point about reading the image into memory inside a read-only transaction is about performance or design, not correctness. Task images are small uploads with an enforced size limit. Net: the location is wrong, no user input reaches the path, and a 500 on a disk fault is acceptable behavior, so the claimed correctness bug does not hold.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1299,
+      "durationMs": 19255,
+      "sessionId": "4cb8d74a-959d-4492-ad24-f34a3d323d23",
+      "costUsd": 0.2592546,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The cited line is wrong: ServedContentService.kt is 105 lines long, and the code in question is at line 52. The code itself matches the finding (`storage.open(image.storageKey)?.use { it.readAllBytes() } ?: return null`, and only a handful of custom exception types are handled). Still, the claimed problem cannot be triggered by a real user or attacker:\n\n1. The storage adapter (`FilesystemFileStorage.open`, line 39) does `locate(key).takeIf(Files::isRegularFile)?.let(Files::newInputStream)`, so a missing file returns null and the endpoint answers 404. The storage key comes from the database row (`image.storageKey`, written at upload time). The child sends only an image UUID, which first has to resolve to a published, servable task in a published mission. A child or attacker has no input that can change which file is read or make the read fail.\n2. A truncated file is not an IOException. `readAllBytes` returns whatever bytes are there. Only an infrastructure fault can make the read throw: wrong permissions on the server's own storage dir, a disk error, or a file deleted between the check and the open. These are operator/server-side failures, not something a request can cause.\n3. The project rule says \"No user input may produce a raw 500\". This 500 comes from a real server-side I/O fault, not from user input, and a 5xx is the semantically right answer there. The suggested fix of mapping it to 404 would hide storage corruption.\n4. The same pattern already exists in the admin paths (`SourceService.file`, `TaskService` image open). This is a consistent design choice in the codebase, not a slip.\n5. Reading the whole image into memory inside a read-only transaction is a minor performance/style point. Image size is capped at upload, so it is not a correctness or exploitability problem.\n\nThere is no reachable trigger from a child or attacker request. It is at most a hardening nit for operator-side storage failures.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1078,
+      "durationMs": 23273,
+      "sessionId": "64ab27de-ad38-471e-b848-3c3b1eee0803",
+      "costUsd": 0.23773160000000002,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding is refuted. Topic order on HQ is already well defined:\n\n1. `ServedContentService.missions()` (ServedContentService.kt:34-36) maps over `missions.list()` with `mapNotNull`, so it keeps the order the store returns.\n2. `JdbcMissionStore.list()` (JdbcMissionStore.kt:22) runs `ORDER BY t.grade, t.position, m.position`. Missions therefore arrive grouped by topic, in topic (grade, position) order. That is the same curriculum order `JdbcTopicStore.all()` uses (`ORDER BY grade, position`). `withTasks` also keeps the order, because it does `missions.map` over the sorted list.\n3. Kotlin's `groupBy` returns a `LinkedHashMap`, so each key stays where it first appeared. Topics on HQ come out ordered by grade, then topic position.\n\nSo the order does not depend on \"how the store happens to return missions\". The store sets it explicitly in SQL. Editing a mission doesn't reorder topics; only changing a topic's grade or position does, and that is intended. The only real point is that the ordering is implicit, since it relies on a sort in another module's adapter. That is a maintainability remark, not a correctness bug. Even the re-sort by position inside each topic (PracticeService.kt:82) is redundant, because the SQL already orders by `m.position`.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1111,
+      "durationMs": 19770,
+      "sessionId": "5cb6d609-48d8-440e-a9fb-f4371fa92c9f",
+      "costUsd": 0.26878179999999996,
+      "numTurns": 8,
+      "result": {
+        "refuted": true,
+        "reasoning": "The topic order is already well defined. `hq()` (PracticeService.kt:49-88; the finding's line 1463 doesn't exist) gets missions from `served.missions()`. `ServedContentService.missions()` (ServedContentService.kt:34-37) is `missions.list().mapNotNull { ... }`, which only filters and keeps the order. `JdbcMissionStore.list()` (JdbcMissionStore.kt:22) runs `ORDER BY t.grade, t.position, m.position`, so missions are sorted by topic grade, then topic position, then mission position. That is the same order `JdbcTopicStore.all()` uses (`ORDER BY grade, position`). `withTasks` maps over the ordered list and also keeps the order. Kotlin's `groupBy` returns a LinkedHashMap, which keeps keys in the order they first appear. So the topics on HQ come out in a fixed (grade, topic position) order. They don't depend on \"how the store happens to return missions\", and editing a mission can't reorder them unless the topic's own grade or position changes, which is the intended behaviour. The only weakness is that the ordering is implicit: it relies on the adapter's SQL instead of an explicit sort in the service. That is a maintainability note, not a bug any user can hit.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1303,
+      "durationMs": 13992,
+      "sessionId": "9c2f58e4-3252-4d43-b660-042bed437b7c",
+      "costUsd": 0.19425219999999999,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding is refuted on correctness grounds. The file has only 105 lines, so the cited line 278 does not exist, and the title gets the mechanism partly wrong. The HQ load path, `missions()` at lines 34-37, does not run per-task lookups. It builds `servableIds()` once with a single filtered `tasks.list(...)` call and passes `servable::contains` to `served`. The only per-mission query left there is `topics.find(mission.content.topicId)` at line 77, a plain N+1 over topics. `mission(missionId)` at line 39 does call `tasks.find` for each task id through `::servable`. That covers a single mission, though, not every mission on each HQ load, and it re-checks status and modality on purpose (see the class KDoc). The claim that `outcome()` re-reads attempts through `states()` concerns code outside this file. Whatever the query counts, every path returns the right data: no wrong result, no leaked answer key, no draft or graphic task served, no 500. This is at most a minor performance observation, and the reviewer says it is fine for MVP data sizes. It is not a correctness defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1336,
+      "durationMs": 18225,
+      "sessionId": "efdd9147-f155-49d0-8995-e459e2ce1cad",
+      "costUsd": 0.2057998,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "I'm refuting this finding: its main claim is wrong, its location is wrong, and nothing in it can break for a real user.\n\n1. **Wrong location.** `ServedContentService.kt` has only 105 lines, so line 278 does not exist. The `outcome()` and `states()` evidence actually lives in `PracticeService.kt` (lines 264 and 296), not in the cited file.\n\n2. **The title is wrong about how the HQ list loads.** `missions()` (lines 34-37) does not check tasks one at a time. It calls `servableIds()` (lines 56-62) once. That is a single filtered `tasks.list(...)` query, and each mission is then checked with the in-memory `servable::contains`. The suggestion to \"use a single filtered query as servableIds() already does\" describes what `missions()` already does. The one-lookup-per-task path (`::servable` → `tasks.find`) is used only by `mission(missionId)`, for a single mission. That costs one lookup per task in that mission, not \"per-task lookups for every mission on each HQ load\".\n\n3. **What is left is minor.** `missions()` does run one `topics.find` per published, non-empty mission (line 77), and `mission()` does one `tasks.find` per task. This is a small N+1 query pattern, not a correctness bug. The finding itself admits \"That's fine for MVP data sizes\". This is a single-child tutoring app with a small set of missions. No user or attacker input changes how many queries run: the content is admin-authored, and child endpoints can't create missions or tasks. Results stay the same and nothing is denied. At worst a few extra indexed lookups run inside one read-only transaction.\n\n4. **Wrong category.** It is filed under the \"correctness\" dimension, but no behaviour is wrong. At most it would be a speculative performance note for slice 8.\n\nWithin this scope there is nothing that can be exploited or reproduced as a defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2076,
+      "durationMs": 24275,
+      "sessionId": "cacccdc5-bd6a-44eb-bbf4-4bc613ce613d",
+      "costUsd": 0.25360859999999996,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The facts in the finding are accurate. `SecurityConfiguration.kt:64-66` permits any request with CSRF off. `report()` (PracticeService.kt:192-203) inserts one row per call with no cap. The other child writes have no throttle either, and each takes the store lock. But none of this is a correctness defect. The code does what the spec asks:\n\n1. Login-free child endpoints are required by NFR-1, and the finding admits this. Append-only attempts, hints and runs are also required (FR-31, FR-42). So \"the admin cannot undo it\" is the intended behaviour, not a bug. Anyone with access to the child UI, including the child, can already submit wrong answers and open hints. A script on the network gains nothing the UI doesn't already allow.\n2. The deployment model limits exposure. The platform-foundation spec (\"Loopback or LAN binding only\") publishes only the frontend, defaults to binding `127.0.0.1`, and refuses non-RFC1918 addresses. The backend port is never published. LAN exposure is an opt-in home-network setup, and other devices on that network are trusted by the product's threat model. A hostile device on the family LAN is outside that model.\n3. Through the correctness lens, nothing is actually broken. No wrong grade, no answer-key leak (FR-27), no raw 500, no lost attempt. The only real point is that problem reports can grow without bound. That's a resource-hygiene hardening idea for a single-family local app, not a flaw in the cited code.\n\nWhat the finding proposes (a token bucket, a report cap, recording origin) is new product scope. It would need a docs-store spec change first (per AGENTS.md), so it doesn't show that this implementation is wrong. At most it's an optional hardening note. As a defect claim against PracticeService.kt:192, it's refuted.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2109,
+      "durationMs": 36681,
+      "sessionId": "f65ede42-0db9-4c55-8b71-fb163845eb3b",
+      "costUsd": 0.2351026,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The mechanism is real: SecurityConfiguration.kt:64-66 allows every request with CSRF off, and PracticeService.report() (line 192) inserts a row on every call with no cap. But the \"attacker\" it describes is simply someone who can use the product as designed, inside the threat model the spec accepts:\n- FR-24 says the child has no login, by design.\n- NFR-2 says the stack binds to localhost/LAN only.\n- NFR-15 and OQ-23 explicitly turn down even an admin lockout because the network is \"LAN only\". The spec chose to trust devices on the home network.\n\nAnyone on that LAN can already open the child UI in a browser and do exactly these actions: burn attempts, open hints, start replays, file reports. The raw API gives them no extra privilege, only speed. Remote attackers can't reach it either:\n- The DNS-rebinding guard (StrictHttpFirewall allowed-hosts, SecurityConfiguration.kt:47-51) stops a malicious website from scripting the API from the child's browser.\n- Nothing is exposed to the internet (NFR-2).\n\nSo there is no attacker outside the accepted trust boundary. The flood of report rows and the advisory-lock contention need a hostile device already on a trusted home network, which is a deliberate product decision, not a bug at the cited line. At most this is a hardening suggestion or a design-note item, not a confirmed exploitable defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1659,
+      "durationMs": 23486,
+      "sessionId": "b5a18526-ba9b-49e2-9bad-b1eff7c0636f",
+      "costUsd": 0.30797460000000004,
+      "numTurns": 9,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding describes. Rules.kt:88 builds `FieldError(\"answers.$key\", \"unknown-part\")`, PracticeReaders.kt:28 builds `\"answers.$key\"`, and PracticeProblemAdvice.kt:69 copies `it.field` into the response unchanged. Calling this a defect is still wrong, for four reasons.\n\n1. The contract requires echoing the key. In contract/openspec/specs/practice-flow/spec.md:318-322, the scenario \"Submission naming an unknown part\" says the API answers 400 \"with a problem+json body naming `c`\", the unknown part key. contract/api/openapi.yaml:42 sets the field path convention to `answers.<partKey>`. The finding's main fix, a single generic `answers` field, would break that scenario.\n\n2. A key is a field name, not a submitted value. The advice's rule \"never quote a submitted value (NFR-3)\" is about answer content. The code follows it: the advice never returns the text of an answer. Naming the offending property path is normal RFC 7807 validation behaviour.\n\n3. A child never types a key. The frontend sends the part keys the task defines. Only a hand-crafted request can put arbitrary text in a key, and that text goes back only to the client that sent it. That is not PII leaking from the child's data.\n\n4. The remaining risks are hypothetical. The response is application/problem+json. Problems only appear if a future frontend renders `field` as HTML or someone adds logging of problem bodies, and neither exists in the cited code. The body is capped at 16 KB (413 handler).\n\nThe mechanism is real, but it is the specified behaviour, not a correctness bug. At most it is a hardening idea, such as limiting echoed keys to the part-key pattern, and that belongs in the contract first.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1692,
+      "durationMs": 23726,
+      "sessionId": "2f393743-bdd6-44b7-903e-686b39099150",
+      "costUsd": 0.2583502,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The echo itself is real. `Rules.kt:88` and `PracticeReaders.kt:28` build `\"answers.$key\"` from the submitted JSON property name, and `PracticeProblemAdvice.invalid` (lines 65-69) copies `it.field` into the 400 `errors[].field` without changing it. So a client sending `{\"answers\":{\"<b>x</b>\":\"1\"}}` gets that key back.\n\nThe claimed harm cannot happen for a real user or attacker:\n\n1. **It only reflects to the sender.** The key comes back in the response to the same authenticated request that sent it. No other user, session or stored record ever receives it, so the attacker can only target themselves.\n2. **No cross-site path.** The body is a JSON request answered with `application/problem+json`. A cross-origin page cannot read that response, and the JSON content type rules out reflected XSS by direct navigation.\n3. **The NFR-3 rule isn't actually broken.** NFR-3 is about the child's PII ending up in code, fixtures, logs or screenshots. Sending the child's own input back to the child's own client discloses nothing. The \"never quote a submitted value\" comment refers to catalog messages, and those are indeed never quoted.\n4. **No logging path exists.** Nothing in `src/main` logs problem bodies. The only application logger is in `content/Transactions.kt`, and it logs an exception class name. `RequestContentLogGuard` actively caps the request-content loggers at INFO/WARN. The \"future log\" risk is hypothetical.\n5. **No HTML rendering of `field` is shown.** The finding offers no frontend code that renders `field` as HTML. Even if it did, the injected markup would only reach the attacker's own screen.\n6. **Size is bounded.** The 16 KB body cap (413 via `PracticeBodyTooLarge`) limits the reflected size, and that is no worse than the request itself.\n\nThe finding admits there is \"no direct XSS\" and rests on speculative future code. At most this is a hygiene nit (contract part-key pattern / generic `unknown-part`), not an exploitable security issue."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/ChildControllers.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2488,
+      "durationMs": 16519,
+      "sessionId": "07ae01e8-0cfe-4eca-aa4d-fe75969e859e",
+      "costUsd": 0.239809,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "This finding reports no defect. It lists areas that were reviewed and found clean, says no action is needed and suggests nothing, so there is no faulty mechanism to confirm. The cited code backs up its clean claims. ChildControllers.kt sends every child route through PracticeService. In PracticeService.kt, `mission()` (line 248) requires `served.mission`, which returns null unless the mission is PUBLISHED. `task()` (lines 250-256) requires the task to be in `mission.taskIds` and to be served. In ServedContentService.kt, `image()` (lines 48-54) resolves the owner task, requires PUBLISHED and TEXT, and requires membership in a published mission. These match the lines the finding cites (42-48 is close). Because nothing here can be wrong, it should not count as a minor-severity finding. Refuted as a non-actionable informational entry.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/ChildControllers.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2521,
+      "durationMs": 14001,
+      "sessionId": "e20d20f2-9091-4861-8657-d831a9b057a7",
+      "costUsd": 0.1843272,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "This \"finding\" doesn't claim any defect. It is a list of areas the reviewer checked and found clean, and it asks for no action. Seen as a question of whether a real user or attacker could trigger it, there is nothing to trigger: no attack path, no input and no observable failure is described.\n\nI spot-checked the riskiest claim, that answer keys don't leak. `PracticeMapping.kt:110` reads only `part.spec.type`, never `spec.accepted`. Within the practice module, `accepted` is used only in `DeterministicTutor.kt:31`, which is the reveal path. That matches the reviewer's \"clean\" claims.\n\nSo there is no confirmed problem, and it should not be counted as a minor-severity defect. I'm marking it refuted, meaning not a real issue, and it should be dropped from the defect list.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1464,
+      "durationMs": 12131,
+      "sessionId": "9748b2b0-74b2-4cd8-84ff-91d0befa0f41",
+      "costUsd": 0.1757472,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "This is a coverage roll-up, not a defect. It names no faulty mechanism at the cited location (spec.md:1, a spec file, not code), and its own suggestion is \"No action on its own; see the individual findings.\" The two \"contradicted\" edge cases it mentions (400 returned before the 404 check, and the note-length check running after trimming) are separate findings and are not shown here. For the note case, I checked the code at src/main/kotlin/cz/doucko/practice/domain/Rules.kt:174-209. The trim-then-measure behaviour is intentional and documented (\"a note is at most 1000 code points after trimming\"), so this summary gives no evidence of a correctness bug. The rest are counts of scenarios with full, partial or missing tests (NFR-5 round-trip time, TC-6 with network access denied), which are about test coverage, not wrong behaviour. With no concrete mechanism I could confirm, I'm defaulting to refuted.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1497,
+      "durationMs": 9324,
+      "sessionId": "e9dea997-8ea3-4324-86f2-795f0c454be0",
+      "costUsd": 0.16850320000000002,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "This \"finding\" is a coverage summary, not a defect. It points at line 1 of the change-delta spec file and does not describe any mechanism that a real user or attacker could trigger. Its own suggestion is \"No action on its own; see the individual findings\", and its evidence says all 7 change-delta scenarios are implemented and tested. The two \"contradicted\" edge cases (400 returned before the 404 check, and the note limit checked after trimming) are only named here. Each one would need to stand or fall as its own finding, with its own code location and reproduction. This summary gives no exploitable or reproducible failure path, so there is nothing here to confirm. The \"4 partial\" items (NFR-5 RTT, TC-6 network-denied, replay of an in-progress mission, same feedback across two fresh runs) are gaps in test evidence, not runtime defects. Following the default, this is refuted as a standalone finding.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/practice/PracticeTimingIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1580,
+      "durationMs": 20746,
+      "sessionId": "30d7aa8c-b35c-4346-b61f-bcee42903fd4",
+      "costUsd": 0.2714016,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "I couldn't refute this. Every factual claim in the finding matches the code and the spec.\n\n**Spec** (`contract/openspec/specs/practice-flow/spec.md:330-334`): the \"Check round-trip time\" scenario asks for:\n- the Docker Compose stack;\n- at least 10 published tasks that together cover every MVP answer type, including at least one two-part task;\n- 200 submissions, each a valid attempt 1 or attempt 2, with fresh runs coming from replays.\n\nThe requirement text at lines 263-267 also says the time is measured against the Compose stack.\n\n**Test** (`PracticeTimingIT.kt`):\n- It seeds exactly one task with two parts, typed INTEGER and DECIMAL (lines 75-77). That means CHOICE, TEXT and FRACTION are never exercised.\n- It runs `jdbc.update(\"DELETE FROM attempt\")` after every submission (line 116), so every measured request is attempt 1. The attempt-2 path (locked parts, the reveal) is never timed, and replays are not used.\n- It runs on the in-process server started by `@SpringBootTest(RANDOM_PORT)` with Testcontainers Postgres, not on the Compose stack.\n\n**Mitigation:** the KDoc (lines 28-33) openly calls this \"the backend share\". It says the attempts are cleared on purpose and that the frontend's e2e test measures the Compose stack. So the narrowing is deliberate and disclosed, not hidden. The check is honest (real HTTP, real Postgres, a client-side timer, 20 warm-ups, 200 submissions, half correct and half wrong).\n\n**Why it still stands:** the backend test's workload is narrower than the scenario it cites, and `tasks.md` 5.1 reports \"p95 67 ms\" as NFR-5 evidence. Each answer type is graded in microseconds (`CheckerTimingTest`), so the most likely real gap is the attempt-2 path with its extra reads and writes. The missing answer types matter less.\n\n**Severity:** I'd downgrade from major to minor. This is a spec-compliance and evidence-scope gap, not a code defect. The test discloses its scope, and the Compose-stack measurement is explicitly delegated to the frontend e2e job. I did not check that job's mechanism from this repo.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/practice/PracticeTimingIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1613,
+      "durationMs": 25417,
+      "sessionId": "9cd0ab41-a6dc-414e-9102-6ebbc71e288f",
+      "costUsd": 0.2930542,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "I checked the code, and the factual claims are correct. `contract/openspec/specs/practice-flow/spec.md:330-334` (\"Check round-trip time\") requires all of the following:\n- the Docker Compose stack\n- at least 10 published tasks covering every MVP answer type, including a two-part task\n- valid attempt-1 or attempt-2 submissions, with fresh runs coming from replays\n\nThe text at lines 263-267 also says the local check runs against Compose.\n\n`PracticeTimingIT.kt` differs on each point:\n- It seeds one task with only INTEGER and DECIMAL parts (lines 75-77).\n- It runs `DELETE FROM attempt` after every submission (line 116), so every timed request is attempt 1.\n- It runs against the in-process `@SpringBootTest` RANDOM_PORT server with Testcontainers Postgres, not Compose.\n\nSo CHOICE/TEXT/FRACTION grading, the attempt-2 path (reading prior attempts and locking parts) and replays are never timed. The finding is not refuted.\n\nI'm downgrading it from major to minor for these reasons:\n1. **Test-fidelity gap, not a runtime defect.** No user or attacker can trigger anything. It only matters if the untimed paths are actually slow.\n2. **Large margin.** The measured p95 is 67 ms against a 300 ms budget. Per `CheckerTimingTest`, the checker's per-part cost is microseconds (p95 37-73 µs), so the other answer types are very unlikely to change the result much. The attempt-2 path adds about one query.\n3. **The narrowing is disclosed and split by design.** The test's KDoc calls it \"the backend share\", explains why attempts are cleared, and says the frontend's e2e test measures the Compose stack. The traceability report maps \"e2e -> frontend; local-verifiable -> backend+frontend\".\n\nWhat remains real is a mismatch between what this repo's local-verifiable evidence shows and what the scenario specifies. `tasks.md` 5.1 also cites p95 67 ms as NFR-5 evidence without that caveat. Either the fixture and attempt mix should be widened, or the spec should accept the in-process run as the backend's share. I couldn't confirm that the frontend e2e test exists or meets the scenario, because read access to `../frontend` was denied."
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1322,
+      "durationMs": 17565,
+      "sessionId": "618af54b-81fa-4af0-b7fb-39a30302206e",
+      "costUsd": 0.223837,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds up. The store spec `contract/openspec/specs/practice-flow/spec.md:697-698` asks for two things: the resolved dependency list has no AI or LLM group ids, and every attempt-checking integration test passes while all outbound network connections from the backend container are denied (TC-6).\n\n`TutorTest.kt:87-93` covers only the first part, and only partly. It searches the text of `pom.xml` for `<groupId>` strings and checks for classloader resources. That is not the same as inspecting the resolved dependency list, so a transitive AI dependency could get past it.\n\nThe network-denied part has no mechanism anywhere:\n- **Tests:** grepping `src/test` for network, egress, ProxySelector, SocketFactory or withNetwork finds nothing that denies egress. The only network mentions are `BindAddressTest`, `ComposeConfigurationTest` and a comment in `CheckingPurityTest`.\n- **Battery and config:** nothing in scripts or `compose.yaml` runs `PracticeIT` with egress blocked.\n- **Waiver:** no waiver exists. `docs/qa/traceability-report.md:86` shows TC-6 with no tests (\"| TC-6 | - | n/a |\").\n\nThis also breaks the repo's \"declared-method-needs-mechanism\" rule: a declared verification method has no executable check. The spec-compliance gap is real, and major severity is reasonable.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1355,
+      "durationMs": 18644,
+      "sessionId": "9b116357-455b-49c9-b207-65d9603c47a4",
+      "costUsd": 0.2559772,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding is accurate. In the store spec, `contract/openspec/specs/practice-flow/spec.md:694-698` (\"Feedback never comes from AI in MVP\") requires two things: a dependency check, and the attempt-checking integration tests passing \"with all outbound network connections from the backend container denied\". `TutorTest.kt:87-93` covers only the first. It greps `pom.xml` for three group ids and probes the classpath for the matching package paths. Nothing in `src/test` denies network access: searching for Network, internal, offline, ProxySelector and egress finds nothing. No waiver for this was found in `openspec/changes`. The repo's own rule (\"declared-method-needs-mechanism\") says a declared verification method with no executable mechanism must be implemented or waived. So this is a real spec-compliance gap.\n\nSeen through the exploitability lens, though, no user or attacker can trigger anything. It is a gap in test evidence, not a runtime defect. The main code has no AI or LLM library. `DeterministicTutor` is the only `TutorPort` implementation, and ArchUnit checks that, so no network call can happen today.\n\nThe cited check is also weak. It only matches `<groupId>` strings written directly in `pom.xml`, not the resolved dependency list the spec names, so a transitive dependency would slip past it.\n\nDowngrade: the gap is real and should be fixed or waived, but it has no exploitable impact.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/ChildControllers.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1475,
+      "durationMs": 26715,
+      "sessionId": "a8c7a8c2-21f9-460b-9d8d-d7d36073d790",
+      "costUsd": 0.29960319999999996,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is confirmed. In ChildControllers.kt:72, `PracticeReaders.answers(body())` runs, and can throw InvalidPracticeInput (400), before `service.submit(missionId, taskId, …)` does the mission and task lookup. reportProblem (line 86) works the same way: `PracticeReaders.report(body())` is evaluated as an argument, so it runs before `service.report` calls `mission(missionId)` and `task(mission, taskId)` (PracticeService.kt:197-198). The PracticeReaders KDoc says this on purpose: \"Checks that need no task run here, before any lookup\".\n\nTwo documents say this order is wrong:\n1. The store spec, practice-flow spec.md:219-224. Any child request that names a task (submit, report) SHALL get 404 when the task does not exist, is not served, or is not in the mission.\n2. The repo's own design, openspec/changes/implement-practice-flow-api/design.md:76-77. It sets the check order for submitAttempt as \"path ids (400) → served mission and task in it (404) → body shape (400) → …\". The code runs body shape before the 404 lookup, so it breaks the order its own design states.\n\nCould the framework catch this first? Generated bean validation (useBeanValidation=true) could reject some schema-level shape errors before the controller, but it would return 400 in those cases too, so the precedence problem stays. Some rules can't be written in the schema and only PracticeReaders/ReportRules enforce them, such as OTHER without a note. Those requests reach the controller and get 400 before any 404 lookup. A draft, GRAPHIC or non-existent task therefore returns 400 instead of 404 for those bodies.\n\nImpact is limited. Nothing is stored either way and no answer key leaks; at most the 400 shows that the endpoint shape exists. Minor severity is right.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/ChildControllers.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1508,
+      "durationMs": 29041,
+      "sessionId": "89d2bd84-7dbc-4237-b08f-c81cd4c89c18",
+      "costUsd": 0.29744979999999993,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism in the code, and anyone who can call the API can reproduce it. In `ChildControllers.kt:72`, `submitAttempt` runs `PracticeReaders.answers(body())` before `service.submit(missionId, taskId, answers)`. In `ChildControllers.kt:86`, `reportProblem` runs `PracticeReaders.report(body())` before `service.report(...)`. The KDoc in `PracticeReaders.kt:12` says on purpose that \"Checks that need no task run here, before any lookup\". These checks include the limit of 20 choice elements (`MAX_SELECTION = 20`), and `Rules.kt:210` makes an OTHER report without a note fail. Neither check depends on the task, and nothing guards them earlier. So a request for a draft task, a GRAPHIC task, a task id that does not exist, or a task outside the mission gets a 400 with a malformed body, not the 404.\n\nThe spec (`contract/openspec/specs/practice-flow/spec.md:215-224`) says every child request that names a task, including submitting an attempt and reporting a problem, \"SHALL be refused with HTTP 404 … when the task does not exist, is not served…\". The rule on body shape (lines 343-346) lists what gets a 400 but never says that 400 comes before 404. So on a literal reading the code breaks the 404 requirement. The scenarios at lines 232-242 only use valid bodies, which is why the current tests miss this.\n\nReal-world impact is very small. Nothing is stored either way: validation fails before any write, so attempt counts, hints and XP stay the same. The only thing leaked is that the endpoint shape exists, and the OpenAPI contract already makes that public. It does not show whether a given task exists, because the 400 comes back the same for every task id. It is a real but minor spec-compliance gap, so keep the severity at minor. It is not a security problem. The fix is either to look up the mission and task (404) before validating the body, or to write in the spec that body-shape errors (400) take precedence over 404.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1434,
+      "durationMs": 15801,
+      "sessionId": "811e0e06-6ca3-4e53-898e-8ce85708be1d",
+      "costUsd": 0.1845712,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "I read the code, and it does what the finding says. `Rules.kt:207` trims the note, and line 209 then checks the trimmed text against NOTE_MAX (1000) code points. The finding is still wrong to call this a bug, because the contract asks for exactly this behaviour.\n\nThe spec says the limit is \"the `ReportRequest.note` limit in `api/openapi.yaml`\". That points at the pinned contract, `contract/api/openapi.yaml:1483-1486`, which defines `note` as follows:\n- `type: string`\n- `x-maxCodePoints: 1000`\n- description: \"Required (non-blank after trimming) when reason is OTHER; otherwise optional. At most 1000 code points after trimming (server-enforced); over that is 400 on `note`.\"\n\nThe finding's main premise is wrong. There is no standard `maxLength` in the OpenAPI. The limit is a custom `x-maxCodePoints` extension, and its description says outright that it applies after trimming. So the generated code does no raw-length validation for the trimmed check to be \"looser than\".\n\nChecking the trimmed note is therefore what the contract requires, not a deviation from it. Both suggested fixes would be wrong:\n- Checking the raw length would break the contract.\n- Amending the spec isn't needed, because the OpenAPI already says \"after trimming\".\n\nThe required-when-OTHER rule (line 210) also uses the trimmed text, which matches the same description.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1467,
+      "durationMs": 15394,
+      "sessionId": "d3b019c7-6e83-48db-a479-d49a895f5661",
+      "costUsd": 0.2195566,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "I'm refuting this finding: the code at the cited location does what the pinned contract says. The finding assumes the limit is an OpenAPI `maxLength` applied to the raw value, but there isn't one.\n\n1. **`contract/api/openapi.yaml:1483-1486`** — `ReportRequest.note` has no `maxLength`. It declares `x-maxCodePoints: 1000`, and its description says: \"At most 1000 code points after trimming (server-enforced); over that is 400 on `note`.\"\n2. **The global \"Text limits\" rule (`openapi.yaml:52-57`)** says limits \"count Unicode code points after trimming leading and trailing whitespace\". They are deliberately published as `x-maxCodePoints` rather than schema `maxLength`, so that generated validators cannot refuse a value the spec accepts.\n3. **`Rules.kt:207-209`** trims first, then checks `codePointCount > NOTE_MAX`. That matches the contract exactly.\n\nA note of 1000 characters plus a trailing space is meant to be accepted under the contract. Rejecting it, as the finding suggests, would itself break the spec. The behaviour the finding describes does happen, but it is the specified behaviour, not a defect, and no user or attacker can use it to get past the limit. The extra whitespace is trimmed and never stored.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1405,
+      "durationMs": 20049,
+      "sessionId": "83f6fe44-7ea7-44c2-b648-c63bd7b45a92",
+      "costUsd": 0.25521079999999996,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code is as the finding quotes it: `Rules.kt:106` stores `raw = null` for a locked part, and a value the child sends for that part is not recorded. But this is a deliberate, documented choice, not undocumented drift. The change's own `design.md:171-173` defines the attempt `parts` JSONB as an array of `PartRecord` with \"`raw` string | array | null for a locked part\". So the change does document that locked parts carry no raw input on attempt 2.\n\nThe spec delta does not contradict this either:\n- It says the locked part's value is \"ignored and not re-graded\".\n- The `Grading.grade` KDoc (lines 92-95) says the same: \"not re-graded, whatever was sent for it\".\n- The \"raw input verbatim … per part\" rule covers input that was actually graded in that attempt. A locked part takes no input on attempt 2, because its verdict and normalized value are carried over from attempt 1.\n- Attempt 1's record still keeps that part's original raw input verbatim, so no input that was graded is ever lost.\n- The only \"verbatim\" scenario (spec.md:52-56) is an attempt-1 entry, and the code satisfies it (line 114 stores the raw value).\n\nThe mechanism matches the documented design. The claim that the attempt-log contents changed without documentation is false. At most, one could argue the spec wording should repeat what design.md already says, which is a docs nit and not a correctness defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1438,
+      "durationMs": 22184,
+      "sessionId": "17644f81-b7ed-4b87-9c61-83a8566c7366",
+      "costUsd": 0.24816520000000003,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code path itself is real: `Rules.kt:106` stores `raw = null` for a part that was locked on attempt 1, and any value the child sends for that part on attempt 2 (e.g. `13`) is dropped. That part checks out.\n\nThe finding's actual claim, though, is that this is \"undocumented drift\", and that is false. The change's own design explicitly documents the behaviour:\n- `openspec/changes/implement-practice-flow-api/design.md:172` defines the stored PartRecord as \"`raw` string | array | null for a locked\" part.\n- The migration `V4__practice.sql:25` says the same (\"raw … null when locked\").\n- The domain model KDoc (`Model.kt:44`: \"the raw input verbatim (null for a part locked as correct on…\") and `JdbcPracticeStore.kt:24` also document it.\n\nThis also matches the spec's semantics. The delta's state machine says locked parts are not re-graded, and the store spec says the value sent for them is \"ignored\". An ignored value is not graded input for that attempt, so keeping the locked part's normalized value and verdict with no raw value is consistent. Storing the ignored value would arguably be the more surprising choice. The \"Attempt log entry\" scenario only covers attempt 1, where every part keeps its raw value verbatim (line 114).\n\nFrom a reproducibility/exploitability view there is no user-facing or attacker-facing impact. No answer key leaks, no attempt is consumed wrongly, and no verdict or XP is affected. The only effect is that a value the spec says to ignore is not logged, which is an intentional, documented design choice rather than a defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1277,
+      "durationMs": 23296,
+      "sessionId": "3407280f-9ff9-4a86-afc7-9e4be9328409",
+      "costUsd": 0.2450728,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds: there's a real test gap, though the production code is correct.\n\n**The test only covers a new mission.** In `PracticeIT.kt:809-834`, the only refused replay is at line 812. It runs right after `mission(ids)` is created and before any attempt or hint, so the mission is NEW, not IN_PROGRESS. I searched every test under `src/test` for \"replay\". The only other match is `ChildOperationsContractTest.kt`, and it just lists the endpoint as an allowed child write. No test resolves part of a mission and then asks for a replay.\n\n**The code itself handles the in-progress case.** In `PracticeService.kt:213-228`, `replay()` throws `PracticeConflict(\"replay-not-complete\")` whenever `primaryProgress(mission).state != MissionState.COMPLETE`. That covers both NEW and IN_PROGRESS. It throws before `store.insertRun`, and the method is `@Transactional`, so a refusal can't change anything.\n\n**Nothing checks that progress is unchanged.** The spec's \"progress is unchanged\" clause has only indirect coverage: line 828 asserts `count(\"practice_run\") shouldBe 1`, which shows the earlier refusal on the NEW mission created no run. There is no assertion that `resolvedCount` or `state` stay the same after a refused replay on an in-progress mission.\n\nSo the finding is accurate as a spec-compliance and coverage gap, not a runtime bug. Minor severity is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1310,
+      "durationMs": 19702,
+      "sessionId": "79189691-cb99-449f-b097-92abe768cd7a",
+      "costUsd": 0.24657759999999998,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The factual claim holds. PracticeIT.kt:812 posts the replay before any activity, so the mission is NEW, and no test requests a replay while a mission is IN_PROGRESS. The only other replay calls (lines 822 and 827) happen after the mission is COMPLETE.\n\nBut from the exploitability angle, there is no real defect. In PracticeService.replay (lines 213-229), when the current run is not a replay, the code checks `primaryProgress(mission).state != MissionState.COMPLETE` and throws PracticeConflict(\"replay-not-complete\") before `store.insertRun`. NEW and IN_PROGRESS go through the same `!= COMPLETE` branch, so the existing NEW case already runs that exact line and branch. The method is transactional and takes `store.lock()` first, so a refused request creates no practice_run row and writes nothing to attempts or hints. Progress therefore cannot change on this path.\n\nThe only extra risk a new test would catch is MissionProgress.of wrongly reporting a partly resolved mission as COMPLETE. That is a separate question about how mission state is derived, not about the replay guard. No real user or attacker can replay an unfinished mission. This is a valid but low-value test-coverage gap against the spec scenario's wording, so I'm keeping it with the severity downgraded."
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1383,
+      "durationMs": 30797,
+      "sessionId": "e367e541-dbc9-4952-b4eb-bcb57a71ae15",
+      "costUsd": 0.2798404,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this. The test gap is real, though the example the finding gives is weak.\n\nWhat the code shows:\n- **The spec asks for an API-level check.** The scenario \"Same input, same feedback\" (contract/openspec/specs/practice-flow/spec.md:676-680) needs two fresh runs through the API. It then compares the canonicalized `feedback` JSON and checks `parts` field by field: key, verdict, normalized, formatTip and locked.\n- **The only test is at unit level.** TutorTest.kt:64-67 calls `DeterministicTutor.feedback(input)` and `feedback(input.copy())` and compares the results with data-class equality. Calling a pure function twice on equal input proves almost nothing. It never touches the `parts` verdicts, the web mapping or the JSON serialization.\n- **No IT covers it either.** I searched PracticeIT.kt for `feedback`, `replay` and two-run patterns. The replay test (line 809) only checks state, taskId and attempt counts. No IT submits the same wrong attempt in two runs and compares the responses.\n\nWeak spot in the finding: the \"RevealedAnswers ordering\" example doesn't fit this scenario. On a wrong attempt 1 the task is not REVEALED, so `revealedAnswers` is null. Also, DeterministicTutor (DeterministicTutor.kt:20-35) is a pure map over `input.parts`, so I see no live nondeterminism. That means the finding is a coverage gap, not a bug that exists now. Even so, the part of the scenario that compares `parts` and the canonical JSON has no test, so the gap stands. Minor severity is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1416,
+      "durationMs": 22110,
+      "sessionId": "a54452ad-4227-446f-b3af-301a82bb5736",
+      "costUsd": 0.2665966,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "This finding is about missing test coverage. It does not show a defect that a user could actually hit, and the code gives no way for the claimed nondeterminism to happen.\n\n- **The tutor is deterministic.** `TutorTest.kt:64` covers `DeterministicTutor`. It returns `Feedback(nextHintIndex, revealedAnswers)` built from the ordered `ServedPart` list, so the same input always gives the same output.\n- **The mapping is deterministic.** `PracticeMapping.attempt` (`PracticeMapping.kt:128-153`) only applies `List.map` to lists that are already ordered: `outcome.parts` and `feedback.revealedAnswers`. It uses no `HashMap`/`HashSet`, no unordered collection, no time and no random value. The fixed values `xpAwarded=0`, `bonusXp=0`, `rankUp=null` and `completedMissionIds=emptyList()` are also deterministic.\n- **The serializer is deterministic.** The `RevealedAnswers` serializer (`RevealedAnswers.kt:25-43`) writes the held `RawAnswer.Text` as a string, or `RawAnswer.Keys` as an array in list order. The \"RevealedAnswers ordering\" problem the finding mentions has no mechanism behind it.\n- **Order comes from the parts list.** The order of `revealedAnswers` follows the task's parts list, and `TutorTest:57-60` already pins that order.\n- **The serialized feedback is already checked through the API.** `PracticeIT` tests it (lines 470, 503, 505, 643, 646), and `TutorSwapTest` covers the request path.\n\nNo user or attacker sequence could produce different feedback for the same input. At most this is a nice-to-have IT for strict spec-scenario traceability, not a reproducible problem.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1335,
+      "durationMs": 22611,
+      "sessionId": "c9eeb598-544b-4774-bd33-c03a97edc812",
+      "costUsd": 0.291835,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "I couldn't find a defect here. The mechanism the finding describes is real, but the claim that it breaks the contract is wrong.\n\n**What the finding gets right.** `PracticeProblemAdvice.kt:49-53` does turn `MethodArgumentTypeMismatchException` into a 400 with `errors[0].field` set to the parameter name and the code `not-uuid`. It is also true that these per-operation response lists have no `400` entry: getMissionBriefing, getCurrentTask, startReplay, getMissionSummary, getTask, openNextHint and getChildImage.\n\n**Why that doesn't make it undocumented.** The contract defines this 400 once, as a global rule, instead of listing it on each operation. In `contract/api/openapi.yaml:39-41`, under the `Conventions:` heading, it says: \"Query and path parameters use their own name (`weeks`, `status`, `q`, `reportId`, `taskId`, …); a path id that is not a UUID is 400 before any lookup.\" The code matches this exactly: a 400, with the field named after the path parameter, raised before any lookup.\n\n**Other places that rely on the same rule:**\n- The implementation design for this slice already lists the case: `openspec/changes/implement-practice-flow-api/design.md:187` says \"`missionId`, `taskId` or `imageId` not a UUID | 400 | `errors[0].field` = that parameter\".\n- The spec store's `progress-stats/spec.md:459` repeats it (\"not a UUID SHALL be refused with 400 before any lookup\").\n- An earlier review raised the same complaint about getSource and getSourceFile. It was rejected because of this convention (\"Contract info Conventions: a path id that is not a UUID is 400 before any lookup, for every operation.\" — `openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/review-findings.json:195`).\n- `ContentProblemAdvice.kt:158` does the same thing for the content endpoints.\n\n**The suggested fix would break things.** Returning 404 for a malformed id would go against the explicit contract convention and against the agreed slice design. At most, the per-operation response lists could also mention the 400 for completeness. That is a docs tidy-up, not a correctness problem in this code.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1368,
+      "durationMs": 22406,
+      "sessionId": "708f34b8-86a4-47a4-9515-da3cfa6a4fb4",
+      "costUsd": 0.24408999999999997,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this finding: the 400 is easy to reproduce, though it is a contract-drift problem rather than a security one.\n\nHow it happens:\n- `PracticeProblemAdvice` is scoped to `ChildHqController` and `ChildPracticeController`.\n- It runs at highest precedence.\n- At line 49 it maps `MethodArgumentTypeMismatchException` to a 400 response with `errors=[{field:<param>, message:\"This must be a UUID.\"}]`.\n- The path params `MissionId`, `TaskId` and `ImageId` are `format: uuid` (openapi.yaml:1083-1086). The generated `*Api` interfaces bind them as `java.util.UUID`, so Spring throws that exception for any non-UUID segment. The framework does not turn it into a 404, because this handler catches it first.\n\nReproduction: any client can send `GET /api/child/missions/abc`, `/current-task`, `/summary`, `POST /replay`, `GET /tasks/{bad}`, `/hints`, or `GET /api/child/images/xyz` and get a 400 `application/problem+json`. I checked the contract with grep: getMissionBriefing, getCurrentTask, startReplay, getMissionSummary, getTask, openNextHint and getChildImage list only 200/204/404/409. None of them lists 400. Only submitAttempt and the profile operations list 400. So the status code is undocumented for those operations, as the finding says.\n\nThings that weaken it but do not refute it:\n- The `format: uuid` constraint arguably implies a 400 under general OpenAPI convention.\n- The content admin advice (`ContentProblemAdvice.kt:86`) uses the same pattern, so it is a project-wide convention, not a slice-7 slip.\n- Nothing leaks: no answer key, no driver internals, no 500. It only affects a client that builds malformed ids.\n\nSeverity: minor is about right. This is spec compliance with no security impact.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1100,
+      "durationMs": 18689,
+      "sessionId": "2bd2af5a-8f02-43fa-8068-d6258d727b26",
+      "costUsd": 0.25826859999999996,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding is accurate as a test-coverage gap. A grep of src/test for 413 / oversize / rank-up-ack finds 413 tests for practice only on attempts (PracticeIT:564-565) and reports (PracticeIT:721), plus profile settings (ProfileSettingsTest:281). Every rank-up-ack test uses a small body: PracticeIT:838-848 sends {\"rankIndex\":1} (expects 204) and {\"rankIndex\":-1} (expects 400). PracticeApiTest:158-160 covers 400 cases, and RequestContentNotLoggedTest:136 checks a sentinel for log leakage. No test sends more than 16 KB to /api/child/hq/rank-up-ack.\n\nThe runtime behavior is very likely correct. PracticeBodyAdvice is scoped to ChildHqController, which handles rank-up-ack. Its supports() method matches AckRankUpRequest through PLACEHOLDERS, and beforeBodyRead throws PracticeBodyTooLarge for any supported type before it looks at the type. That code path is shared with attempts and reports, which are already tested, so this is not a product bug. It is still a real gap against the spec scenario, which lists rank-up acknowledgement explicitly. The gap matters most if ChildHqController is ever changed so the advice no longer applies to it. Minor severity fits.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1133,
+      "durationMs": 19341,
+      "sessionId": "ba299f4b-5448-413d-97e5-23ea8389cfb3",
+      "costUsd": 0.2478308,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The factual claim holds. The only rank-up-ack requests in PracticeIT.kt are at lines 838–848: a 204 for {\"rankIndex\":1} and a 400 for {\"rankIndex\":-1}. PracticeApiTest.kt:158–160 only covers 400 cases. RequestContentNotLoggedTest.kt:136 sends a small sentinel body to check logging, not the size limit. No test anywhere sends a body over 16 KB to /api/child/hq/rank-up-ack, so the scenario's \"rank-up acknowledgement → 413\" branch has no backend test.\n\nFrom an exploitability point of view, though, nobody can trigger a bug here. PracticeBodyAdvice.supports() is true for AckRankUpRequest because it is in PLACEHOLDERS (PracticeBodyAdvice.kt:89). beforeBodyRead does readNBytes(MAX_BYTES + 1) and throws PracticeBodyTooLarge when the body is over 16 KB (lines 44–45). That is the same code path the attempt test (PracticeIT.kt:565) and the report test (PracticeIT.kt:721) already prove returns 413 problem+json. Only the map entry differs, and it is present. So the 413 behaviour works today. The finding is a real gap in spec-to-test traceability, not a defect a child or attacker could hit. It's a valid nit, best rated low/minor-to-trivial: one regression test would protect against someone later removing the map entry."
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "19 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 7, contested: 2, rejected: 10"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/implement-practice-flow-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "slice 7 practice-flow backend (implement-practice-flow-api)",
+    "summary": "Review gate for slice 7 practice-flow backend (implement-practice-flow-api): 7 confirmed, 2 contested (treat as confirmed unless trivially wrong), 10 rejected.",
+    "confirmed": [
+      {
+        "title": "Task screen returns a raw 500 when an admin removes hints from a published task after the child opened some",
+        "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeMapping.kt",
+        "line": 702,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "`TaskView.hints.opened` is built as `(1..screen.hintsOpened).map { hint(task, it, locale) }`, and `hint()` reads `task.hints[index - 1]`. `hintsOpened` comes from the append-only `opened_hint` log, but `task.hints` is the current content. `TaskService.update` / `MissionRules.taskEdit` (Missions.kt:228) let an admin edit the content of a published task, including its hints. Say the child opened 2 hints and the task now has 1: `hints[1]` throws IndexOutOfBoundsException. getTask, getCurrentTask and startReplay then return a raw 500, and `remaining = task.hints.size - index` would go negative.",
+        "suggestion": "Clamp the opened count to the current number of hints: `(1..minOf(screen.hintsOpened, task.hints.size))`. Clamp `remaining` at 0 too. Add an IT that opens hints, removes them in an admin edit, and reloads the task.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Confirmed; the only error is the line number. The code is at PracticeMapping.kt:118 (the file is about 165 lines, so line 702 can't exist), with the hint helper at lines 155-163.\n\nHow it fails:\n1. PracticeService.screen (PracticeService.kt:282) sets hintsOpened = store.hints(run.scope, [taskId]).size. That count comes from the append-only opened-hint log for the current run.\n2. The task comes from served.task(taskId) (PracticeService.kt:255), which returns the task's current content, not a snapshot.\n3. PracticeMapping.kt:118 builds the opened list as (1..screen.hintsOpened).map { hint(task, it, locale) }. Line 161 then reads task.hints[index - 1] without checking bounds (the translation lookup uses getOrNull, but the main list does not). Line 162 computes remaining = task.hints.size - index, which goes negative.\n4. Nothing stops an admin from removing hints. TaskService.update (TaskService.kt:132-142) only runs MissionRules.taskEdit, which (Missions.kt:228-241) only refuses a change of topic or grade while the task is in a mission, or a switch to GRAPHIC while it is in a published mission. It has no \"used\" check and no rule about hints. The \"used\" check (usage.usedTasks) applies only to deletes.\n5. No handler catches IndexOutOfBoundsException. The @ExceptionHandler methods in PracticeProblemAdvice and the other advice classes cover only specific exception types, so the error becomes an unhandled 500. That breaks the AGENTS.md rule that no input may produce a raw 500.\n\nWho is affected: every caller of screen(), which includes getTask, getCurrentTask and replay. Example: a child opens 2 hints, the admin saves the task with 1 hint, and every later load of that task returns a 500 until a new run starts. Opening another hint does not crash: openHint returns a 409 because opened >= task.hints.size. The task screen itself stays broken.\n\nSeverity stays major: an ordinary admin edit leaves a child's task permanently unloadable. The suggested fix is correct: limit the opened count to the current number of hints and keep remaining at 0 or more.",
+          "The mechanism is real. One correction: the code is at PracticeMapping.kt:118 and :155-163, not line 702.\n\n- **The crash:** line 118 builds `opened = (1..screen.hintsOpened).map { hint(task, it, locale) }`. `hint()` at line 161 reads `task.hints[index - 1]` without a bounds check, and line 162 computes `remaining = task.hints.size - index`.\n- **Where `hintsOpened` comes from:** PracticeService.kt:282 sets it to `store.hints(run.scope, listOf(task.taskId)).size`. That is a count of the append-only opened-hint log, not of the current hints.\n- **Where `task.hints` comes from:** ServedContentService.kt:96 maps it from the task's current content (`hints = c.hints`). There is no per-attempt snapshot.\n- **No guard on edits:** `TaskService.update` (TaskService.kt:132-141) only checks `MissionRules.taskEdit` (Missions.kt:228-241). That refuses only topic/grade changes while the task is in missions, and switching to GRAPHIC while it is in a published mission. Nothing stops an admin from shortening the hints list of a published task the child has already used. The only usage-based guard (`usage.usedTasks`) applies to delete, not update.\n- **Only the opening path is guarded:** PracticeService.kt:184 checks `opened >= task.hints.size` when opening a new hint. The rendering path has no check.\n\nRepro: the child opens 2 hints, then the admin saves the task with 1 hint. The task stays published and servable, so GET of the task screen hits `hints[1]` and throws IndexOutOfBoundsException. That is an unhandled exception, so the child gets a 500, which breaks the \"no raw 500\" rule. Through getCurrentTask it can also block the child's mission until the admin adds the hints back.\n\nIt can't be triggered by an attacker; it needs an ordinary admin edit. But a single admin editing a hint wording or count is a normal authoring action, so a real user can easily reproduce it. Severity stays major, because it blocks the child's practice flow."
+        ]
+      },
+      {
+        "title": "An old replay run comes back to life when a task is added to the mission later, so attempts go into the replay scope instead of the primary one",
+        "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+        "line": 1645,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "`currentRun` takes the latest `practice_run` and treats it as active if `mission.taskIds.any { states[it]?.resolved != true }`, using the mission's current task list. Suppose a replay finished and the admin then adds a task (missions can be edited). The finished run now has an unresolved task, so it counts as the current replay again. getCurrentTask and submit then write that task's attempts into the replay scope with `replay=true`. The primary scope never sees the task, so HQ shows the mission IN_PROGRESS with a continue target that can't be cleared through the normal flow.",
+        "suggestion": "Mark a run as finished once it is complete: store `completed_at`, or freeze the run's task list when it starts. Or only treat a run as current when the tasks it started with are still unresolved. Then route newly added tasks to the primary scope.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I couldn't refute the core mechanism. One part of the finding goes too far.\n\n**Where the run is chosen.** `PracticeService.currentRun` is at `PracticeService.kt:258-262`, not line 1645. It takes `store.runs(missionId).lastOrNull()` and checks it against the mission's *current* `mission.taskIds`. If any of those tasks is unresolved in that run's scope, it returns `Run(run.id, replay=true)`. Runs have no completion marker and no frozen task list.\n\n**Missions can gain tasks after publishing.** `MissionRules.edit` (`content/domain/Missions.kt:205-215`) lets a published mission take newly added tasks, as long as they are published text tasks. `ServedContentService.served` (`ServedContentService.kt:70-79`) builds `ServedMission.taskIds` straight from the stored mission's current list. So the next `served.mission()` call includes the added task.\n\n**What happens after the edit.** Take a replay that finished, then an admin adds task T:\n- `currentRun` now finds T unresolved in the old run and returns that run as replay.\n- `currentTask`, `task`, `submit`, `openHint`, `report` and `briefing` all route through `currentRun`.\n- `submit` therefore saves T's attempts with `scope=run.id` and `replay=true` (lines 136-167).\n- `primaryProgress` only reads `Scope.PRIMARY`, so HQ shows IN_PROGRESS with T as the continue target.\n- `briefing` mixes the two: task states come from the replay scope, but `state` comes from the primary scope.\n- `replay()` returns the revived run unchanged, because `current.replay` is true.\n\n**What the finding overstates.** It says the continue target \"can't be cleared through the normal flow\". That's wrong. Once the child resolves T in the revived run, every task in that run is resolved. `currentRun` then falls back to PRIMARY, and `currentTask` serves T again in the primary scope. So it does clear, but the child has to do the task twice, and the first attempts are logged as replay attempts. The misrouting is real; the permanent stuck state is not.\n\n**Scope and severity.** The bug needs a published mission edited after a replay finished, which is a plausible admin action. The finding also misses that it happens whenever a replay run exists, even if the primary run had not finished when the task was added. The consequences are wrong attempt scope/flag and HQ inconsistent with what the child is shown, and they correct themselves after the double work. I'm keeping the severity at major for the data-integrity problem (attempts saved with the wrong scope and replay flag), with the caveat about recovery.",
+          "I confirmed the mechanism in the code. It can be reached through normal admin actions.\n\n1. `PracticeService.kt:258-262`: `currentRun` takes the latest `practice_run` row. It decides whether that run is active by checking the mission's current `taskIds` against the run's states. A run has no `completed_at` field and no frozen task list, so a finished run is never marked as finished.\n2. Admins can add tasks to a published mission. `content/domain/Missions.kt:202-203` says a published mission \"stays non-empty and admits only published text tasks. Reordering and removing (while one remains) are always allowed\". Adding a published TEXT task is therefore allowed. `ServedContentService` then serves the longer task list to the child right away.\n3. Here is how to reproduce it. The child completes mission M, starts a replay with `replay()` and finishes it, so the run is complete. The admin then adds a published task T to M. Now `currentRun(M)` sees that T is unresolved in the old run and returns `Run(oldRun, replay=true)`. In `hq()`, which only reads the primary scope, M shows as IN_PROGRESS with `continueTarget` = T. When the child opens T, `task()`, `currentTask()`, `submit()` and `openHint()` all call `currentRun`. They show T in the replay scope and write the attempts and hints to `oldRun` with `replay=true`. `briefing()` mixes the two scopes: the state comes from the primary scope and the per-task states come from the replay scope. `replay()` also returns this revived run instead of starting a fresh one.\n\nOne overstatement: the finding says the continue target \"can't be cleared through the normal flow.\" That is not quite true. Once T is resolved in the revived replay run, every task in the run is resolved again. `currentRun` then falls back to the primary scope. HQ still points at T, and the child can solve it again in the primary scope. So the state isn't stuck forever. What does happen is that the work goes into the wrong scope, the child has to solve the task twice, the replay flag and the summary are wrong, and the briefing shows inconsistent state. The data in the attempt log is also wrong (FR-31 logging is attributed to the wrong scope). The core problem is real and can be reproduced with normal admin and child actions, so I'm keeping the severity at major."
+        ]
+      },
+      {
+        "title": "NFR-5 check round-trip test does not follow the scenario's fixture or load shape",
+        "file": "src/test/kotlin/cz/doucko/practice/PracticeTimingIT.kt",
+        "line": 75,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "The scenario says: \"Docker Compose stack seeded with a fixture of at least 10 published tasks that together cover every MVP answer type and include at least one two-part task … each a valid attempt 1 or attempt 2 … (fresh runs come from replays)\". The test seeds a single INTEGER+DECIMAL task, runs `jdbc.update(\"DELETE FROM attempt\")` after every request (line 116), so every submission is attempt 1, and runs against the in-process Spring Boot test server, not the Compose stack. CHOICE/TEXT/FRACTION paths and the attempt-2 lock path are never timed. The reported p95 of 67 ms is real but measures a narrower workload than the spec.",
+        "suggestion": "Seed 10 or more tasks covering every answer type. Alternate attempt 1 and attempt 2 using replays (startReplay) instead of deleting rows. Either run the measurement against the Compose stack (or the e2e job), or amend NFR-5's scenario to accept the in-process measurement as the backend half.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I couldn't refute this. Every factual claim in the finding matches the code and the spec.\n\n**Spec** (`contract/openspec/specs/practice-flow/spec.md:330-334`): the \"Check round-trip time\" scenario asks for:\n- the Docker Compose stack;\n- at least 10 published tasks that together cover every MVP answer type, including at least one two-part task;\n- 200 submissions, each a valid attempt 1 or attempt 2, with fresh runs coming from replays.\n\nThe requirement text at lines 263-267 also says the time is measured against the Compose stack.\n\n**Test** (`PracticeTimingIT.kt`):\n- It seeds exactly one task with two parts, typed INTEGER and DECIMAL (lines 75-77). That means CHOICE, TEXT and FRACTION are never exercised.\n- It runs `jdbc.update(\"DELETE FROM attempt\")` after every submission (line 116), so every measured request is attempt 1. The attempt-2 path (locked parts, the reveal) is never timed, and replays are not used.\n- It runs on the in-process server started by `@SpringBootTest(RANDOM_PORT)` with Testcontainers Postgres, not on the Compose stack.\n\n**Mitigation:** the KDoc (lines 28-33) openly calls this \"the backend share\". It says the attempts are cleared on purpose and that the frontend's e2e test measures the Compose stack. So the narrowing is deliberate and disclosed, not hidden. The check is honest (real HTTP, real Postgres, a client-side timer, 20 warm-ups, 200 submissions, half correct and half wrong).\n\n**Why it still stands:** the backend test's workload is narrower than the scenario it cites, and `tasks.md` 5.1 reports \"p95 67 ms\" as NFR-5 evidence. Each answer type is graded in microseconds (`CheckerTimingTest`), so the most likely real gap is the attempt-2 path with its extra reads and writes. The missing answer types matter less.\n\n**Severity:** I'd downgrade from major to minor. This is a spec-compliance and evidence-scope gap, not a code defect. The test discloses its scope, and the Compose-stack measurement is explicitly delegated to the frontend e2e job. I did not check that job's mechanism from this repo.",
+          "I checked the code, and the factual claims are correct. `contract/openspec/specs/practice-flow/spec.md:330-334` (\"Check round-trip time\") requires all of the following:\n- the Docker Compose stack\n- at least 10 published tasks covering every MVP answer type, including a two-part task\n- valid attempt-1 or attempt-2 submissions, with fresh runs coming from replays\n\nThe text at lines 263-267 also says the local check runs against Compose.\n\n`PracticeTimingIT.kt` differs on each point:\n- It seeds one task with only INTEGER and DECIMAL parts (lines 75-77).\n- It runs `DELETE FROM attempt` after every submission (line 116), so every timed request is attempt 1.\n- It runs against the in-process `@SpringBootTest` RANDOM_PORT server with Testcontainers Postgres, not Compose.\n\nSo CHOICE/TEXT/FRACTION grading, the attempt-2 path (reading prior attempts and locking parts) and replays are never timed. The finding is not refuted.\n\nI'm downgrading it from major to minor for these reasons:\n1. **Test-fidelity gap, not a runtime defect.** No user or attacker can trigger anything. It only matters if the untimed paths are actually slow.\n2. **Large margin.** The measured p95 is 67 ms against a 300 ms budget. Per `CheckerTimingTest`, the checker's per-part cost is microseconds (p95 37-73 µs), so the other answer types are very unlikely to change the result much. The attempt-2 path adds about one query.\n3. **The narrowing is disclosed and split by design.** The test's KDoc calls it \"the backend share\", explains why attempts are cleared, and says the frontend's e2e test measures the Compose stack. The traceability report maps \"e2e -> frontend; local-verifiable -> backend+frontend\".\n\nWhat remains real is a mismatch between what this repo's local-verifiable evidence shows and what the scenario specifies. `tasks.md` 5.1 also cites p95 67 ms as NFR-5 evidence without that caveat. Either the fixture and attempt mix should be widened, or the spec should accept the in-process run as the backend's share. I couldn't confirm that the frontend e2e test exists or meets the scenario, because read access to `../frontend` was denied."
+        ]
+      },
+      {
+        "title": "TC-6 'Feedback never comes from AI' is only half enforced: no network-denied run of the attempt tests",
+        "file": "src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+        "line": 87,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "The scenario says: \"…and the attempt-checking integration tests run with all outbound network connections from the backend container denied … every attempt-checking test passes with the network denied (TC-6)\". TutorTest only has `no AI or LLM library is a dependency (TC-6)`, which inspects dependencies. Nothing in src/test or the battery denies outbound network during PracticeIT.",
+        "suggestion": "Add a mechanism that denies egress while the attempt ITs run, for example a Testcontainers network with internal=true for an app container, or a SecurityManager/ProxySelector guard that fails on any non-localhost socket. Otherwise record an explicit waiver in the store spec.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds up. The store spec `contract/openspec/specs/practice-flow/spec.md:697-698` asks for two things: the resolved dependency list has no AI or LLM group ids, and every attempt-checking integration test passes while all outbound network connections from the backend container are denied (TC-6).\n\n`TutorTest.kt:87-93` covers only the first part, and only partly. It searches the text of `pom.xml` for `<groupId>` strings and checks for classloader resources. That is not the same as inspecting the resolved dependency list, so a transitive AI dependency could get past it.\n\nThe network-denied part has no mechanism anywhere:\n- **Tests:** grepping `src/test` for network, egress, ProxySelector, SocketFactory or withNetwork finds nothing that denies egress. The only network mentions are `BindAddressTest`, `ComposeConfigurationTest` and a comment in `CheckingPurityTest`.\n- **Battery and config:** nothing in scripts or `compose.yaml` runs `PracticeIT` with egress blocked.\n- **Waiver:** no waiver exists. `docs/qa/traceability-report.md:86` shows TC-6 with no tests (\"| TC-6 | - | n/a |\").\n\nThis also breaks the repo's \"declared-method-needs-mechanism\" rule: a declared verification method has no executable check. The spec-compliance gap is real, and major severity is reasonable.",
+          "The finding is accurate. In the store spec, `contract/openspec/specs/practice-flow/spec.md:694-698` (\"Feedback never comes from AI in MVP\") requires two things: a dependency check, and the attempt-checking integration tests passing \"with all outbound network connections from the backend container denied\". `TutorTest.kt:87-93` covers only the first. It greps `pom.xml` for three group ids and probes the classpath for the matching package paths. Nothing in `src/test` denies network access: searching for Network, internal, offline, ProxySelector and egress finds nothing. No waiver for this was found in `openspec/changes`. The repo's own rule (\"declared-method-needs-mechanism\") says a declared verification method with no executable mechanism must be implemented or waived. So this is a real spec-compliance gap.\n\nSeen through the exploitability lens, though, no user or attacker can trigger anything. It is a gap in test evidence, not a runtime defect. The main code has no AI or LLM library. `DeterministicTutor` is the only `TutorPort` implementation, and ArchUnit checks that, so no network call can happen today.\n\nThe cited check is also weak. It only matches `<groupId>` strings written directly in `pom.xml`, not the resolved dependency list the spec names, so a transitive dependency would slip past it.\n\nDowngrade: the gap is real and should be fixed or waived, but it has no exploitable impact."
+        ]
+      },
+      {
+        "title": "Malformed body on a task that is not served returns 400, not the required 404",
+        "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/ChildControllers.kt",
+        "line": 72,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "The spec requires: \"Every child request that names a task — … submitting an attempt, … reporting a problem — SHALL be refused with HTTP 404 … when the task does not exist, is not served…\". In the code, `PracticeReaders.answers(body())` and `PracticeReaders.report(body())` run in the controller before `service.submit/report` looks up the mission or task (the PracticeReaders KDoc says \"Checks that need no task run here, before any lookup\"). So a 21-element list or an OTHER report without a note sent for a draft or GRAPHIC task gets 400, which shows the endpoint shape exists for unserved ids. Nothing is stored either way.",
+        "suggestion": "Resolve the mission and task (404) before validating the body, or amend the spec to say body-shape 400 takes precedence over 404. Add an IT that sends an invalid body for a draft task.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is confirmed. In ChildControllers.kt:72, `PracticeReaders.answers(body())` runs, and can throw InvalidPracticeInput (400), before `service.submit(missionId, taskId, …)` does the mission and task lookup. reportProblem (line 86) works the same way: `PracticeReaders.report(body())` is evaluated as an argument, so it runs before `service.report` calls `mission(missionId)` and `task(mission, taskId)` (PracticeService.kt:197-198). The PracticeReaders KDoc says this on purpose: \"Checks that need no task run here, before any lookup\".\n\nTwo documents say this order is wrong:\n1. The store spec, practice-flow spec.md:219-224. Any child request that names a task (submit, report) SHALL get 404 when the task does not exist, is not served, or is not in the mission.\n2. The repo's own design, openspec/changes/implement-practice-flow-api/design.md:76-77. It sets the check order for submitAttempt as \"path ids (400) → served mission and task in it (404) → body shape (400) → …\". The code runs body shape before the 404 lookup, so it breaks the order its own design states.\n\nCould the framework catch this first? Generated bean validation (useBeanValidation=true) could reject some schema-level shape errors before the controller, but it would return 400 in those cases too, so the precedence problem stays. Some rules can't be written in the schema and only PracticeReaders/ReportRules enforce them, such as OTHER without a note. Those requests reach the controller and get 400 before any 404 lookup. A draft, GRAPHIC or non-existent task therefore returns 400 instead of 404 for those bodies.\n\nImpact is limited. Nothing is stored either way and no answer key leaks; at most the 400 shows that the endpoint shape exists. Minor severity is right.",
+          "I confirmed the mechanism in the code, and anyone who can call the API can reproduce it. In `ChildControllers.kt:72`, `submitAttempt` runs `PracticeReaders.answers(body())` before `service.submit(missionId, taskId, answers)`. In `ChildControllers.kt:86`, `reportProblem` runs `PracticeReaders.report(body())` before `service.report(...)`. The KDoc in `PracticeReaders.kt:12` says on purpose that \"Checks that need no task run here, before any lookup\". These checks include the limit of 20 choice elements (`MAX_SELECTION = 20`), and `Rules.kt:210` makes an OTHER report without a note fail. Neither check depends on the task, and nothing guards them earlier. So a request for a draft task, a GRAPHIC task, a task id that does not exist, or a task outside the mission gets a 400 with a malformed body, not the 404.\n\nThe spec (`contract/openspec/specs/practice-flow/spec.md:215-224`) says every child request that names a task, including submitting an attempt and reporting a problem, \"SHALL be refused with HTTP 404 … when the task does not exist, is not served…\". The rule on body shape (lines 343-346) lists what gets a 400 but never says that 400 comes before 404. So on a literal reading the code breaks the 404 requirement. The scenarios at lines 232-242 only use valid bodies, which is why the current tests miss this.\n\nReal-world impact is very small. Nothing is stored either way: validation fails before any write, so attempt counts, hints and XP stay the same. The only thing leaked is that the endpoint shape exists, and the OpenAPI contract already makes that public. It does not show whether a given task exists, because the 400 comes back the same for every task id. It is a real but minor spec-compliance gap, so keep the severity at minor. It is not a security problem. The fix is either to look up the mission and task (404) before validating the body, or to write in the spec that body-shape errors (400) take precedence over 404."
+        ]
+      },
+      {
+        "title": "'Replay of an unfinished mission is refused' is only tested for a NEW mission, not one in progress",
+        "file": "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "line": 812,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "The scenario reads: \"GIVEN a mission in progress / WHEN a replay request … THEN 409 … and the mission's progress is unchanged\". The test calls `mvc.post(\"/api/child/missions/$m/replay\").isProblem(409)` before any activity, so the mission is NEW. The code (PracticeService.kt:221 `if (primaryProgress(mission).state != MissionState.COMPLETE) throw PracticeConflict`) does handle IN_PROGRESS, but that path has no test and nothing asserts the progress is unchanged.",
+        "suggestion": "Add an IT that resolves one task, then requests a replay and asserts 409, that no practice_run row was created, and that resolvedCount is unchanged.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds: there's a real test gap, though the production code is correct.\n\n**The test only covers a new mission.** In `PracticeIT.kt:809-834`, the only refused replay is at line 812. It runs right after `mission(ids)` is created and before any attempt or hint, so the mission is NEW, not IN_PROGRESS. I searched every test under `src/test` for \"replay\". The only other match is `ChildOperationsContractTest.kt`, and it just lists the endpoint as an allowed child write. No test resolves part of a mission and then asks for a replay.\n\n**The code itself handles the in-progress case.** In `PracticeService.kt:213-228`, `replay()` throws `PracticeConflict(\"replay-not-complete\")` whenever `primaryProgress(mission).state != MissionState.COMPLETE`. That covers both NEW and IN_PROGRESS. It throws before `store.insertRun`, and the method is `@Transactional`, so a refusal can't change anything.\n\n**Nothing checks that progress is unchanged.** The spec's \"progress is unchanged\" clause has only indirect coverage: line 828 asserts `count(\"practice_run\") shouldBe 1`, which shows the earlier refusal on the NEW mission created no run. There is no assertion that `resolvedCount` or `state` stay the same after a refused replay on an in-progress mission.\n\nSo the finding is accurate as a spec-compliance and coverage gap, not a runtime bug. Minor severity is appropriate.",
+          "The factual claim holds. PracticeIT.kt:812 posts the replay before any activity, so the mission is NEW, and no test requests a replay while a mission is IN_PROGRESS. The only other replay calls (lines 822 and 827) happen after the mission is COMPLETE.\n\nBut from the exploitability angle, there is no real defect. In PracticeService.replay (lines 213-229), when the current run is not a replay, the code checks `primaryProgress(mission).state != MissionState.COMPLETE` and throws PracticeConflict(\"replay-not-complete\") before `store.insertRun`. NEW and IN_PROGRESS go through the same `!= COMPLETE` branch, so the existing NEW case already runs that exact line and branch. The method is transactional and takes `store.lock()` first, so a refused request creates no practice_run row and writes nothing to attempts or hints. Progress therefore cannot change on this path.\n\nThe only extra risk a new test would catch is MissionProgress.of wrongly reporting a partly resolved mission as COMPLETE. That is a separate question about how mission state is derived, not about the replay guard. No real user or attacker can replay an unfinished mission. This is a valid but low-value test-coverage gap against the spec scenario's wording, so I'm keeping it with the severity downgraded."
+        ]
+      },
+      {
+        "title": "No backend test for the 413 'Request body too large' scenario on rank-up acknowledgement",
+        "file": "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "line": 838,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "The scenario reads: \"GIVEN any child endpoint that accepts a body (attempt, report, profile settings, rank-up acknowledgement) … THEN 413\". PracticeIT tests 413 for attempts (line 565) and reports (line 721). ackRankUp is covered by PracticeBodyAdvice's PLACEHOLDERS map in code, but there is no test sending more than 16 KB to `/api/child/hq/rank-up-ack`.",
+        "suggestion": "Add a 17 KB rank-up-ack request to the replay/placeholder test asserting 413 problem+json.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding is accurate as a test-coverage gap. A grep of src/test for 413 / oversize / rank-up-ack finds 413 tests for practice only on attempts (PracticeIT:564-565) and reports (PracticeIT:721), plus profile settings (ProfileSettingsTest:281). Every rank-up-ack test uses a small body: PracticeIT:838-848 sends {\"rankIndex\":1} (expects 204) and {\"rankIndex\":-1} (expects 400). PracticeApiTest:158-160 covers 400 cases, and RequestContentNotLoggedTest:136 checks a sentinel for log leakage. No test sends more than 16 KB to /api/child/hq/rank-up-ack.\n\nThe runtime behavior is very likely correct. PracticeBodyAdvice is scoped to ChildHqController, which handles rank-up-ack. Its supports() method matches AckRankUpRequest through PLACEHOLDERS, and beforeBodyRead throws PracticeBodyTooLarge for any supported type before it looks at the type. That code path is shared with attempts and reports, which are already tested, so this is not a product bug. It is still a real gap against the spec scenario, which lists rank-up acknowledgement explicitly. The gap matters most if ChildHqController is ever changed so the advice no longer applies to it. Minor severity fits.",
+          "The factual claim holds. The only rank-up-ack requests in PracticeIT.kt are at lines 838–848: a 204 for {\"rankIndex\":1} and a 400 for {\"rankIndex\":-1}. PracticeApiTest.kt:158–160 only covers 400 cases. RequestContentNotLoggedTest.kt:136 sends a small sentinel body to check logging, not the size limit. No test anywhere sends a body over 16 KB to /api/child/hq/rank-up-ack, so the scenario's \"rank-up acknowledgement → 413\" branch has no backend test.\n\nFrom an exploitability point of view, though, nobody can trigger a bug here. PracticeBodyAdvice.supports() is true for AckRankUpRequest because it is in PLACEHOLDERS (PracticeBodyAdvice.kt:89). beforeBodyRead does readNBytes(MAX_BYTES + 1) and throws PracticeBodyTooLarge when the body is over 16 KB (lines 44–45). That is the same code path the attempt test (PracticeIT.kt:565) and the report test (PracticeIT.kt:721) already prove returns 413 problem+json. Only the map entry differs, and it is present. So the 413 behaviour works today. The finding is a real gap in spec-to-test traceability, not a defect a child or attacker could hit. It's a valid nit, best rated low/minor-to-trivial: one regression test would protect against someone later removing the map entry."
+        ]
+      }
+    ],
+    "contested": [
+      {
+        "title": "'Same input, same feedback' is verified only at unit level, not across two fresh runs through the API",
+        "file": "src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+        "line": 64,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The scenario reads: \"two fresh runs of the same task with the same hints opened … the `feedback` objects … byte-identical after JSON canonicalization, and the `parts` lists are equal in every key, verdict, normalized, formatTip and locked value\". TutorTest `same input, same feedback` calls DeterministicTutor directly. No IT compares two serialized AttemptResults, for example a primary run against a replay run, so mapping or serialization nondeterminism such as RevealedAnswers ordering would not be caught.",
+        "suggestion": "Add an IT: submit the same wrong attempt 1 in two runs (two missions sharing the task, or primary plus replay) with equal hints opened, then compare the canonicalized `feedback` JSON and the `parts` arrays.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "I could not refute this. The test gap is real, though the example the finding gives is weak.\n\nWhat the code shows:\n- **The spec asks for an API-level check.** The scenario \"Same input, same feedback\" (contract/openspec/specs/practice-flow/spec.md:676-680) needs two fresh runs through the API. It then compares the canonicalized `feedback` JSON and checks `parts` field by field: key, verdict, normalized, formatTip and locked.\n- **The only test is at unit level.** TutorTest.kt:64-67 calls `DeterministicTutor.feedback(input)` and `feedback(input.copy())` and compares the results with data-class equality. Calling a pure function twice on equal input proves almost nothing. It never touches the `parts` verdicts, the web mapping or the JSON serialization.\n- **No IT covers it either.** I searched PracticeIT.kt for `feedback`, `replay` and two-run patterns. The replay test (line 809) only checks state, taskId and attempt counts. No IT submits the same wrong attempt in two runs and compares the responses.\n\nWeak spot in the finding: the \"RevealedAnswers ordering\" example doesn't fit this scenario. On a wrong attempt 1 the task is not REVEALED, so `revealedAnswers` is null. Also, DeterministicTutor (DeterministicTutor.kt:20-35) is a pure map over `input.parts`, so I see no live nondeterminism. That means the finding is a coverage gap, not a bug that exists now. Even so, the part of the scenario that compares `parts` and the canonical JSON has no test, so the gap stands. Minor severity is appropriate.",
+          "This finding is about missing test coverage. It does not show a defect that a user could actually hit, and the code gives no way for the claimed nondeterminism to happen.\n\n- **The tutor is deterministic.** `TutorTest.kt:64` covers `DeterministicTutor`. It returns `Feedback(nextHintIndex, revealedAnswers)` built from the ordered `ServedPart` list, so the same input always gives the same output.\n- **The mapping is deterministic.** `PracticeMapping.attempt` (`PracticeMapping.kt:128-153`) only applies `List.map` to lists that are already ordered: `outcome.parts` and `feedback.revealedAnswers`. It uses no `HashMap`/`HashSet`, no unordered collection, no time and no random value. The fixed values `xpAwarded=0`, `bonusXp=0`, `rankUp=null` and `completedMissionIds=emptyList()` are also deterministic.\n- **The serializer is deterministic.** The `RevealedAnswers` serializer (`RevealedAnswers.kt:25-43`) writes the held `RawAnswer.Text` as a string, or `RawAnswer.Keys` as an array in list order. The \"RevealedAnswers ordering\" problem the finding mentions has no mechanism behind it.\n- **Order comes from the parts list.** The order of `revealedAnswers` follows the task's parts list, and `TutorTest:57-60` already pins that order.\n- **The serialized feedback is already checked through the API.** `PracticeIT` tests it (lines 470, 503, 505, 643, 646), and `TutorSwapTest` covers the request path.\n\nNo user or attacker sequence could produce different feedback for the same input. At most this is a nice-to-have IT for strict spec-scenario traceability, not a reproducible problem."
+        ]
+      },
+      {
+        "title": "Undocumented 400 for non-UUID path ids on endpoints whose OpenAPI lists only 200/404 (or 200/204/404)",
+        "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+        "line": 49,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`@ExceptionHandler(MethodArgumentTypeMismatchException::class) fun typeMismatch(...) = invalid(request, listOf(FieldError(exception.name, \"not-uuid\")))` returns 400 for every child controller. contract/api/openapi.yaml declares no 400 for getMissionBriefing, getCurrentTask, startReplay, getMissionSummary, getTask, openNextHint or getChildImage (only 200/204/404/409). The instructions say the implementation must not use undocumented status codes.",
+        "suggestion": "Either map a malformed id to 404 NotFound, which matches \"a mission id that does not exist\", or add `400: BadRequest` to those operations in the docs-store OpenAPI and bump the contract pin.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "I couldn't find a defect here. The mechanism the finding describes is real, but the claim that it breaks the contract is wrong.\n\n**What the finding gets right.** `PracticeProblemAdvice.kt:49-53` does turn `MethodArgumentTypeMismatchException` into a 400 with `errors[0].field` set to the parameter name and the code `not-uuid`. It is also true that these per-operation response lists have no `400` entry: getMissionBriefing, getCurrentTask, startReplay, getMissionSummary, getTask, openNextHint and getChildImage.\n\n**Why that doesn't make it undocumented.** The contract defines this 400 once, as a global rule, instead of listing it on each operation. In `contract/api/openapi.yaml:39-41`, under the `Conventions:` heading, it says: \"Query and path parameters use their own name (`weeks`, `status`, `q`, `reportId`, `taskId`, …); a path id that is not a UUID is 400 before any lookup.\" The code matches this exactly: a 400, with the field named after the path parameter, raised before any lookup.\n\n**Other places that rely on the same rule:**\n- The implementation design for this slice already lists the case: `openspec/changes/implement-practice-flow-api/design.md:187` says \"`missionId`, `taskId` or `imageId` not a UUID | 400 | `errors[0].field` = that parameter\".\n- The spec store's `progress-stats/spec.md:459` repeats it (\"not a UUID SHALL be refused with 400 before any lookup\").\n- An earlier review raised the same complaint about getSource and getSourceFile. It was rejected because of this convention (\"Contract info Conventions: a path id that is not a UUID is 400 before any lookup, for every operation.\" — `openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/review-findings.json:195`).\n- `ContentProblemAdvice.kt:158` does the same thing for the content endpoints.\n\n**The suggested fix would break things.** Returning 404 for a malformed id would go against the explicit contract convention and against the agreed slice design. At most, the per-operation response lists could also mention the 400 for completeness. That is a docs tidy-up, not a correctness problem in this code.",
+          "I could not refute this finding: the 400 is easy to reproduce, though it is a contract-drift problem rather than a security one.\n\nHow it happens:\n- `PracticeProblemAdvice` is scoped to `ChildHqController` and `ChildPracticeController`.\n- It runs at highest precedence.\n- At line 49 it maps `MethodArgumentTypeMismatchException` to a 400 response with `errors=[{field:<param>, message:\"This must be a UUID.\"}]`.\n- The path params `MissionId`, `TaskId` and `ImageId` are `format: uuid` (openapi.yaml:1083-1086). The generated `*Api` interfaces bind them as `java.util.UUID`, so Spring throws that exception for any non-UUID segment. The framework does not turn it into a 404, because this handler catches it first.\n\nReproduction: any client can send `GET /api/child/missions/abc`, `/current-task`, `/summary`, `POST /replay`, `GET /tasks/{bad}`, `/hints`, or `GET /api/child/images/xyz` and get a 400 `application/problem+json`. I checked the contract with grep: getMissionBriefing, getCurrentTask, startReplay, getMissionSummary, getTask, openNextHint and getChildImage list only 200/204/404/409. None of them lists 400. Only submitAttempt and the profile operations list 400. So the status code is undocumented for those operations, as the finding says.\n\nThings that weaken it but do not refute it:\n- The `format: uuid` constraint arguably implies a 400 under general OpenAPI convention.\n- The content admin advice (`ContentProblemAdvice.kt:86`) uses the same pattern, so it is a project-wide convention, not a slice-7 slip.\n- Nothing leaks: no answer key, no driver internals, no 500. It only affects a client that builds malformed ids.\n\nSeverity: minor is about right. This is spec compliance with no security impact."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "Summary first-try count leaves out shared tasks that were solved first try in a different mission",
+        "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+        "line": 1630,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`firstTry = attempts.count { it.attemptNo == 1 && it.correct && it.missionId == mission.missionId }`. In the primary scope one task's state is shared by every mission that contains it (OQ-15), so it can be resolved under another mission. That task counts in `taskCount = mission.taskIds.size` and makes the mission COMPLETE, but the `missionId` filter drops it from `firstTryCount`. The summary then shows something like '3 of 5 first try' even though all 5 were solved first try.",
+        "suggestion": "Count from the task states in the scope instead of filtering attempts by missionId: `states(scope, mission.taskIds).count { it.value == TaskState.CORRECT_FIRST_TRY }`. If the filter is intended, state that in the spec and design doc.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding is refuted. The code does what it describes, but that behaviour is the specified one, not a bug. In `PracticeService.kt:243-244`, `firstTry` counts only attempts with `missionId == mission.missionId`, so a shared task resolved in another mission is left out. The contract spec requires exactly this. In `contract/openspec/specs/practice-flow/spec.md:571-575`, the scenario \"Shared task earns nothing on the summary\" sets up a 10-task mission where 9 tasks were correct on the first try in this mission and task T was already resolved in another mission. It then requires the screen to show \"9 na první pokus\". The design doc agrees: `openspec/changes/implement-practice-flow-api/design.md:114-115` defines `firstTryCount` as \"tasks resolved first try in that run through this mission\". The finding's own fallback (\"if the filter is intended, state that in the spec and design doc\") is therefore already met. Its suggested fix, counting `CORRECT_FIRST_TRY` states across the whole scope, would break that spec scenario (it would give 10 instead of 9). The finding also cites line 1630, but the code is at line 244.",
+          "The scenario can happen, but the behaviour is documented as intended, so it is not a defect. Evidence: V3__missions.sql:3 allows a task to be in several missions (OQ-15). Model.kt:26 shares the primary scope across those missions. In PracticeService.kt:243-244, a task solved first try under mission A makes mission B COMPLETE, yet the `missionId == mission.missionId` filter leaves it out of B's firstTryCount. However, openspec/changes/implement-practice-flow-api/design.md:114-115 defines it this way on purpose: \"`firstTryCount` = tasks resolved first try in that run through this mission\". It also marks the summary as a slice-7 placeholder that slice 8 replaces with the gamification rules. The finding itself says that if the filter is intended it should be stated in the design doc, and it already is. So the code matches its spec, and at most the finding is a product-level question about the slice-8 rules. Also, the cited line 1630 is wrong; the code is at line 244."
+        ]
+      },
+      {
+        "title": "Image read failure is not handled, so the child image endpoint can return a raw 500",
+        "file": "src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+        "line": 246,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`storage.open(image.storageKey)?.use { it.readAllBytes() }` handles a missing file (null → 404). It does not handle an IOException from the storage adapter while reading (truncated or unreadable file, permissions). That exception reaches `getChildImage` without a handler in PracticeProblemAdvice and becomes a generic 500. The whole image is also read into memory inside a read-only DB transaction.",
+        "suggestion": "Catch IOException in `image()`: log it without the key contents and return null (404), or map it to a 5xx RFC 7807 problem with a human message. You could also stream the resource outside the transaction.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The location is wrong. ServedContentService.kt has only 105 lines, and the cited code is at line 52, not line 246. The narrow mechanism is real: in `image()`, `storage.open(key)?.use { it.readAllBytes() }` does not catch IOException. Neither does `FilesystemFileStorage.open` (`Files.newInputStream`). PracticeProblemAdvice has no handler for it, so a read failure would end in a 500.\n\nThat is not a correctness defect, though:\n1. User input cannot cause it. `imageId` is only used as a lookup key. The storage key comes from the database, and `locate()` enforces the storage root. Missing images and images that cannot be served are already turned into null, then 404. The rule in AGENTS.md is \"No **user input** may produce a raw 500\". An I/O fault on the server's own disk is a real server error, and 5xx is the right class.\n2. application.yaml enables `spring.mvc.problemdetails` and sets `include-stacktrace: never`. So the response is Spring's standard error/problem body, with no driver internals or stack trace leaked. The suggested fix of returning 404 would hide a storage fault behind a misleading \"not found\".\n3. Admin image and source serving (`TaskService` line 221, `SourceService.file`) handle storage I/O the same way. This is consistent design, not a slip specific to slice 7.\n\nThe point about reading the image into memory inside a read-only transaction is about performance or design, not correctness. Task images are small uploads with an enforced size limit. Net: the location is wrong, no user input reaches the path, and a 500 on a disk fault is acceptable behavior, so the claimed correctness bug does not hold.",
+          "The cited line is wrong: ServedContentService.kt is 105 lines long, and the code in question is at line 52. The code itself matches the finding (`storage.open(image.storageKey)?.use { it.readAllBytes() } ?: return null`, and only a handful of custom exception types are handled). Still, the claimed problem cannot be triggered by a real user or attacker:\n\n1. The storage adapter (`FilesystemFileStorage.open`, line 39) does `locate(key).takeIf(Files::isRegularFile)?.let(Files::newInputStream)`, so a missing file returns null and the endpoint answers 404. The storage key comes from the database row (`image.storageKey`, written at upload time). The child sends only an image UUID, which first has to resolve to a published, servable task in a published mission. A child or attacker has no input that can change which file is read or make the read fail.\n2. A truncated file is not an IOException. `readAllBytes` returns whatever bytes are there. Only an infrastructure fault can make the read throw: wrong permissions on the server's own storage dir, a disk error, or a file deleted between the check and the open. These are operator/server-side failures, not something a request can cause.\n3. The project rule says \"No user input may produce a raw 500\". This 500 comes from a real server-side I/O fault, not from user input, and a 5xx is the semantically right answer there. The suggested fix of mapping it to 404 would hide storage corruption.\n4. The same pattern already exists in the admin paths (`SourceService.file`, `TaskService` image open). This is a consistent design choice in the codebase, not a slip.\n5. Reading the whole image into memory inside a read-only transaction is a minor performance/style point. Image size is capped at upload, so it is not a correctness or exploitability problem.\n\nThere is no reachable trigger from a child or attacker request. It is at most a hardening nit for operator-side storage failures."
+        ]
+      },
+      {
+        "title": "HQ topics are listed in mission-list order instead of a defined order",
+        "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+        "line": 1463,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`missions.groupBy { it.topicId }.map { ... }` keeps topics in the order their first mission appears in `missions.list()`. Missions inside a topic are sorted by position, but topics are never sorted. Topic order on HQ therefore depends on how the store happens to return missions, and can change after edits.",
+        "suggestion": "Sort topics explicitly (topic position or name, whichever the practice-flow spec defines) before mapping them to `TopicView`.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding is refuted. Topic order on HQ is already well defined:\n\n1. `ServedContentService.missions()` (ServedContentService.kt:34-36) maps over `missions.list()` with `mapNotNull`, so it keeps the order the store returns.\n2. `JdbcMissionStore.list()` (JdbcMissionStore.kt:22) runs `ORDER BY t.grade, t.position, m.position`. Missions therefore arrive grouped by topic, in topic (grade, position) order. That is the same curriculum order `JdbcTopicStore.all()` uses (`ORDER BY grade, position`). `withTasks` also keeps the order, because it does `missions.map` over the sorted list.\n3. Kotlin's `groupBy` returns a `LinkedHashMap`, so each key stays where it first appeared. Topics on HQ come out ordered by grade, then topic position.\n\nSo the order does not depend on \"how the store happens to return missions\". The store sets it explicitly in SQL. Editing a mission doesn't reorder topics; only changing a topic's grade or position does, and that is intended. The only real point is that the ordering is implicit, since it relies on a sort in another module's adapter. That is a maintainability remark, not a correctness bug. Even the re-sort by position inside each topic (PracticeService.kt:82) is redundant, because the SQL already orders by `m.position`.",
+          "The topic order is already well defined. `hq()` (PracticeService.kt:49-88; the finding's line 1463 doesn't exist) gets missions from `served.missions()`. `ServedContentService.missions()` (ServedContentService.kt:34-37) is `missions.list().mapNotNull { ... }`, which only filters and keeps the order. `JdbcMissionStore.list()` (JdbcMissionStore.kt:22) runs `ORDER BY t.grade, t.position, m.position`, so missions are sorted by topic grade, then topic position, then mission position. That is the same order `JdbcTopicStore.all()` uses (`ORDER BY grade, position`). `withTasks` maps over the ordered list and also keeps the order. Kotlin's `groupBy` returns a LinkedHashMap, which keeps keys in the order they first appear. So the topics on HQ come out in a fixed (grade, topic position) order. They don't depend on \"how the store happens to return missions\", and editing a mission can't reorder them unless the topic's own grade or position changes, which is the intended behaviour. The only weakness is that the ordering is implicit: it relies on the adapter's SQL instead of an explicit sort in the service. That is a maintainability note, not a bug any user can hit."
+        ]
+      },
+      {
+        "title": "ServedContent.missions() runs one topic lookup and per-task lookups for every mission on each HQ load",
+        "file": "src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+        "line": 278,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`served(mission, …)` calls `topics.find(mission.content.topicId)` once per mission. `mission(missionId)` passes `::servable`, which calls `tasks.find(taskId)` for each task. Every child endpoint goes through `mission()`, so each request does N task loads, including images, before running further `store.attempts` queries. `outcome()` re-reads every task's attempts again through `states()`.",
+        "suggestion": "Batch these: load the topics once per `missions()` call, and check servable tasks with a single filtered query, as `servableIds()` already does. That's fine for MVP data sizes, but worth doing before slice 8 adds XP aggregation.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding is refuted on correctness grounds. The file has only 105 lines, so the cited line 278 does not exist, and the title gets the mechanism partly wrong. The HQ load path, `missions()` at lines 34-37, does not run per-task lookups. It builds `servableIds()` once with a single filtered `tasks.list(...)` call and passes `servable::contains` to `served`. The only per-mission query left there is `topics.find(mission.content.topicId)` at line 77, a plain N+1 over topics. `mission(missionId)` at line 39 does call `tasks.find` for each task id through `::servable`. That covers a single mission, though, not every mission on each HQ load, and it re-checks status and modality on purpose (see the class KDoc). The claim that `outcome()` re-reads attempts through `states()` concerns code outside this file. Whatever the query counts, every path returns the right data: no wrong result, no leaked answer key, no draft or graphic task served, no 500. This is at most a minor performance observation, and the reviewer says it is fine for MVP data sizes. It is not a correctness defect.",
+          "I'm refuting this finding: its main claim is wrong, its location is wrong, and nothing in it can break for a real user.\n\n1. **Wrong location.** `ServedContentService.kt` has only 105 lines, so line 278 does not exist. The `outcome()` and `states()` evidence actually lives in `PracticeService.kt` (lines 264 and 296), not in the cited file.\n\n2. **The title is wrong about how the HQ list loads.** `missions()` (lines 34-37) does not check tasks one at a time. It calls `servableIds()` (lines 56-62) once. That is a single filtered `tasks.list(...)` query, and each mission is then checked with the in-memory `servable::contains`. The suggestion to \"use a single filtered query as servableIds() already does\" describes what `missions()` already does. The one-lookup-per-task path (`::servable` → `tasks.find`) is used only by `mission(missionId)`, for a single mission. That costs one lookup per task in that mission, not \"per-task lookups for every mission on each HQ load\".\n\n3. **What is left is minor.** `missions()` does run one `topics.find` per published, non-empty mission (line 77), and `mission()` does one `tasks.find` per task. This is a small N+1 query pattern, not a correctness bug. The finding itself admits \"That's fine for MVP data sizes\". This is a single-child tutoring app with a small set of missions. No user or attacker input changes how many queries run: the content is admin-authored, and child endpoints can't create missions or tasks. Results stay the same and nothing is denied. At worst a few extra indexed lookups run inside one read-only transaction.\n\n4. **Wrong category.** It is filed under the \"correctness\" dimension, but no behaviour is wrong. At most it would be a speculative performance note for slice 8.\n\nWithin this scope there is nothing that can be exploited or reproduced as a defect."
+        ]
+      },
+      {
+        "title": "Unauthenticated, unthrottled child write endpoints let any LAN device burn attempts, force reveals and flood problem reports permanently",
+        "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+        "line": 192,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "The shared chain is `authorize(anyRequest, permitAll)` with CSRF off (SecurityConfiguration.kt:64-66), and the five child writes (attempt, hint, report, replay, ackRankUp) have no rate limit or per-device bound. Any device on the home network can read mission/task UUIDs from `GET /api/child/hq`, then submit two wrong attempts per task to turn every task REVEALED, open every hint, and start replay runs. Because the attempt log, opened hints and runs are append-only (FR-42, `V4__practice.sql`), the admin cannot undo this. The child's progress and stats are corrupted for good. `report()` inserts one `problem_report` row (note up to 1000 code points) per call with no cap, so a loop can grow the table and the admin report queue without limit. Every call also takes the global `pg_advisory_xact_lock` (JdbcPracticeStore.kt:18-24), so a flood blocks the real child too. Login-free child endpoints are by design (NFR-1), so this is limited to the LAN, but the scope asked about abuse resistance.",
+        "suggestion": "Add a simple in-process rate limit on `/api/child/**` POSTs (for example a token bucket keyed by remote address) and a cap on open problem reports per task (for example refuse with 409 once N OPEN reports exist for a task in a short window). Record the decision in design.md. Optionally give the admin a way to see where attempts came from, without logging any payload.",
+        "dimension": "security",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The facts in the finding are accurate. `SecurityConfiguration.kt:64-66` permits any request with CSRF off. `report()` (PracticeService.kt:192-203) inserts one row per call with no cap. The other child writes have no throttle either, and each takes the store lock. But none of this is a correctness defect. The code does what the spec asks:\n\n1. Login-free child endpoints are required by NFR-1, and the finding admits this. Append-only attempts, hints and runs are also required (FR-31, FR-42). So \"the admin cannot undo it\" is the intended behaviour, not a bug. Anyone with access to the child UI, including the child, can already submit wrong answers and open hints. A script on the network gains nothing the UI doesn't already allow.\n2. The deployment model limits exposure. The platform-foundation spec (\"Loopback or LAN binding only\") publishes only the frontend, defaults to binding `127.0.0.1`, and refuses non-RFC1918 addresses. The backend port is never published. LAN exposure is an opt-in home-network setup, and other devices on that network are trusted by the product's threat model. A hostile device on the family LAN is outside that model.\n3. Through the correctness lens, nothing is actually broken. No wrong grade, no answer-key leak (FR-27), no raw 500, no lost attempt. The only real point is that problem reports can grow without bound. That's a resource-hygiene hardening idea for a single-family local app, not a flaw in the cited code.\n\nWhat the finding proposes (a token bucket, a report cap, recording origin) is new product scope. It would need a docs-store spec change first (per AGENTS.md), so it doesn't show that this implementation is wrong. At most it's an optional hardening note. As a defect claim against PracticeService.kt:192, it's refuted.",
+          "The mechanism is real: SecurityConfiguration.kt:64-66 allows every request with CSRF off, and PracticeService.report() (line 192) inserts a row on every call with no cap. But the \"attacker\" it describes is simply someone who can use the product as designed, inside the threat model the spec accepts:\n- FR-24 says the child has no login, by design.\n- NFR-2 says the stack binds to localhost/LAN only.\n- NFR-15 and OQ-23 explicitly turn down even an admin lockout because the network is \"LAN only\". The spec chose to trust devices on the home network.\n\nAnyone on that LAN can already open the child UI in a browser and do exactly these actions: burn attempts, open hints, start replays, file reports. The raw API gives them no extra privilege, only speed. Remote attackers can't reach it either:\n- The DNS-rebinding guard (StrictHttpFirewall allowed-hosts, SecurityConfiguration.kt:47-51) stops a malicious website from scripting the API from the child's browser.\n- Nothing is exposed to the internet (NFR-2).\n\nSo there is no attacker outside the accepted trust boundary. The flood of report rows and the advisory-lock contention need a hostile device already on a trusted home network, which is a deliberate product decision, not a bug at the cited line. At most this is a hardening suggestion or a design-note item, not a confirmed exploitable defect."
+        ]
+      },
+      {
+        "title": "400 problem responses echo attacker-chosen JSON keys back in `errors[].field`",
+        "file": "src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+        "line": 88,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "`Grading.shapeErrors` returns `FieldError(\"answers.$key\", \"unknown-part\")` for any submitted key that is not a part key, and `PracticeReaders.answers` builds `val field = \"answers.$key\"` (PracticeReaders.kt:28) for shape and length errors. `PracticeProblemAdvice.invalid` copies `it.field` into the response verbatim. A client can therefore put any string of up to about 16 KB, such as markup or a long text, into the problem JSON. That contradicts the file's own rule \"never quote a submitted value (NFR-3)\". The response is application/problem+json, so there is no direct XSS. The risk is a frontend that renders `field` as HTML, or a future log of problem bodies that captures child-typed content.",
+        "suggestion": "Report only part keys the task actually defines. For unknown keys, emit one generic error with field `answers` and code `unknown-part`, or truncate and sanitise the key to the contract's part-key pattern before echoing it. Add a test that a submitted key with markup or over 64 chars does not appear in the response.",
+        "dimension": "security",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The code does what the finding describes. Rules.kt:88 builds `FieldError(\"answers.$key\", \"unknown-part\")`, PracticeReaders.kt:28 builds `\"answers.$key\"`, and PracticeProblemAdvice.kt:69 copies `it.field` into the response unchanged. Calling this a defect is still wrong, for four reasons.\n\n1. The contract requires echoing the key. In contract/openspec/specs/practice-flow/spec.md:318-322, the scenario \"Submission naming an unknown part\" says the API answers 400 \"with a problem+json body naming `c`\", the unknown part key. contract/api/openapi.yaml:42 sets the field path convention to `answers.<partKey>`. The finding's main fix, a single generic `answers` field, would break that scenario.\n\n2. A key is a field name, not a submitted value. The advice's rule \"never quote a submitted value (NFR-3)\" is about answer content. The code follows it: the advice never returns the text of an answer. Naming the offending property path is normal RFC 7807 validation behaviour.\n\n3. A child never types a key. The frontend sends the part keys the task defines. Only a hand-crafted request can put arbitrary text in a key, and that text goes back only to the client that sent it. That is not PII leaking from the child's data.\n\n4. The remaining risks are hypothetical. The response is application/problem+json. Problems only appear if a future frontend renders `field` as HTML or someone adds logging of problem bodies, and neither exists in the cited code. The body is capped at 16 KB (413 handler).\n\nThe mechanism is real, but it is the specified behaviour, not a correctness bug. At most it is a hardening idea, such as limiting echoed keys to the part-key pattern, and that belongs in the contract first.",
+          "The echo itself is real. `Rules.kt:88` and `PracticeReaders.kt:28` build `\"answers.$key\"` from the submitted JSON property name, and `PracticeProblemAdvice.invalid` (lines 65-69) copies `it.field` into the 400 `errors[].field` without changing it. So a client sending `{\"answers\":{\"<b>x</b>\":\"1\"}}` gets that key back.\n\nThe claimed harm cannot happen for a real user or attacker:\n\n1. **It only reflects to the sender.** The key comes back in the response to the same authenticated request that sent it. No other user, session or stored record ever receives it, so the attacker can only target themselves.\n2. **No cross-site path.** The body is a JSON request answered with `application/problem+json`. A cross-origin page cannot read that response, and the JSON content type rules out reflected XSS by direct navigation.\n3. **The NFR-3 rule isn't actually broken.** NFR-3 is about the child's PII ending up in code, fixtures, logs or screenshots. Sending the child's own input back to the child's own client discloses nothing. The \"never quote a submitted value\" comment refers to catalog messages, and those are indeed never quoted.\n4. **No logging path exists.** Nothing in `src/main` logs problem bodies. The only application logger is in `content/Transactions.kt`, and it logs an exception class name. `RequestContentLogGuard` actively caps the request-content loggers at INFO/WARN. The \"future log\" risk is hypothetical.\n5. **No HTML rendering of `field` is shown.** The finding offers no frontend code that renders `field` as HTML. Even if it did, the injected markup would only reach the attacker's own screen.\n6. **Size is bounded.** The 16 KB body cap (413 via `PracticeBodyTooLarge`) limits the reflected size, and that is no worse than the request itself.\n\nThe finding admits there is \"no direct XSS\" and rests on speculative future code. At most this is a hygiene nit (contract part-key pattern / generic `unknown-part`), not an exploitable security issue."
+        ]
+      },
+      {
+        "title": "Checklist areas reviewed and found clean (informational, no action)",
+        "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/ChildControllers.kt",
+        "line": 1,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "Non-findings, listed so nothing is assumed by silence. (1) AuthZ/IDOR: every child route goes through `PracticeService.mission()` and `task()`. These require a PUBLISHED mission and a task in that mission's served list. `image()` resolves the owner task and requires PUBLISHED, TEXT and membership in a published mission (ServedContentService.kt:42-48). Child endpoints write only practice tables, never content. Answer keys: `ServedPart.spec` is never mapped into `TaskView`/`PartView`. `revealedAnswers` comes only from DeterministicTutor when the state is REVEALED. Format tips are built so they never fall in the accepted region (FormatTips.kt). The PracticeBodyAdvice placeholder binding prevents mass assignment. Single-tenant app, so there is no tenant scoping to check. (2) Auth/session: no change to admin auth; the ContentBodyAdvice narrowing still covers every content controller. (3) Injection: all new SQL in JdbcPracticeStore and JdbcTaskStore.imageOwner uses bound parameters; JSONB uses `?::jsonb` with a serialized tree. Images are served with an allowlisted PNG/JPEG media type and the default Spring Security nosniff header. The 16 KB body cap is enforced before parsing. No CSV/HTML rendering on the server. (4) Exposure: compose and CORS are not changed in this diff, and the Host firewall still blocks DNS rebinding. (5) Privacy: the display name is read through a function (not a dumped property). Spring JDBC and Hibernate ORM bind loggers are now capped at INFO. No PII or workbook content in the new migration or messages. (6) Secrets: none added. (7) Dependencies: pom.xml and package files are unchanged in d1843b0..HEAD, so there are no new advisories to assess for this slice. A full `mvn dependency-check` was not run.",
+        "suggestion": "None. Keep these properties covered by the existing PracticeIT and PracticeLogCaptureIT tests.",
+        "dimension": "security",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "This finding reports no defect. It lists areas that were reviewed and found clean, says no action is needed and suggests nothing, so there is no faulty mechanism to confirm. The cited code backs up its clean claims. ChildControllers.kt sends every child route through PracticeService. In PracticeService.kt, `mission()` (line 248) requires `served.mission`, which returns null unless the mission is PUBLISHED. `task()` (lines 250-256) requires the task to be in `mission.taskIds` and to be served. In ServedContentService.kt, `image()` (lines 48-54) resolves the owner task, requires PUBLISHED and TEXT, and requires membership in a published mission. These match the lines the finding cites (42-48 is close). Because nothing here can be wrong, it should not count as a minor-severity finding. Refuted as a non-actionable informational entry.",
+          "This \"finding\" doesn't claim any defect. It is a list of areas the reviewer checked and found clean, and it asks for no action. Seen as a question of whether a real user or attacker could trigger it, there is nothing to trigger: no attack path, no input and no observable failure is described.\n\nI spot-checked the riskiest claim, that answer keys don't leak. `PracticeMapping.kt:110` reads only `part.spec.type`, never `spec.accepted`. Within the practice module, `accepted` is used only in `DeterministicTutor.kt:31`, which is the reveal path. That matches the reviewer's \"clean\" claims.\n\nSo there is no confirmed problem, and it should not be counted as a minor-severity defect. I'm marking it refuted, meaning not a real issue, and it should be dropped from the defect list."
+        ]
+      },
+      {
+        "title": "Coverage summary: 47 backend scenarios: 41 implemented, 4 partial, 0 missing, 2 contradicted (both minor ordering/validation edges). XP, rank and mission-summary scenarios are deferred to slice 8 as placeholders, as the proposal declares.",
+        "file": "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md",
+        "line": 1,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "All 7 change-delta scenarios are implemented and tested (PracticeIT, PracticeRulesTest, TutorTest, TutorSwapTest). Of the 40 or so backend-relevant scenarios in contract/openspec/specs/practice-flow/spec.md, 4 are only partly covered: NFR-5 RTT, TC-6 network-denied, replay of an in-progress mission, and same-feedback across two fresh runs. 2 edge cases contradict the spec: 400 is returned before the 404 check, and the note limit is checked after trimming. Every FR the plan assigns to backend for practice-flow (FR-22, 24–31, 42, 44, plus FR-56, NFR-1 and NFR-5) has an @trace'd test.",
+        "suggestion": "No action on its own; see the individual findings.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "This is a coverage roll-up, not a defect. It names no faulty mechanism at the cited location (spec.md:1, a spec file, not code), and its own suggestion is \"No action on its own; see the individual findings.\" The two \"contradicted\" edge cases it mentions (400 returned before the 404 check, and the note-length check running after trimming) are separate findings and are not shown here. For the note case, I checked the code at src/main/kotlin/cz/doucko/practice/domain/Rules.kt:174-209. The trim-then-measure behaviour is intentional and documented (\"a note is at most 1000 code points after trimming\"), so this summary gives no evidence of a correctness bug. The rest are counts of scenarios with full, partial or missing tests (NFR-5 round-trip time, TC-6 with network access denied), which are about test coverage, not wrong behaviour. With no concrete mechanism I could confirm, I'm defaulting to refuted.",
+          "This \"finding\" is a coverage summary, not a defect. It points at line 1 of the change-delta spec file and does not describe any mechanism that a real user or attacker could trigger. Its own suggestion is \"No action on its own; see the individual findings\", and its evidence says all 7 change-delta scenarios are implemented and tested. The two \"contradicted\" edge cases (400 returned before the 404 check, and the note limit checked after trimming) are only named here. Each one would need to stand or fall as its own finding, with its own code location and reproduction. This summary gives no exploitable or reproducible failure path, so there is nothing here to confirm. The \"4 partial\" items (NFR-5 RTT, TC-6 network-denied, replay of an in-progress mission, same feedback across two fresh runs) are gaps in test evidence, not runtime defects. Following the default, this is refuted as a standalone finding."
+        ]
+      },
+      {
+        "title": "Report note limit is checked after trimming, so notes over 1000 code points with surrounding whitespace are accepted",
+        "file": "src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+        "line": 207,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "The spec says: \"The API SHALL refuse with HTTP 400 … a report note longer than 1000 code points (the `ReportRequest.note` limit in `api/openapi.yaml`)\". The code does `is JsonText.Value -> note.text.trim().ifEmpty { null }`, then `if (text != null && text.codePointCount(...) > NOTE_MAX)`. A 1001-code-point note padded with whitespace, or 1000 characters plus a trailing space, passes, which is looser than the OpenAPI maxLength. The change delta says \"the trimmed note\" for storage, but not for validation.",
+        "suggestion": "Check the length on the raw note (matching the OpenAPI maxLength) and store the trimmed note. Alternatively, amend the spec/OpenAPI to say the limit applies after trimming. Add a test with a 1001-character note that has trailing whitespace.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "I read the code, and it does what the finding says. `Rules.kt:207` trims the note, and line 209 then checks the trimmed text against NOTE_MAX (1000) code points. The finding is still wrong to call this a bug, because the contract asks for exactly this behaviour.\n\nThe spec says the limit is \"the `ReportRequest.note` limit in `api/openapi.yaml`\". That points at the pinned contract, `contract/api/openapi.yaml:1483-1486`, which defines `note` as follows:\n- `type: string`\n- `x-maxCodePoints: 1000`\n- description: \"Required (non-blank after trimming) when reason is OTHER; otherwise optional. At most 1000 code points after trimming (server-enforced); over that is 400 on `note`.\"\n\nThe finding's main premise is wrong. There is no standard `maxLength` in the OpenAPI. The limit is a custom `x-maxCodePoints` extension, and its description says outright that it applies after trimming. So the generated code does no raw-length validation for the trimmed check to be \"looser than\".\n\nChecking the trimmed note is therefore what the contract requires, not a deviation from it. Both suggested fixes would be wrong:\n- Checking the raw length would break the contract.\n- Amending the spec isn't needed, because the OpenAPI already says \"after trimming\".\n\nThe required-when-OTHER rule (line 210) also uses the trimmed text, which matches the same description.",
+          "I'm refuting this finding: the code at the cited location does what the pinned contract says. The finding assumes the limit is an OpenAPI `maxLength` applied to the raw value, but there isn't one.\n\n1. **`contract/api/openapi.yaml:1483-1486`** — `ReportRequest.note` has no `maxLength`. It declares `x-maxCodePoints: 1000`, and its description says: \"At most 1000 code points after trimming (server-enforced); over that is 400 on `note`.\"\n2. **The global \"Text limits\" rule (`openapi.yaml:52-57`)** says limits \"count Unicode code points after trimming leading and trailing whitespace\". They are deliberately published as `x-maxCodePoints` rather than schema `maxLength`, so that generated validators cannot refuse a value the spec accepts.\n3. **`Rules.kt:207-209`** trims first, then checks `codePointCount > NOTE_MAX`. That matches the contract exactly.\n\nA note of 1000 characters plus a trailing space is meant to be accepted under the contract. Rejecting it, as the finding suggests, would itself break the spec. The behaviour the finding describes does happen, but it is the specified behaviour, not a defect, and no user or attacker can use it to get past the limit. The extra whitespace is trimmed and never stored."
+        ]
+      },
+      {
+        "title": "Locked parts are stored with raw = null on attempt 2, while the delta requires raw input verbatim per part",
+        "file": "src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+        "line": 106,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The change delta says: \"Each graded attempt SHALL be stored … with the raw input verbatim and the normalized input per part\". The code has `records += PartRecord(part.key, null, lockedPart.normalized, Verdict.CORRECT, locked = true)`, so whatever the child sent for a locked part (e.g. `13` in the 'Locked part resent' scenario) is dropped from the attempt log. The store spec says the value is \"ignored and not re-graded\" but says nothing about not logging it, so this is undocumented drift in the attempt-log contents (progress-stats).",
+        "suggestion": "Either store the sent raw value (or explicitly mark it absent) for locked parts, or amend the delta/progress-stats 'Attempt log contents' to say locked parts carry no raw input on attempt 2.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The code is as the finding quotes it: `Rules.kt:106` stores `raw = null` for a locked part, and a value the child sends for that part is not recorded. But this is a deliberate, documented choice, not undocumented drift. The change's own `design.md:171-173` defines the attempt `parts` JSONB as an array of `PartRecord` with \"`raw` string | array | null for a locked part\". So the change does document that locked parts carry no raw input on attempt 2.\n\nThe spec delta does not contradict this either:\n- It says the locked part's value is \"ignored and not re-graded\".\n- The `Grading.grade` KDoc (lines 92-95) says the same: \"not re-graded, whatever was sent for it\".\n- The \"raw input verbatim … per part\" rule covers input that was actually graded in that attempt. A locked part takes no input on attempt 2, because its verdict and normalized value are carried over from attempt 1.\n- Attempt 1's record still keeps that part's original raw input verbatim, so no input that was graded is ever lost.\n- The only \"verbatim\" scenario (spec.md:52-56) is an attempt-1 entry, and the code satisfies it (line 114 stores the raw value).\n\nThe mechanism matches the documented design. The claim that the attempt-log contents changed without documentation is false. At most, one could argue the spec wording should repeat what design.md already says, which is a docs nit and not a correctness defect.",
+          "The code path itself is real: `Rules.kt:106` stores `raw = null` for a part that was locked on attempt 1, and any value the child sends for that part on attempt 2 (e.g. `13`) is dropped. That part checks out.\n\nThe finding's actual claim, though, is that this is \"undocumented drift\", and that is false. The change's own design explicitly documents the behaviour:\n- `openspec/changes/implement-practice-flow-api/design.md:172` defines the stored PartRecord as \"`raw` string | array | null for a locked\" part.\n- The migration `V4__practice.sql:25` says the same (\"raw … null when locked\").\n- The domain model KDoc (`Model.kt:44`: \"the raw input verbatim (null for a part locked as correct on…\") and `JdbcPracticeStore.kt:24` also document it.\n\nThis also matches the spec's semantics. The delta's state machine says locked parts are not re-graded, and the store spec says the value sent for them is \"ignored\". An ignored value is not graded input for that attempt, so keeping the locked part's normalized value and verdict with no raw value is consistent. Storing the ignored value would arguably be the more surprising choice. The \"Attempt log entry\" scenario only covers attempt 1, where every part keeps its raw value verbatim (line 114).\n\nFrom a reproducibility/exploitability view there is no user-facing or attacker-facing impact. No answer key leaks, no attempt is consumed wrongly, and no verdict or XP is affected. The only effect is that a value the spec says to ignore is not logged, which is an intentional, documented design choice rather than a defect."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/implement-practice-flow-api/review-findings.json"
+  }
+}

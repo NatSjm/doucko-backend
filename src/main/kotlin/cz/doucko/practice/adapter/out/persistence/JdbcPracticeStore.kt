@@ -20,7 +20,7 @@ import java.sql.Types
 import java.util.UUID
 
 /**
- * [PracticeStore] on Postgres (`V4__practice.sql`). Insert-only (FR-42). Attempt parts are one JSONB
+ * [PracticeStore] on Postgres (`V4__practice.sql`). Insert-only (FR-42), except that a replay run is marked finished once. Attempt parts are one JSONB
  * array: `key`, `raw` (string, array of option keys, or null for a locked part), `normalized`, `verdict`,
  * `locked`. Values are always bound parameters; nothing here logs (NFR-3).
  */
@@ -119,13 +119,14 @@ class JdbcPracticeStore(
 
     override fun runs(missionId: UUID): List<RunRecord> =
         jdbc
-            .sql("SELECT id, mission_id, started_at FROM practice_run WHERE mission_id = ? ORDER BY started_at, id")
+            .sql("SELECT id, mission_id, started_at, finished_at FROM practice_run WHERE mission_id = ? ORDER BY started_at, id")
             .param(missionId)
             .query { rs, _ ->
                 RunRecord(
                     rs.getObject("id", UUID::class.java),
                     rs.getObject("mission_id", UUID::class.java),
                     rs.getTimestamp("started_at").toInstant(),
+                    rs.getTimestamp("finished_at")?.toInstant(),
                 )
             }.list()
 
@@ -133,6 +134,16 @@ class JdbcPracticeStore(
         jdbc
             .sql("INSERT INTO practice_run (id, mission_id, started_at) VALUES (?, ?, ?)")
             .params(run.id, run.missionId, Timestamp.from(run.startedAt))
+            .update()
+    }
+
+    override fun finishRun(
+        runId: UUID,
+        at: java.time.Instant,
+    ) {
+        jdbc
+            .sql("UPDATE practice_run SET finished_at = ? WHERE id = ? AND finished_at IS NULL")
+            .params(Timestamp.from(at), runId)
             .update()
     }
 

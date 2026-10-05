@@ -38,11 +38,11 @@ Result: PASS, 11 warning(s)
 | FR-24 | yes | yes | backend, frontend | 2 | - |
 | FR-25 | yes | yes | backend, frontend | 8 | - |
 | FR-26 | yes | yes | backend, frontend | 6 | - |
-| FR-27 | yes | yes | backend, frontend | 8 | - |
-| FR-28 | yes | yes | backend, frontend | 2 | - |
+| FR-27 | yes | yes | backend, frontend | 9 | - |
+| FR-28 | yes | yes | backend, frontend | 3 | - |
 | FR-29 | yes | yes | backend, frontend | 2 | - |
-| FR-30 | yes | yes | backend, frontend | 3 | - |
-| FR-31 | yes | yes | backend, frontend | 2 | - |
+| FR-30 | yes | yes | backend, frontend | 4 | - |
+| FR-31 | yes | yes | backend, frontend | 3 | - |
 | FR-32 | yes | yes | backend, frontend | - | - |
 | FR-33 | yes | yes | backend, frontend | - | - |
 | FR-34 | yes | yes | backend | - | - |
@@ -56,7 +56,7 @@ Result: PASS, 11 warning(s)
 | FR-41 | yes | yes | backend, frontend | - | - |
 | FR-42 | yes | yes | backend | 1 | - |
 | FR-43 | yes | yes | backend | 52 | - |
-| FR-44 | yes | yes | backend | 8 | - |
+| FR-44 | yes | yes | backend | 10 | - |
 
 ## Other MVP requirements (NFR / TC / BC)
 

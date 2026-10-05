@@ -115,7 +115,12 @@ internal object PracticeMapping {
                                 .ifEmpty { null },
                     )
                 },
-            hints = HintState(total = task.hints.size, opened = (1..screen.hintsOpened).map { hint(task, it, locale) }),
+            // Hints opened before an admin removed some stay counted in the log; only existing ones are shown.
+            hints =
+                HintState(
+                    total = task.hints.size,
+                    opened = (1..minOf(screen.hintsOpened, task.hints.size)).map { hint(task, it, locale) },
+                ),
             maxAttempts = TaskView.MaxAttempts._2,
             attemptsUsed = screen.attemptsUsed,
             state = TaskState.forValue(screen.state.name),

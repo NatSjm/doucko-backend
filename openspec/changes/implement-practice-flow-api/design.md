@@ -55,8 +55,11 @@ Non-goals (not delivered in this change):
    mission that contains it, skipped by `getCurrentTask`, and a further
    attempt through any of those missions is 409. A replay run (`practice_run`
    row) is its own scope with fresh attempts and hints. The *current run* of
-   a mission is its latest replay run while that run still has an unresolved
-   task, otherwise the primary scope.
+   a mission is its latest replay run while that run is not finished and still
+   has an unresolved task, otherwise the primary scope. A replay run is marked
+   finished (`finished_at`) by the attempt that resolves its last task, so a
+   task the admin adds to the mission later belongs to the primary scope
+   (review F02).
 2. **Task state machine** (per task and scope, derived from the stored
    attempts, never stored itself):
 
@@ -73,8 +76,8 @@ Non-goals (not delivered in this change):
    `locked: true`, with their attempt-1 normalized value. A part that is not
    locked and has no answer in the body is graded as empty input, i.e.
    `UNPARSEABLE` (the answer tester's rule). Order of checks for
-   `submitAttempt`: path ids (400) → served mission and task in it (404) →
-   body shape (400) → task already resolved in the current run (409) → any
+   `submitAttempt`: path ids (400) → body size (413) and one JSON object
+   (400) → served mission and task in it (404) → body shape (400) → task already resolved in the current run (409) → any
    unreadable non-locked part (200 `UNPARSEABLE`, nothing stored) → graded and
    stored (200 `GRADED`).
 3. **One practice lock.** Every practice write takes
@@ -88,7 +91,10 @@ Non-goals (not delivered in this change):
    task is `REVEALED`, `revealedAnswers` (per part the first accepted answer as
    entered; for `CHOICE_*` the accepted option keys). No ids or timestamps.
    An ArchUnit test proves `Feedback` is built only by `TutorPort`
-   implementations and that there is exactly one.
+   implementations and that there is exactly one. `PracticeIT` runs with
+   outbound network denied (`DenyOutboundNetwork`: a default `ProxySelector`
+   that refuses every non-local target the JDK asks it about) and fails on any
+   refused connection (TC-6, review F04).
 5. **Request bodies are read by a practice body advice.** The generated
    `AttemptRequestAnswersValue` is a sealed interface Jackson cannot build,
    and the contract wants code-point limits and `answers.<key>` paths. Like
@@ -166,7 +172,7 @@ Non-goals (not delivered in this change):
 
 ## Data model (`V4__practice.sql`)
 
-- `practice_run(id uuid pk, mission_id uuid fk mission on delete cascade, started_at)` — replay runs only.
+- `practice_run(id uuid pk, mission_id uuid fk mission on delete cascade, started_at, finished_at null)` — replay runs only; `finished_at` is set once, when the run's last task is resolved.
 - `attempt(id uuid pk, task_id fk task on delete restrict, mission_id uuid, scope uuid, replay boolean, attempt_no 1..2, hints_used >= 0, correct boolean, parts jsonb, created_at)`,
   unique `(task_id, scope, attempt_no)`, index `(scope, task_id)`. `parts` is a
   JSON array of `PartRecord` (`key`, `raw` string | array | null for a locked
@@ -181,13 +187,17 @@ Non-goals (not delivered in this change):
 
 All child refusals are `application/problem+json` with title and detail from
 `messages.properties` (NFR-9), never quoting a submitted value (NFR-3).
+Order: a non-UUID path id (400, contract Conventions) and a body over 16 KB
+(413) or not one JSON object (400) are refused before any lookup; then the
+404 rules; then field rules (400) and state rules (409).
 
 | Case | Status | Shape |
 |---|---|---|
 | `missionId`, `taskId` or `imageId` not a UUID | 400 | `errors[0].field` = that parameter |
 | mission unknown, draft or without served tasks | 404 | problem (`practice-not-found`) |
 | task unknown, draft, `GRAPHIC`, or not in the mission of the URL | 404 | problem; nothing stored |
-| image not of a served task | 404 | problem |
+| image not of a served task, or its file is missing | 404 | problem |
+| a body with invalid fields for a task that is not served | 404 | problem (the 404 check runs before the field rules, review F05) |
 | body empty or not one JSON object | 400 | problem (`practice-unreadable`) |
 | body over 16 KB | 413 | problem (`child-body-too-large`) |
 | attempt: `answers` missing or not an object | 400 | `answers` |

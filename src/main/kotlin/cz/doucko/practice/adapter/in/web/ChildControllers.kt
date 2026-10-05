@@ -69,6 +69,7 @@ class ChildPracticeController(
         taskId: UUID,
         attemptRequest: AttemptRequest,
     ): ResponseEntity<AttemptResult> {
+        service.requireServed(missionId, taskId)
         val answers = PracticeReaders.answers(body())
         return ResponseEntity.ok(PracticeMapping.attempt(service.submit(missionId, taskId, answers)))
     }
@@ -83,6 +84,7 @@ class ChildPracticeController(
         taskId: UUID,
         reportRequest: ReportRequest,
     ): ResponseEntity<Unit> {
+        service.requireServed(missionId, taskId)
         service.report(missionId, taskId, PracticeReaders.report(body()))
         return ResponseEntity.status(HttpStatus.CREATED).build()
     }

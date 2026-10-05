@@ -24,6 +24,7 @@ import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -36,6 +37,8 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.util.UUID
 
 /**
@@ -45,6 +48,7 @@ import java.util.UUID
  * admin API; every child request carries no credentials.
  */
 @Import(TestcontainersConfiguration::class)
+@ExtendWith(DenyOutboundNetwork::class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 class PracticeIT {
@@ -848,5 +852,92 @@ class PracticeIT {
             .andExpect { jsonPath("$.errors[0].field") { value("rankIndex") } }
         mvc.post("/api/child/hq") { contentType = MediaType.APPLICATION_JSON }.andExpect { status { isMethodNotAllowed() } }
         mvc.get("/api/child/missions/$m/summary").andExpect { jsonPath("$.rankUp") { value(nullValue()) } }
+    }
+
+    // ---------------------------------------------------------------- review-gate regressions
+
+    // @trace FR-44
+    @Test
+    fun `the attempt tests run with outbound network denied, and the guard refuses a public address`() {
+        val refused = runCatching { Socket().use { it.connect(InetSocketAddress("192.0.2.1", 9), 200) } }
+        refused.isFailure shouldBe true
+        DenyOutboundNetwork.denied.toList() shouldContainExactly listOf("socket://192.0.2.1:9")
+        DenyOutboundNetwork.denied.clear()
+    }
+
+    // @trace FR-28
+    @Test
+    fun `the task still loads after the admin removes hints the child had opened`() {
+        val t = task(twoHints)
+        val m = mission(listOf(t))
+        hint(m, t)
+        hint(m, t)
+        mvc
+            .adminJson("PUT", admin, "/api/admin/tasks/$t", taskJson(sourceId, "hints" to """["Jen jedna."]"""))
+            .andExpect { status { isOk() } }
+        read(childTask(m, t).andExpect { status { isOk() } }).let {
+            it.read<Int>("$.hints.total") shouldBe 1
+            it.read<List<Int>>("$.hints.opened[*].remaining") shouldContainExactly listOf(0)
+        }
+        hint(m, t).isProblem(409)
+        graded(m, t, """{"a":"1"}""").read<Any?>("$.feedback.nextHintIndex").shouldBeNull()
+    }
+
+    // @trace FR-31
+    @Test
+    fun `a finished replay stays finished when a task is added to the mission later`() {
+        val first = task()
+        val m = mission(listOf(first))
+        solve(m, first)
+        mvc.post("/api/child/missions/$m/replay").andExpect { status { isOk() } }
+        solve(m, first).read<Boolean>("$.missionComplete") shouldBe true
+        val added = task()
+        val body = """{"topicId":"${Topics.DECIMALS}","position":$position,"taskIds":["$first","$added"]}"""
+        mvc.adminJson("PUT", admin, "/api/admin/missions/$m", body).andExpect { status { isOk() } }
+        read(mvc.get("/api/child/missions/$m/current-task")).read<String>("$.taskId") shouldBe added
+        graded(m, added, """{"a":"7"}""")
+        jdbc.queryForObject("SELECT replay FROM attempt WHERE task_id = ?::uuid", Boolean::class.java, added) shouldBe false
+        hq().read<Map<String, String>>("$.continueTarget") shouldBe mapOf("missionId" to m, "taskId" to added)
+        mvc.post("/api/child/missions/$m/replay").isProblem(409)
+    }
+
+    // @trace FR-30
+    @Test
+    fun `an invalid body for a task that is not served is 404, not 400`() {
+        val draft = task(publish = false)
+        val m = mission(listOf(task()))
+        attempt(m, draft, """{"a":${List(21) { "\"A\"" }.joinToString(",", "[", "]")}}""").isProblem(404)
+        report(m, draft, """{"reason":"OTHER"}""").isProblem(404)
+        nothingStored()
+    }
+
+    // @trace FR-27
+    @Test
+    fun `an in-progress mission cannot be replayed and the rank-up body has the 16 KB limit`() {
+        val ids = List(2) { task() }
+        val m = mission(ids)
+        solve(m, ids[0])
+        mvc.post("/api/child/missions/$m/replay").isProblem(409)
+        count("practice_run") shouldBe 0
+        read(mvc.get("/api/child/missions/$m")).read<String>("$.state") shouldBe "IN_PROGRESS"
+        mvc
+            .post("/api/child/hq/rank-up-ack") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"rankIndex":1,"pad":"${"x".repeat(17 * 1024)}"}"""
+            }.isProblem(413)
+    }
+
+    // @trace FR-44
+    @Test
+    fun `the same wrong input gives the same feedback and parts in two fresh runs`() {
+        val t = task(twoParts, twoHints)
+        val m = mission(listOf(t))
+        val primary = attempt(m, t, """{"a":"12","b":"3"}""").andReturn().response.contentAsString
+        graded(m, t, """{"b":"0.5"}""")
+        mvc.post("/api/child/missions/$m/replay").andExpect { status { isOk() } }
+        val replay = attempt(m, t, """{"a":"12","b":"3"}""").andReturn().response.contentAsString
+        JsonPath.parse(replay).read<Map<String, Any?>>("$.feedback") shouldBe JsonPath.parse(primary).read<Map<String, Any?>>("$.feedback")
+        JsonPath.parse(replay).read<List<Map<String, Any?>>>("$.parts") shouldBe
+            JsonPath.parse(primary).read<List<Map<String, Any?>>>("$.parts")
     }
 }

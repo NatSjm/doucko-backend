@@ -9,7 +9,7 @@ import cz.doucko.practice.domain.ReportRules
 import tools.jackson.databind.JsonNode
 
 /**
- * JSON trees of the child bodies → practice input. Checks that need no task run here, before any lookup:
+ * JSON trees of the child bodies → practice input, read after the 404 check of the mission and task:
  * `answers` must be an object of strings and arrays of strings, an array holds at most 20 elements of at
  * most 100 code points (contract `AttemptRequest`). An over-long string is not refused: the checker grades
  * it UNPARSEABLE. Only `answers` is read; every other top-level field is ignored (NFR-1).
