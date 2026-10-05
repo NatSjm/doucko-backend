@@ -16,7 +16,7 @@ Result: PASS, 2 warning(s)
 | 2026-10-04-implement-authoring-tasks-api | clean | 7 | yes | content |
 | 2026-10-04-implement-child-profile-api | clean | 4 | yes | profile, shared |
 | 2026-10-04-implement-platform-foundation-api | clean | 8 | yes | shared |
-| 2026-10-05-fix-restore-schema-drift | clean | 2 | yes | - |
+| 2026-10-05-fix-restore-schema-drift | clean | 3 | yes | - |
 | 2026-10-05-implement-practice-flow-api | clean | 4 | yes | practice, content, profile, shared |
 
 ## Cross-slice module overlap

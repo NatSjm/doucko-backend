@@ -60,7 +60,7 @@
     {
       "slice": "2026-10-05-fix-restore-schema-drift",
       "reviewEvidence": "clean",
-      "trailerCommits": 2,
+      "trailerCommits": 3,
       "libDomains": [],
       "processComplete": true
     },
