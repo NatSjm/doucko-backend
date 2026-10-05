@@ -2,6 +2,7 @@ package cz.doucko.admin
 
 import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
 import cz.doucko.content.ContentWebTestBeans
+import cz.doucko.practice.PracticeWebTestBeans
 import cz.doucko.profile.ProfileWebTestBeans
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import org.junit.jupiter.api.Test
@@ -21,6 +22,7 @@ import java.time.Duration
     AdminWebTestBeans::class,
     ProfileWebTestBeans::class,
     ContentWebTestBeans::class,
+    PracticeWebTestBeans::class,
 )
 class AdminIdleTimeoutTest {
     @Autowired

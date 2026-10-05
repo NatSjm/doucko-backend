@@ -2,6 +2,7 @@ package cz.doucko.shared
 
 import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
 import cz.doucko.content.ContentWebTestBeans
+import cz.doucko.practice.PracticeWebTestBeans
 import cz.doucko.profile.ProfileWebTestBeans
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import io.kotest.matchers.shouldBe
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger
     UndeclaredPathTest.AdminProbe::class,
     ProfileWebTestBeans::class,
     ContentWebTestBeans::class,
+    PracticeWebTestBeans::class,
 )
 class UndeclaredPathTest {
     @Autowired

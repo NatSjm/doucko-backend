@@ -11,6 +11,9 @@ interface ChildProfileStore {
 
     fun settings(): ProfileSettings
 
+    /** The display name of the existing profile (NFR-3: never logged). */
+    fun displayName(): String
+
     /** Reads the settings under a write lock, applies [change] and stores the result in one transaction. */
     fun updateSettings(change: (ProfileSettings) -> ProfileSettings): ProfileSettings
 }

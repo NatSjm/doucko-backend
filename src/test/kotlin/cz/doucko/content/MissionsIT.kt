@@ -16,6 +16,7 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import java.util.UUID
@@ -29,10 +30,11 @@ import java.util.UUID
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 class MissionsIT {
-    /** Practice usage as the tests set it; slice 7 replaces it with the real adapter. */
+    /** Practice usage as the tests set it, in place of the real practice adapter (PracticeIT covers that one). */
     @TestConfiguration(proxyBeanMethods = false)
     class Usage {
         @Bean
+        @Primary
         fun contentUsage() = FakeContentUsage()
     }
 

@@ -4,6 +4,7 @@ import cz.doucko.admin.AdminWebTestBeans
 import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
 import cz.doucko.admin.signedIn
 import cz.doucko.content.ContentWebTestBeans
+import cz.doucko.practice.PracticeWebTestBeans
 import cz.doucko.profile.domain.AnswerMode
 import cz.doucko.profile.domain.ProfileSettings
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
@@ -65,6 +66,7 @@ private fun ResultActionsDsl.isProblem(
     AdminWebTestBeans::class,
     ProfileWebTestBeans::class,
     ContentWebTestBeans::class,
+    PracticeWebTestBeans::class,
 )
 class ProfileSettingsTest {
     @Autowired
@@ -317,6 +319,7 @@ class ProfileSettingsTest {
         AdminWebTestBeans::class,
         ProfileWebTestBeans::class,
         ContentWebTestBeans::class,
+        PracticeWebTestBeans::class,
     )
     inner class WithoutConfiguredLocales {
         @Autowired

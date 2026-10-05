@@ -37,6 +37,8 @@ class InMemoryChildProfileStore(
 
     override fun settings() = current.also { checkNotNull(displayName) }
 
+    override fun displayName() = checkNotNull(displayName)
+
     override fun updateSettings(change: (ProfileSettings) -> ProfileSettings): ProfileSettings {
         current = change(current)
         writes++

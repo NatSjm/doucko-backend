@@ -1,5 +1,6 @@
 package cz.doucko.profile.application
 
+import cz.doucko.profile.ChildProfile
 import cz.doucko.profile.domain.AnswerMode
 import cz.doucko.profile.domain.Change
 import cz.doucko.profile.domain.ProfileSettings
@@ -18,7 +19,7 @@ private val LOCALE_SHAPE = Regex("[a-z]{2}")
 class ProfileSettingsService(
     private val store: ChildProfileStore,
     locales: TaskLocaleProperties,
-) {
+) : ChildProfile {
     /** The configured task locales, in configuration order (the 400 detail lists them). */
     val supportedLocales: List<String> =
         locales.taskLocales.distinct().onEach {
@@ -29,6 +30,10 @@ class ProfileSettingsService(
     private val validator = SettingsValidator(supportedLocales.toSet())
 
     fun settings(): ProfileSettings = store.settings()
+
+    override fun displayName(): String = store.displayName()
+
+    override fun secondaryTaskLocale(): String? = store.settings().secondaryTaskLocale
 
     fun update(input: SettingsInput): ProfileSettings {
         val patch =

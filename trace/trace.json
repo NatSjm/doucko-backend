@@ -396,13 +396,17 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/content-authoring/spec.md",
-        "openspec/specs/content-authoring/spec.md"
+        "openspec/specs/content-authoring/spec.md",
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
         "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
         "src/test/kotlin/cz/doucko/content/MissionApiTest.kt",
-        "src/test/kotlin/cz/doucko/content/MissionsIT.kt"
+        "src/test/kotlin/cz/doucko/content/MissionsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt"
       ],
       "recordings": []
     },
@@ -451,7 +455,8 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/content-authoring/spec.md",
-        "openspec/specs/content-authoring/spec.md"
+        "openspec/specs/content-authoring/spec.md",
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -466,7 +471,9 @@
         "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
         "src/test/kotlin/cz/doucko/content/MissionRulesTest.kt",
         "src/test/kotlin/cz/doucko/content/MissionsIT.kt",
-        "src/test/kotlin/cz/doucko/content/MissionsIT.kt"
+        "src/test/kotlin/cz/doucko/content/MissionsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeApiTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt"
       ],
       "recordings": []
     },
@@ -654,10 +661,15 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/answer-checking/spec.md"
+        "contract/openspec/specs/answer-checking/spec.md",
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -690,10 +702,14 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md",
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -704,10 +720,20 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md",
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -718,10 +744,18 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md",
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeApiTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeApiTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -732,10 +766,21 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md",
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeApiTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -746,10 +791,15 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md",
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt"
+      ],
       "recordings": []
     },
     {
@@ -763,7 +813,10 @@
         "contract/openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeApiTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt"
+      ],
       "recordings": []
     },
     {
@@ -774,10 +827,16 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md",
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -788,10 +847,15 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md",
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt"
+      ],
       "recordings": []
     },
     {
@@ -952,10 +1016,13 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/progress-stats/spec.md"
+        "contract/openspec/specs/progress-stats/spec.md",
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt"
+      ],
       "recordings": []
     },
     {
@@ -1032,10 +1099,22 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md",
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/PracticeApiTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/TutorSwapTest.kt",
+        "src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+        "src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+        "src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+        "src/test/kotlin/cz/doucko/practice/TutorTest.kt",
+        "src/test/kotlin/cz/doucko/practice/TutorTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -1061,6 +1140,7 @@
         "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
         "src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt",
         "src/test/kotlin/cz/doucko/admin/ChildOperationsContractTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt",
         "src/test/kotlin/cz/doucko/profile/ProfileSettingsTest.kt"
       ]
@@ -1099,6 +1179,7 @@
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/platform/DockerContextTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeLogCaptureIT.kt",
         "src/test/kotlin/cz/doucko/profile/ChildProfileEntityTest.kt",
         "src/test/kotlin/cz/doucko/profile/ChildProfileStartupIT.kt",
         "src/test/kotlin/cz/doucko/profile/ChildProfileStartupIT.kt",
@@ -1139,7 +1220,8 @@
       ],
       "ownedHere": true,
       "tests": [
-        "src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt"
+        "src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeTimingIT.kt"
       ]
     },
     {
@@ -1377,42 +1459,6 @@
   "warnings": [
     {
       "check": "test-trace",
-      "msg": "FR-22 (owned by backend) has no test annotated \"@trace FR-22\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-24 (owned by backend) has no test annotated \"@trace FR-24\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-25 (owned by backend) has no test annotated \"@trace FR-25\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-26 (owned by backend) has no test annotated \"@trace FR-26\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-27 (owned by backend) has no test annotated \"@trace FR-27\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-28 (owned by backend) has no test annotated \"@trace FR-28\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-29 (owned by backend) has no test annotated \"@trace FR-29\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-30 (owned by backend) has no test annotated \"@trace FR-30\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-31 (owned by backend) has no test annotated \"@trace FR-31\""
-    },
-    {
-      "check": "test-trace",
       "msg": "FR-32 (owned by backend) has no test annotated \"@trace FR-32\""
     },
     {
@@ -1450,14 +1496,6 @@
     {
       "check": "test-trace",
       "msg": "FR-41 (owned by backend) has no test annotated \"@trace FR-41\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-42 (owned by backend) has no test annotated \"@trace FR-42\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-44 (owned by backend) has no test annotated \"@trace FR-44\""
     }
   ]
 }

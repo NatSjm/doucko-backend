@@ -5,7 +5,7 @@ requirements/spec/test/recording change; CI runs `--check-fresh`.
 
 Repo: backend (contract: submodule).
 Scope: 48 MVP functional requirements, 47 owned by backend.
-Result: PASS, 21 warning(s)
+Result: PASS, 10 warning(s)
 
 | FR | Spec | Plan | Owner repo(s) | Test trace here | Recording here |
 |---|---|---|---|---|---|
@@ -20,10 +20,10 @@ Result: PASS, 21 warning(s)
 | FR-9 | yes | yes | backend, frontend | 21 | - |
 | FR-10 | yes | yes | backend, frontend | 5 | - |
 | FR-11 | yes | yes | backend, frontend | 6 | - |
-| FR-12 | yes | yes | backend | 3 | - |
+| FR-12 | yes | yes | backend | 6 | - |
 | FR-13 | yes | yes | backend, frontend | 3 | - |
 | FR-55 | yes | yes | backend, frontend | 3 | - |
-| FR-56 | yes | yes | backend | 12 | - |
+| FR-56 | yes | yes | backend | 14 | - |
 | FR-57 | yes | yes | backend | 22 | - |
 | FR-14 | yes | yes | backend | 9 | - |
 | FR-15 | yes | yes | backend | 3 | - |
@@ -33,16 +33,16 @@ Result: PASS, 21 warning(s)
 | FR-19 | yes | yes | backend | 3 | - |
 | FR-20 | yes | yes | backend | 1 | - |
 | FR-21 | yes | yes | backend | 2 | - |
-| FR-22 | yes | yes | backend, frontend | - | - |
+| FR-22 | yes | yes | backend, frontend | 3 | - |
 | FR-23 | yes | yes | backend | 7 | - |
-| FR-24 | yes | yes | backend, frontend | - | - |
-| FR-25 | yes | yes | backend, frontend | - | - |
-| FR-26 | yes | yes | backend, frontend | - | - |
-| FR-27 | yes | yes | backend, frontend | - | - |
-| FR-28 | yes | yes | backend, frontend | - | - |
-| FR-29 | yes | yes | backend, frontend | - | - |
-| FR-30 | yes | yes | backend, frontend | - | - |
-| FR-31 | yes | yes | backend, frontend | - | - |
+| FR-24 | yes | yes | backend, frontend | 2 | - |
+| FR-25 | yes | yes | backend, frontend | 8 | - |
+| FR-26 | yes | yes | backend, frontend | 6 | - |
+| FR-27 | yes | yes | backend, frontend | 9 | - |
+| FR-28 | yes | yes | backend, frontend | 3 | - |
+| FR-29 | yes | yes | backend, frontend | 2 | - |
+| FR-30 | yes | yes | backend, frontend | 4 | - |
+| FR-31 | yes | yes | backend, frontend | 3 | - |
 | FR-32 | yes | yes | backend, frontend | - | - |
 | FR-33 | yes | yes | backend, frontend | - | - |
 | FR-34 | yes | yes | backend | - | - |
@@ -54,19 +54,19 @@ Result: PASS, 21 warning(s)
 | FR-58 | yes | yes | frontend | n/a | n/a |
 | FR-40 | yes | yes | backend, frontend | - | - |
 | FR-41 | yes | yes | backend, frontend | - | - |
-| FR-42 | yes | yes | backend | - | - |
+| FR-42 | yes | yes | backend | 1 | - |
 | FR-43 | yes | yes | backend | 52 | - |
-| FR-44 | yes | yes | backend | - | - |
+| FR-44 | yes | yes | backend | 10 | - |
 
 ## Other MVP requirements (NFR / TC / BC)
 
 | Req | Owner repo(s) | Test trace here |
 |---|---|---|
-| NFR-1 | backend | 18 |
+| NFR-1 | backend | 19 |
 | NFR-2 | backend | 11 |
-| NFR-3 | backend, frontend | 20 |
+| NFR-3 | backend, frontend | 21 |
 | NFR-4 | backend, frontend | 6 |
-| NFR-5 | backend, frontend | 1 |
+| NFR-5 | backend, frontend | 2 |
 | NFR-6 | frontend | n/a |
 | NFR-7 | frontend | n/a |
 | NFR-8 | frontend | n/a |
@@ -97,15 +97,6 @@ None.
 
 ## Warnings
 
-- **test-trace**: FR-22 (owned by backend) has no test annotated "@trace FR-22"
-- **test-trace**: FR-24 (owned by backend) has no test annotated "@trace FR-24"
-- **test-trace**: FR-25 (owned by backend) has no test annotated "@trace FR-25"
-- **test-trace**: FR-26 (owned by backend) has no test annotated "@trace FR-26"
-- **test-trace**: FR-27 (owned by backend) has no test annotated "@trace FR-27"
-- **test-trace**: FR-28 (owned by backend) has no test annotated "@trace FR-28"
-- **test-trace**: FR-29 (owned by backend) has no test annotated "@trace FR-29"
-- **test-trace**: FR-30 (owned by backend) has no test annotated "@trace FR-30"
-- **test-trace**: FR-31 (owned by backend) has no test annotated "@trace FR-31"
 - **test-trace**: FR-32 (owned by backend) has no test annotated "@trace FR-32"
 - **test-trace**: FR-33 (owned by backend) has no test annotated "@trace FR-33"
 - **test-trace**: FR-34 (owned by backend) has no test annotated "@trace FR-34"
@@ -116,5 +107,3 @@ None.
 - **test-trace**: FR-39 (owned by backend) has no test annotated "@trace FR-39"
 - **test-trace**: FR-40 (owned by backend) has no test annotated "@trace FR-40"
 - **test-trace**: FR-41 (owned by backend) has no test annotated "@trace FR-41"
-- **test-trace**: FR-42 (owned by backend) has no test annotated "@trace FR-42"
-- **test-trace**: FR-44 (owned by backend) has no test annotated "@trace FR-44"

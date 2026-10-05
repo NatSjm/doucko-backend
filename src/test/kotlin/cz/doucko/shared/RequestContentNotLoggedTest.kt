@@ -11,6 +11,7 @@ import cz.doucko.content.adminJson
 import cz.doucko.content.quote
 import cz.doucko.content.taskJson
 import cz.doucko.content.uploadSource
+import cz.doucko.practice.PracticeWebTestBeans
 import cz.doucko.profile.ProfileWebTestBeans
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import io.kotest.matchers.string.shouldContain
@@ -35,6 +36,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import java.util.UUID
 
 /**
  * NFR-3: request content (answers, report notes, any text a child types) never reaches the logs, at
@@ -118,6 +120,30 @@ class RequestContentNotLoggedTest {
         adminGet(admin, "/api/admin/tasks/$SENTINEL")
     }
 
+    /**
+     * practice-flow (NFR-3, plan §2.1 slice 7): the child practice bodies (answers, report notes, rank-up
+     * acknowledgements), valid in shape and refused, on missions that are not served. The full flow against
+     * Postgres is PracticeLogCaptureIT.
+     */
+    private fun MockMvc.practiceWithSentinel() {
+        val base = "/api/child/missions/${UUID.randomUUID()}/tasks/${UUID.randomUUID()}"
+        for ((path, body) in listOf(
+            "$base/attempts" to """{"answers":{"a":"$SENTINEL"},"x":"$SENTINEL"}""",
+            "$base/attempts" to """{"answers":{"a":["$SENTINEL",1]}}""",
+            "$base/attempts" to """{"answers": "$SENTINEL"""",
+            "$base/reports" to """{"reason":"OTHER","note":"$SENTINEL"}""",
+            "$base/reports" to """{"reason":"$SENTINEL"}""",
+            "/api/child/hq/rank-up-ack" to """{"rankIndex":"$SENTINEL"}""",
+        )) {
+            post("$path?q=$SENTINEL") {
+                contentType = MediaType.APPLICATION_JSON
+                content = body
+                header("X-Probe", SENTINEL)
+            }
+        }
+        get("/api/child/hq") { header("X-Probe", SENTINEL) }.andExpect { status { isOk() } }
+    }
+
     @Nested
     @WebMvcTest(
         properties = [
@@ -133,6 +159,7 @@ class RequestContentNotLoggedTest {
         Echo::class,
         ProfileWebTestBeans::class,
         ContentWebTestBeans::class,
+        PracticeWebTestBeans::class,
     )
     @ExtendWith(OutputCaptureExtension::class)
     inner class AtTrace {
@@ -147,6 +174,7 @@ class RequestContentNotLoggedTest {
             mvc.signInWithSentinel()
             mvc.settingsWithSentinel()
             mvc.contentWithSentinel()
+            mvc.practiceWithSentinel()
             output.all shouldNotContain SENTINEL
         }
     }
@@ -159,6 +187,7 @@ class RequestContentNotLoggedTest {
         Echo::class,
         ProfileWebTestBeans::class,
         ContentWebTestBeans::class,
+        PracticeWebTestBeans::class,
     )
     @ExtendWith(OutputCaptureExtension::class)
     inner class AtConfiguredLevels {
@@ -173,6 +202,7 @@ class RequestContentNotLoggedTest {
             mvc.signInWithSentinel()
             mvc.settingsWithSentinel()
             mvc.contentWithSentinel()
+            mvc.practiceWithSentinel()
             output.all shouldNotContain SENTINEL
         }
     }
@@ -196,6 +226,7 @@ class RequestContentNotLoggedTest {
         Echo::class,
         ProfileWebTestBeans::class,
         ContentWebTestBeans::class,
+        PracticeWebTestBeans::class,
     )
     @ExtendWith(OutputCaptureExtension::class)
     inner class CaptureControl {

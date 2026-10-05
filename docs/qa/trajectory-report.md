@@ -5,8 +5,8 @@ archived slice took: review evidence, `Slice:` trailers, and module scope.
 It does NOT verify test-first ordering or test integrity (not derivable from
 one-commit-per-slice history) — those are graded by the trajectory-eval workflow.
 
-Scope: 6 archived slice(s).
-Result: PASS, 1 warning(s)
+Scope: 7 archived slice(s).
+Result: PASS, 2 warning(s)
 
 | Slice | Review evidence | Trailer commits | design+tasks | lib domains touched |
 |---|---|---|---|---|
@@ -16,10 +16,12 @@ Result: PASS, 1 warning(s)
 | 2026-10-04-implement-authoring-tasks-api | clean | 7 | yes | content |
 | 2026-10-04-implement-child-profile-api | clean | 4 | yes | profile, shared |
 | 2026-10-04-implement-platform-foundation-api | clean | 8 | yes | shared |
+| 2026-10-05-implement-practice-flow-api | clean | 4 | yes | practice, content, profile, shared |
 
 ## Cross-slice module overlap
 
-- `lib/content/` touched by: 2026-10-04-implement-authoring-missions-api, 2026-10-04-implement-authoring-tasks-api
+- `lib/content/` touched by: 2026-10-04-implement-authoring-missions-api, 2026-10-04-implement-authoring-tasks-api, 2026-10-05-implement-practice-flow-api
+- `lib/profile/` touched by: 2026-10-04-implement-child-profile-api, 2026-10-05-implement-practice-flow-api
 
 ## Failures
 
@@ -27,4 +29,5 @@ None.
 
 ## Warnings
 
-- **in-scope**: lib/content/ modified by 2 slices (2026-10-04-implement-authoring-missions-api, 2026-10-04-implement-authoring-tasks-api) — review for scope drift
+- **in-scope**: lib/content/ modified by 3 slices (2026-10-04-implement-authoring-missions-api, 2026-10-04-implement-authoring-tasks-api, 2026-10-05-implement-practice-flow-api) — review for scope drift
+- **in-scope**: lib/profile/ modified by 2 slices (2026-10-04-implement-child-profile-api, 2026-10-05-implement-practice-flow-api) — review for scope drift

@@ -29,9 +29,12 @@ import java.lang.reflect.Type
  * needs its dotted field path. So the raw body is read here (at most [TESTER_MAX_BYTES] for the answer
  * tester, [MAX_BYTES] otherwise, else 413), parsed into one JSON tree kept as a request attribute for
  * the controller, and Jackson is handed a fixed valid placeholder: the generated DTO never holds a
- * submitted value (NFR-3).
+ * submitted value (NFR-3). Scoped to the content controllers: the child attempt endpoint binds the same
+ * `AttemptRequest` type and has its own advice in practice.
  */
-@ControllerAdvice
+@ControllerAdvice(
+    assignableTypes = [SourceController::class, TaskController::class, MissionController::class, ReferenceController::class],
+)
 class ContentBodyAdvice(
     private val json: JsonMapper,
 ) : RequestBodyAdviceAdapter() {

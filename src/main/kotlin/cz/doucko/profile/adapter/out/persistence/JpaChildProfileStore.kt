@@ -21,6 +21,9 @@ class JpaChildProfileStore(
     @Transactional(readOnly = true)
     override fun settings(): ProfileSettings = repository.findById(ChildProfileEntity.SINGLE_ID).orElseThrow().settings()
 
+    @Transactional(readOnly = true)
+    override fun displayName(): String = repository.findById(ChildProfileEntity.SINGLE_ID).orElseThrow().name()
+
     @Transactional
     override fun updateSettings(change: (ProfileSettings) -> ProfileSettings): ProfileSettings {
         val entity = checkNotNull(repository.findForUpdate(ChildProfileEntity.SINGLE_ID))

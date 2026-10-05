@@ -2,6 +2,7 @@ package cz.doucko.admin
 
 import cz.doucko.admin.adapter.`in`.web.AdminSecurityConfiguration
 import cz.doucko.content.ContentWebTestBeans
+import cz.doucko.practice.PracticeWebTestBeans
 import cz.doucko.profile.ProfileWebTestBeans
 import cz.doucko.shared.adapter.`in`.web.SecurityConfiguration
 import io.kotest.matchers.nulls.shouldBeNull
@@ -32,6 +33,7 @@ import java.net.URI
     AdminWebTestBeans::class,
     ProfileWebTestBeans::class,
     ContentWebTestBeans::class,
+    PracticeWebTestBeans::class,
 )
 class AdminSessionTest {
     @Autowired
