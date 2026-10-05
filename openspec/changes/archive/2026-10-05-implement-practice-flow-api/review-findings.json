@@ -35,7 +35,9 @@
       "title": "Task screen returns a raw 500 when an admin removes hints from a published task after the child opened some",
       "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeMapping.kt",
       "line": 702,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "6befcf1",
+      "resolution": "PracticeMapping shows only the opened hints that still exist (minOf(opened, total)); remaining stays >= 0. PracticeIT \"the task still loads after the admin removes hints the child had opened\"."
     },
     {
       "id": "F02",
@@ -45,7 +47,9 @@
       "title": "An old replay run comes back to life when a task is added to the mission later, so attempts go into the replay scope instead of the primary one",
       "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
       "line": 1645,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "6befcf1",
+      "resolution": "practice_run.finished_at is set by the attempt that resolves a replay run's last task; currentRun ignores finished runs, so a task added later goes to the primary scope. PracticeIT \"a finished replay stays finished when a task is added to the mission later\"."
     },
     {
       "id": "F03",
@@ -55,7 +59,9 @@
       "title": "NFR-5 check round-trip test does not follow the scenario's fixture or load shape",
       "file": "src/test/kotlin/cz/doucko/practice/PracticeTimingIT.kt",
       "line": 75,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "6befcf1",
+      "resolution": "PracticeTimingIT now seeds 10 published tasks covering all seven answer types incl. a two-part task, and times 200 graded submissions after 20 warm-ups, alternating attempt 1 (wrong) and attempt 2 (correct) with fresh runs from startReplay (p95 173 ms on the loaded laptop). The Compose-stack measurement is the frontend e2e timing test that plan §4.7 assigns to the frontend half."
     },
     {
       "id": "F04",
@@ -65,7 +71,9 @@
       "title": "TC-6 'Feedback never comes from AI' is only half enforced: no network-denied run of the attempt tests",
       "file": "src/test/kotlin/cz/doucko/practice/TutorTest.kt",
       "line": 87,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "6befcf1",
+      "resolution": "DenyOutboundNetwork (test extension): while PracticeIT runs, the default ProxySelector refuses every non-local connection the JDK opens through java.net and each test fails if one was attempted; a self-check proves a public address is refused. The dependency check stays in TutorTest."
     },
     {
       "id": "F05",
@@ -75,7 +83,9 @@
       "title": "Malformed body on a task that is not served returns 400, not the required 404",
       "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/ChildControllers.kt",
       "line": 72,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "6befcf1",
+      "resolution": "Controllers call PracticeService.requireServed before reading the attempt or report body, so invalid fields for an unserved task are 404. Only a body over 16 KB or not one JSON object is refused before the lookup (request level, design Error handling). PracticeIT \"an invalid body for a task that is not served is 404, not 400\"."
     },
     {
       "id": "F06",
@@ -85,7 +95,9 @@
       "title": "'Replay of an unfinished mission is refused' is only tested for a NEW mission, not one in progress",
       "file": "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
       "line": 812,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "6befcf1",
+      "resolution": "PracticeIT \"an in-progress mission cannot be replayed and the rank-up body has the 16 KB limit\" (409, no run created, progress unchanged)."
     },
     {
       "id": "F07",
@@ -95,7 +107,9 @@
       "title": "No backend test for the 413 'Request body too large' scenario on rank-up acknowledgement",
       "file": "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
       "line": 838,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "6befcf1",
+      "resolution": "Same test: rank-up acknowledgement over 16 KB is 413 problem+json."
     },
     {
       "id": "F08",
@@ -105,7 +119,9 @@
       "title": "'Same input, same feedback' is verified only at unit level, not across two fresh runs through the API",
       "file": "src/test/kotlin/cz/doucko/practice/TutorTest.kt",
       "line": 64,
-      "status": "open"
+      "status": "fixed",
+      "fixCommit": "6befcf1",
+      "resolution": "PracticeIT \"the same wrong input gives the same feedback and parts in two fresh runs\" compares the feedback object and parts of a primary run and a replay run through the API."
     },
     {
       "id": "F09",
@@ -115,7 +131,8 @@
       "title": "Undocumented 400 for non-UUID path ids on endpoints whose OpenAPI lists only 200/404 (or 200/204/404)",
       "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
       "line": 49,
-      "status": "open"
+      "status": "waived",
+      "reason": "Contested minor, no change: the contract info Conventions state for every operation that a path id that is not a UUID is 400 before any lookup (\"a path id that is not a UUID is 400 before any lookup\"); the child operations follow that documented convention like the admin ones of slices 5 and 6. Listing 400 on each operation would be a docs-store contract change for the owner."
     }
   ],
   "clean": false,

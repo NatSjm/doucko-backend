@@ -397,7 +397,7 @@
       "specs": [
         "contract/openspec/specs/content-authoring/spec.md",
         "openspec/specs/content-authoring/spec.md",
-        "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -456,7 +456,7 @@
       "specs": [
         "contract/openspec/specs/content-authoring/spec.md",
         "openspec/specs/content-authoring/spec.md",
-        "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -662,7 +662,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/answer-checking/spec.md",
-        "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -703,7 +703,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/practice-flow/spec.md",
-        "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -721,7 +721,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/practice-flow/spec.md",
-        "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -745,7 +745,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/practice-flow/spec.md",
-        "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -767,7 +767,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/practice-flow/spec.md",
-        "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -792,7 +792,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/practice-flow/spec.md",
-        "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -828,7 +828,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/practice-flow/spec.md",
-        "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -848,7 +848,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/practice-flow/spec.md",
-        "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -1017,7 +1017,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/progress-stats/spec.md",
-        "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -1100,7 +1100,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/practice-flow/spec.md",
-        "openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -1496,10 +1496,6 @@
     {
       "check": "test-trace",
       "msg": "FR-41 (owned by backend) has no test annotated \"@trace FR-41\""
-    },
-    {
-      "check": "active-changes",
-      "msg": "active change \"implement-practice-flow-api\" is not archived"
     }
   ]
 }

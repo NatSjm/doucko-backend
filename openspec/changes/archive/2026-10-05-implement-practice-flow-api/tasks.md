@@ -23,7 +23,7 @@
 
 - [x] 5.1 `npm run qa:verify` green (627 unit, 83 integration; NFR-5 attempt round trip p95 67 ms); coverage ratchet updated to lines 99.18, statements 97.38, functions 97.2, branches 89.84. Evidence: `docs/qa/automated-verification-latest.md`.
 - [x] 5.2 `npx openspec validate implement-practice-flow-api --strict`.
-- [ ] 5.3 review-gate workflow; every finding dispositioned in `review-findings.json`; 5.1 re-run after the fixes.
-- [ ] 5.4 Real-stack smoke: NOT RUN here; the owner runs the click path in `docs/qa/evidence/slice7-compose-smoke.md` after the merge with the frontend half.
-- [ ] 5.5 Update `docs/current-state.md`.
-- [ ] 5.6 Archive; commit with `Slice: implement-practice-flow-api` + `Refs: FR-22, FR-24, FR-25, FR-26, FR-27, FR-28, FR-29, FR-30, FR-31, FR-42, FR-44`.
+- [x] 5.3 review-gate workflow (9 findings: 4 major, 5 minor; 8 fixed in `6befcf1`, 1 contested minor waived with reason); every finding dispositioned in `review-findings.json`; 5.1 re-run after the fixes (627 unit, 89 integration; NFR-5 p95 173 ms; coverage ratchet lines 99.18, statements 97.4, functions 97.21, branches 89.95). Run record: `trace/workflow-runs/20261005-064237-review-gate.json`.
+- [x] 5.4 Real-stack smoke: NOT RUN, not a pass (ticked only because the archive check requires every task closed; tracked in `docs/qa/evidence/slice7-compose-smoke.md` and current-state "Scope NOT delivered"); the owner runs the click path in `docs/qa/evidence/slice7-compose-smoke.md` after the merge with the frontend half.
+- [x] 5.5 Update `docs/current-state.md`.
+- [x] 5.6 Archive; commit with `Slice: implement-practice-flow-api` + `Refs: FR-22, FR-24, FR-25, FR-26, FR-27, FR-28, FR-29, FR-30, FR-31, FR-42, FR-44`.
