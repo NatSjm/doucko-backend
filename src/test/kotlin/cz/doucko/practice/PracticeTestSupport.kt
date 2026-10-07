@@ -82,6 +82,8 @@ class InMemoryPracticeStore : PracticeStore {
 
     override fun attempt(id: UUID) = attempts.firstOrNull { it.id == id }
 
+    override fun attemptsById(ids: Collection<UUID>) = attempts.filter { it.id in ids }
+
     override fun reports(status: ReportStatus?) =
         reports
             .filter { status == null || it.status == status }

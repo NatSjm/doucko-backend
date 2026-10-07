@@ -19,6 +19,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
@@ -150,6 +151,11 @@ class FlagQueueIT {
         excerpt shouldEndWith "…"
         prompt.startsWith(excerpt.removeSuffix("…")) shouldBe true
         excerpt.removeSuffix("…").length shouldBe 80
+        // A space at the cut is kept: exactly 80 code points, then the ellipsis (review F04).
+        val spaced = "a".repeat(79) + " " + "b".repeat(10)
+        val u = fx.task("prompt" to "\"$spaced\"")
+        val n = fx.mission(listOf(u))
+        entry(fx.report(n, u, "UNCLEAR_PROMPT"))["taskPromptExcerpt"] shouldBe "a".repeat(79) + " …"
     }
 
     // @trace FR-41
@@ -259,7 +265,31 @@ class FlagQueueIT {
         (re["reevaluatedAt"] == a["createdAt"]) shouldBe false
         attemptRows().map { it["correct"] } shouldContainExactly listOf(false, false)
         // The child's own feedback keeps what the attempt earned; HQ shows the total.
-        fx.read(mvc.get("/api/child/missions/$m/tasks/$t")).read<Int>("$.lastFeedback.xpAwarded") shouldBe 1
+        fx.read(mvc.get("/api/child/missions/$m/tasks/$t")).let {
+            it.read<Int>("$.lastFeedback.xpAwarded") shouldBe 1
+            it.read<Int>("$.lastFeedback.attemptNo") shouldBe 2
+            it.read<String>("$.lastFeedback.taskState") shouldBe "CORRECT_SECOND_TRY"
+            it.read<String>("$.lastFeedback.parts[0].verdict") shouldBe "CORRECT"
+        }
+    }
+
+    // @trace FR-41
+    @Test
+    fun `the task screen shows the re-evaluated attempt 1 of a revealed task`() {
+        val t = badTask()
+        val m = fx.mission(listOf(t, fx.task()))
+        fx.answer(m, t, "0,5")
+        val id = fx.report(m, t)
+        fx.answer(m, t, "0,5")
+        fix(t)
+        fx.reevaluateOk(id).read<Int>("$.xpAwarded") shouldBe 9
+        fx.read(mvc.get("/api/child/missions/$m/tasks/$t")).let {
+            it.read<String>("$.state") shouldBe "CORRECT_FIRST_TRY"
+            it.read<Int>("$.lastFeedback.attemptNo") shouldBe 1
+            it.read<String>("$.lastFeedback.taskState") shouldBe "CORRECT_FIRST_TRY"
+            it.read<String>("$.lastFeedback.parts[0].verdict") shouldBe "CORRECT"
+        }
+        fx.total() shouldBe 10
     }
 
     // @trace FR-41
@@ -317,6 +347,14 @@ class FlagQueueIT {
         val hq = fx.hq()
         hq.read<Int>("$.rank.index") shouldBe 1
         hq.read<Int>("$.pendingRankUp.index") shouldBe 1
+        // The celebration plays once: acknowledged, it is never offered again (review F07).
+        mvc
+            .post("/api/child/hq/rank-up-ack") {
+                contentType = org.springframework.http.MediaType.APPLICATION_JSON
+                content = """{"rankIndex":1}"""
+            }.andExpect { status { isNoContent() } }
+        fx.hq().read<Any?>("$.pendingRankUp").shouldBeNull()
+        fx.hq().read<Int>("$.rank.index") shouldBe 1
     }
 
     // @trace FR-41

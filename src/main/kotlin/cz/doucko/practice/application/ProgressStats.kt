@@ -91,7 +91,13 @@ class FlagQueue(
     private val catalog: ContentCatalog,
     private val gamification: Gamification,
 ) {
-    fun list(status: ReportStatus?): List<ReportView> = store.reports(status).map(::view)
+    /** The queue; prompts and attempts are read in one batch each, never per report (review F02). */
+    fun list(status: ReportStatus?): List<ReportView> {
+        val reports = store.reports(status)
+        val prompts = catalog.prompts(reports.map { it.taskId }.distinct())
+        val attempts = store.attemptsById(reports.mapNotNull { it.attemptId }).associateBy { it.id }
+        return reports.map { ReportView(it, excerpt(prompts[it.taskId].orEmpty()), it.attemptId?.let(attempts::get)) }
+    }
 
     /** Re-checks the attached attempt with the task's current answer spec; only ever adds XP. */
     @Transactional
@@ -148,7 +154,7 @@ class FlagQueue(
         /** The first [EXCERPT_LENGTH] code points of [prompt], with `…` when it is longer. */
         fun excerpt(prompt: String): String {
             if (prompt.codePointCount(0, prompt.length) <= EXCERPT_LENGTH) return prompt
-            return prompt.substring(0, prompt.offsetByCodePoints(0, EXCERPT_LENGTH)).trimEnd() + "…"
+            return prompt.substring(0, prompt.offsetByCodePoints(0, EXCERPT_LENGTH)) + "…"
         }
     }
 }

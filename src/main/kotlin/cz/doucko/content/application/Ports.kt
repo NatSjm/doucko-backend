@@ -60,6 +60,9 @@ interface TaskStore {
 
     fun find(id: UUID): Task?
 
+    /** The Czech prompts of the existing tasks among [ids], in one query (the flag queue, FR-41). */
+    fun prompts(ids: Collection<UUID>): Map<UUID, String>
+
     /** The task an image belongs to, or null for an unknown image. */
     fun imageOwner(imageId: UUID): UUID?
 

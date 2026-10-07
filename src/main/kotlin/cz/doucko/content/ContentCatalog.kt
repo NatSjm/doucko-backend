@@ -35,4 +35,7 @@ interface ContentCatalog {
 
     /** The task with this id, or null when it does not exist. */
     fun task(taskId: UUID): CatalogTask?
+
+    /** The Czech prompts of the existing tasks among [taskIds], in one lookup (the flag queue). */
+    fun prompts(taskIds: Collection<UUID>): Map<UUID, String>
 }

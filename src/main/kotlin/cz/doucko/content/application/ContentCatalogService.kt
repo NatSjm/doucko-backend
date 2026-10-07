@@ -27,6 +27,8 @@ class ContentCatalogService(
         }
     }
 
+    override fun prompts(taskIds: Collection<UUID>): Map<UUID, String> = tasks.prompts(taskIds)
+
     override fun task(taskId: UUID): CatalogTask? =
         tasks.find(taskId)?.let { task ->
             CatalogTask(

@@ -32,6 +32,12 @@ class TaskProgress(
 
     val latest: AttemptRecord? get() = attempts.lastOrNull()
 
+    /**
+     * The attempt that decides [state]: attempt 1 when it counts as correct (also after a re-evaluation made it
+     * correct while attempt 2 exists), else the latest.
+     */
+    val deciding: AttemptRecord? get() = attempts.firstOrNull()?.takeIf { it.effectiveCorrect } ?: latest
+
     /** Parts correct on attempt 1, locked for attempt 2 (OQ-11). Empty before attempt 1 and once resolved. */
     val locked: Map<String, PartRecord>
         get() =

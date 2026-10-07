@@ -198,6 +198,17 @@ class JdbcPracticeStore(
             .optional()
             .orElse(null)
 
+    override fun attemptsById(ids: Collection<UUID>): List<AttemptRecord> =
+        if (ids.isEmpty()) {
+            emptyList()
+        } else {
+            jdbc
+                .sql("$ATTEMPTS WHERE a.id IN (:ids)")
+                .param("ids", ids.distinct())
+                .query { rs, _ -> attempt(rs) }
+                .list()
+        }
+
     override fun reports(status: ReportStatus?): List<ReportRecord> =
         jdbc
             .sql(

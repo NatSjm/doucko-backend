@@ -133,6 +133,23 @@ class ReevaluationRulesTest {
 
     // @trace FR-41
     @Test
+    fun `a replay attempt counts as better only when it becomes correct as a whole`() {
+        // Review F06: one of two wrong parts fixed is not "better"; nothing is recorded.
+        val replay = attempt(1, false, replay = true)
+        val partly =
+            Grade.Graded(
+                listOf(
+                    PartRecord("a", RawAnswer.Text("0,5"), "0.5", Verdict.CORRECT, false),
+                    PartRecord("b", RawAnswer.Text("7"), "7", Verdict.WRONG, false),
+                ),
+            )
+        ReevaluationRules.decide(replay, partly, emptyList()) shouldBe ReevaluationDecision.NoChange
+        val primary = attempt(1, false)
+        ReevaluationRules.decide(primary, partly, listOf(primary)) shouldBe ReevaluationDecision.NoChange
+    }
+
+    // @trace FR-41
+    @Test
     fun `a replay re-evaluation never changes the replay run's own state`() {
         val replay = attempt(1, false, replay = true, reevaluation = fixed)
         replay.effectiveCorrect shouldBe false

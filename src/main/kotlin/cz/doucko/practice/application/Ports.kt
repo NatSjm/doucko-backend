@@ -66,6 +66,9 @@ interface PracticeStore {
     /** One logged attempt with its re-evaluation, or null. */
     fun attempt(id: UUID): AttemptRecord?
 
+    /** The logged attempts among [ids] with their re-evaluations, in one query (the flag queue). */
+    fun attemptsById(ids: Collection<UUID>): List<AttemptRecord>
+
     /** The flag queue (FR-41): reports with [status] (null: all), `OPEN` first, each group oldest first. */
     fun reports(status: ReportStatus?): List<ReportRecord>
 

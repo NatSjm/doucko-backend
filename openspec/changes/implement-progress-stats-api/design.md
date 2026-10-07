@@ -65,7 +65,9 @@ smoke (run by the coordinator after the merge).
    `FIXED` and `DISMISSED` together; each group oldest first (`created_at`,
    then id). `status` filters exactly (pattern-checked by the generated
    interface). `taskPromptExcerpt` = the first 80 code points of the task's
-   current Czech prompt, with `…` appended when cut. `attempt` (null when none
+   current Czech prompt, with `…` appended when cut (nothing is trimmed, review F04). Prompts and
+   attempts of the listed reports are read in one batch query each (`ContentCatalog.prompts`,
+   `PracticeStore.attemptsById`; review F02). `attempt` (null when none
    was attached): `rawInput` holds every part typed in that attempt verbatim (a
    part locked as correct on attempt 1 is not re-entered on attempt 2 and is
    left out), `normalized` and `verdicts` hold every part, `replay`,
@@ -87,8 +89,10 @@ smoke (run by the coordinator after the merge).
      stores the new per-part verdicts with its own timestamp, the report
      becomes `FIXED`, and `newTaskState` is the new outcome.
    - *Replay attempt:* the first-resolution outcome, the first-try rate,
-     mission completion and XP never change. If the attempt was wrong and is
-     now correct, the new verdicts are recorded, the report becomes `FIXED`
+     mission completion and XP never change. "Better" means the attempt is
+     now correct as a whole (one of two wrong parts fixed is not better;
+     review F06). If the attempt was wrong and is now correct, the new
+     verdicts are recorded, the report becomes `FIXED`
      with `xpAwarded` 0, `bonusXp` 0, `newTaskState` null.
    - Otherwise `changed: false`, `xpAwarded` 0, `bonusXp` 0,
      `completedMissionIds` [], `newTaskState` null, the report stays `OPEN`
@@ -97,7 +101,11 @@ smoke (run by the coordinator after the merge).
    summary, the first-try rate) reads a primary-scope attempt's re-evaluated
    verdict as its correctness (`AttemptRecord.effectiveCorrect`), so a task
    resolved by a re-evaluation is no longer asked, and its mission can become
-   complete. Replay attempts keep their original verdict for their run.
+   complete. Replay attempts keep their original verdict for their run. The
+   task screen's `lastFeedback` shows the attempt that decides the state
+   (attempt 1 once it counts as correct, else the latest) with its
+   re-evaluated per-part verdicts, so state and verdicts agree (review F01);
+   its XP stays what that attempt itself earned.
 9. **XP of a re-evaluation (gamification, FR-38).** New award =
    `XpRules.taskAward(newOutcome, hints used at the attached attempt)`;
    `xpAwarded` = max(0, new award − the task XP already in the ledger for that
