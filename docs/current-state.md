@@ -8,7 +8,7 @@
 - **Date and time:** 2026-10-08 (Europe/Prague)
 - **Current phase:** Phase 4
 - **Last completed gate:** G3
-- **Active change:** none. Slice 9 backend `implement-progress-stats-api` (the last MVP slice) archived 2026-10-08 on branch `slice9-progress-stats` (not yet merged into `main`; the coordinator merges it with the frontend half and runs the real-stack smoke). Before it: slice 8 `implement-gamification-api`, merged into `main` (`9527006`) with a real-stack smoke PASS.
+- **Active change:** none. Slice 9 backend `implement-progress-stats-api` (the last MVP slice) archived 2026-10-08 and merged into `main` (`e40423d`) with the frontend half; real-stack smoke PASS after the merge (2026-10-08: flag queue OPEN→re-evaluate no change→fix spec→re-evaluate +4 XP FIXED, dismiss, 409/404/400/401/403 paths, stats weeks and first-try rate, both admin screens rendered from the stack, clean log; restore of the pre-smoke V5 dump restarted the V6 backend itself). Before it: slice 8 `implement-gamification-api`, merged into `main` (`9527006`) with a real-stack smoke PASS.
 - **Contract pin:** `contract/` submodule at docs `0168eba`, API 0.5.1
 - **Progress:** Spring Boot 4.1.1 / Kotlin 2.3 / JVM 21 scaffold (ADR-0003) plus slice 1 platform
   foundation: Compose stack (db, backend, frontend; only the frontend's 8081 published, on
@@ -47,9 +47,9 @@
   a `REEVALUATION` ledger row with the XP difference, completion bonuses, rank-ups left pending for HQ; replay attempts
   recorded at 0 XP) and `dismissReport`. Practice state reads re-evaluated verdicts of first play-through attempts.
   Content gained the public query `ContentCatalog`.
-- **Next task:** after the coordinator merges slice 9 and runs its real-stack smoke: Phase 5 hardening (G5) per the
-  playbook; every MVP slice is then archived.
+- **Next task:** Phase 5 hardening (G5) per the playbook; every MVP slice is archived and merged.
 - **Claims:**
+  - Slice 9 merged into `main` (`e40423d`); real-stack smoke PASS after the merge (2026-10-08: flag queue OPEN→re-evaluate no change→fix spec→re-evaluate +4 XP FIXED, dismiss, 409/404/400/401/403 paths, stats weeks and first-try rate, both admin screens rendered from the stack, clean log; restore of the pre-smoke V5 dump restarted the V6 backend itself) — evidence: `docs/qa/evidence/slice9-compose-smoke.md`. Open: the smoke PDF on `doucko_doucko-storage` and a stray empty `doucko-storage` volume, left for the owner to remove.
   - Slice 9 QA battery passes after the review fixes (800 unit, 161 integration tests incl. `ProgressStatsIT`, `FlagQueueIT`, `PracticeLogCaptureIT` with the four admin endpoints, `PracticeTimingIT` NFR-5 p95 78 ms) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-07)
   - Slice 9 review gate dispositioned (8 findings: 1 major, 7 minor; 6 fixed in `2dfbb77`, 2 minor waived — paging and a "why no change" reason need a contract change; run cost $8.81) — evidence: `openspec/changes/archive/2026-10-08-implement-progress-stats-api/review-findings.json`
   - Slice 9 RED run — evidence: `docs/qa/evidence/slice9-red-run.md`
