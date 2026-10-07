@@ -26,8 +26,8 @@ private fun body() = PracticeBodyAdvice.body((RequestContextHolder.currentReques
 
 /**
  * `ChildHqApi` (store spec practice-flow "HQ without login", "Mission list on HQ"; FR-24, FR-25). Login-free:
- * the shared chain lets every child request through. XP, ranks and the summary are slice-8 placeholders
- * (design decision 7).
+ * the shared chain lets every child request through. XP, ranks, the summary and the rank-up acknowledgement
+ * follow gamification (FR-32, FR-36, FR-37).
  */
 @RestController
 class ChildHqController(
@@ -41,9 +41,9 @@ class ChildHqController(
     override fun getMissionSummary(missionId: UUID): ResponseEntity<MissionSummary> =
         ResponseEntity.ok(PracticeMapping.summary(service.summary(missionId)))
 
-    /** Nothing is ever pending before slice 8: the body is validated and the answer is 204. */
+    /** Marks a played celebration (FR-36): 204, also when nothing was pending. */
     override fun ackRankUp(ackRankUpRequest: AckRankUpRequest): ResponseEntity<Unit> {
-        PracticeReaders.rankIndex(body())
+        service.acknowledgeRankUp(PracticeReaders.rankIndex(body()))
         return ResponseEntity.noContent().build()
     }
 }

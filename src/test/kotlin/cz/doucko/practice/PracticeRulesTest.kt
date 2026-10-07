@@ -12,7 +12,6 @@ import cz.doucko.practice.domain.JsonText
 import cz.doucko.practice.domain.MissionProgress
 import cz.doucko.practice.domain.MissionState
 import cz.doucko.practice.domain.PartRecord
-import cz.doucko.practice.domain.PlaceholderLadder
 import cz.doucko.practice.domain.RawAnswer
 import cz.doucko.practice.domain.ReportInput
 import cz.doucko.practice.domain.ReportReason
@@ -210,15 +209,5 @@ class PracticeRulesTest {
             ReportInput(ReportReason.OTHER, "😀".repeat(1000))
         ReportRules.validate(JsonText.Value("UNCLEAR_PROMPT"), JsonText.Value("  ")).first shouldBe
             ReportInput(ReportReason.UNCLEAR_PROMPT, null)
-    }
-
-    // @trace FR-24
-    @Test
-    fun `the placeholder ladder puts every child on the first rank until XP exists`() {
-        PlaceholderLadder.ranks.map { it.minXp } shouldContainExactly listOf(0, 150, 400, 800, 1500)
-        PlaceholderLadder.rankFor(0).index shouldBe 0
-        PlaceholderLadder.rankFor(1500).index shouldBe 4
-        PlaceholderLadder.nextAfter(PlaceholderLadder.rankFor(0))?.index shouldBe 1
-        PlaceholderLadder.nextAfter(PlaceholderLadder.rankFor(1500)).shouldBeNull()
     }
 }

@@ -35,7 +35,7 @@ import cz.doucko.practice.application.TaskScreen
 /**
  * Practice views → generated contract models (NFR-12). Translated text is added next to the Czech only
  * when the profile's locale is on and the text has a translation (FR-29); otherwise `secondary` is null.
- * Slice-8 fields are the placeholders of design decision 7.
+ * XP and ranks come from gamification (slice 8).
  */
 internal object PracticeMapping {
     fun hq(data: HqData) =
@@ -62,7 +62,7 @@ internal object PracticeMapping {
                         },
                     )
                 },
-            pendingRankUp = null,
+            pendingRankUp = data.pendingRankUp?.let(::rank),
         )
 
     fun briefing(data: BriefingData) =
@@ -71,19 +71,19 @@ internal object PracticeMapping {
             position = data.position,
             topicName = data.topicName,
             state = MissionState.forValue(data.state.name),
-            xpAvailable = 0,
+            xpAvailable = data.xpAvailable,
             tasks = data.tasks.map { MissionBriefingTasksInner(it.taskId, it.position, TaskState.forValue(it.state.name)) },
         )
 
     fun summary(data: SummaryData) =
         MissionSummary(
             missionId = data.missionId,
-            xpEarned = 0,
+            xpEarned = data.xpEarned,
             firstTryCount = data.firstTryCount,
             taskCount = data.taskCount,
             replay = data.replay,
-            rankUp = null,
-            rankReachedDuringRun = null,
+            rankUp = data.rankUp?.let(::rank),
+            rankReachedDuringRun = data.rankReachedDuringRun?.let(::rank),
         )
 
     fun task(screen: TaskScreen): TaskView {
@@ -124,7 +124,8 @@ internal object PracticeMapping {
             maxAttempts = TaskView.MaxAttempts._2,
             attemptsUsed = screen.attemptsUsed,
             state = TaskState.forValue(screen.state.name),
-            lastFeedback = screen.lastResult?.let(::attempt),
+            // A celebration never replays: the reloaded result carries no rank-up.
+            lastFeedback = screen.lastResult?.let { attempt(it.copy(rankUp = null)) },
         )
     }
 
@@ -137,7 +138,7 @@ internal object PracticeMapping {
             parts = outcome.parts.map { PartResult(it.key, Verdict.forValue(it.verdict.name), it.normalized, it.formatTip, it.locked) },
             taskState = TaskState.forValue(outcome.state.name),
             attemptsLeft = outcome.attemptsLeft,
-            xpAwarded = 0,
+            xpAwarded = outcome.xp.xpAwarded,
             feedback =
                 outcome.feedback?.let { feedback ->
                     Feedback(
@@ -151,10 +152,10 @@ internal object PracticeMapping {
                             },
                     )
                 },
-            rankUp = null,
+            rankUp = outcome.rankUp?.let(::rank),
             missionComplete = outcome.missionComplete,
-            bonusXp = 0,
-            completedMissionIds = emptyList(),
+            bonusXp = outcome.xp.bonusXp,
+            completedMissionIds = outcome.xp.completedMissionIds,
         )
 
     private fun hint(

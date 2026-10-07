@@ -70,6 +70,9 @@ interface ServedContent {
     /** Every served mission, by topic order and then position. */
     fun missions(): List<ServedMission>
 
+    /** The served missions that contain [taskId] (gamification: completion on a task's first resolution, OQ-15). */
+    fun missionsContaining(taskId: UUID): List<ServedMission>
+
     /** The served mission with this id, or null when it is a draft, empty or unknown. */
     fun mission(missionId: UUID): ServedMission?
 

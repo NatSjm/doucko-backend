@@ -12,7 +12,6 @@ import cz.doucko.practice.domain.Grading
 import cz.doucko.practice.domain.HintRecord
 import cz.doucko.practice.domain.MissionProgress
 import cz.doucko.practice.domain.MissionState
-import cz.doucko.practice.domain.PlaceholderLadder
 import cz.doucko.practice.domain.RawAnswer
 import cz.doucko.practice.domain.ReportInput
 import cz.doucko.practice.domain.ReportRecord
@@ -39,6 +38,7 @@ class PracticeService(
     private val profile: ChildProfile,
     private val store: PracticeStore,
     private val tutor: TutorPort,
+    private val gamification: Gamification,
 ) {
     /** The scope a mission is practised in now: an unfinished replay run, else the primary scope. */
     private data class Run(
@@ -64,13 +64,14 @@ class PracticeService(
                 .sortedWith(compareByDescending<ServedMission, Instant?>(nullsFirst()) { lastActivity[it.missionId] })
                 .firstOrNull()
                 ?.let { it.missionId to progress.getValue(it.missionId).firstUnresolved!! }
-        val rank = PlaceholderLadder.rankFor(0)
+        val xp = gamification.progress()
         return HqData(
             displayName = profile.displayName(),
-            totalXp = 0,
+            totalXp = xp.totalXp,
             solvedTasks = states.count { it.value.resolved },
-            rank = rank,
-            nextRank = PlaceholderLadder.nextAfter(rank),
+            rank = xp.rank,
+            nextRank = xp.nextRank,
+            pendingRankUp = xp.pendingRankUp,
             continueTarget = target,
             topics =
                 missions
@@ -97,6 +98,7 @@ class PracticeService(
             position = mission.position,
             topicName = mission.topicName,
             state = primaryProgress(mission).state,
+            xpAvailable = gamification.available(mission),
             tasks = mission.taskIds.mapIndexed { i, id -> BriefingTask(id, i + 1, states[id] ?: TaskState.UNRESOLVED) },
         )
     }
@@ -165,9 +167,14 @@ class PracticeService(
                         createdAt = Instant.now(),
                     )
                 store.insertAttempt(record)
-                val result = outcome(mission, task, run, TaskProgress(progress.attempts + record), hintsOpened)
+                val after = TaskProgress(progress.attempts + record)
+                val result = outcome(mission, task, run, after, hintsOpened)
                 if (run.replay && result.missionComplete) store.finishRun(run.scope, record.createdAt)
-                result
+                val xp = gamification.onAttempt(record, after.state)
+                // A crossing at the run's last task waits for the summary or HQ (pendingRankUp); any other plays now.
+                val rankUp = xp.crossing?.takeIf { !result.missionComplete }
+                rankUp?.let { gamification.celebrated(it, record.createdAt) }
+                result.copy(xp = xp, rankUp = rankUp)
             }
         }
     }
@@ -219,8 +226,8 @@ class PracticeService(
     fun image(imageId: UUID): ServedImage = served.image(imageId) ?: throw PracticeNotFound()
 
     /**
-     * Placeholder replay (slice 8 owns the rules; design decision 7): an unfinished replay run is returned
-     * unchanged; a mission complete in the primary scope starts a new run; any other mission is 409.
+     * Replay (FR-33, OQ-17): an unfinished replay run is returned unchanged; a mission complete in the primary
+     * scope starts a new run, which earns no XP; any other mission is 409.
      */
     @Transactional
     fun replay(missionId: UUID): TaskScreen {
@@ -241,7 +248,7 @@ class PracticeService(
         return screen(mission, task(mission, next), run)
     }
 
-    /** Placeholder summary of the latest completed run (slice 8 adds XP and ranks); 409 when no run is complete. */
+    /** The mission-complete screen of the latest completed run (FR-32); 409 when no run is complete. */
     fun summary(missionId: UUID): SummaryData {
         val mission = mission(missionId)
         val completedReplay =
@@ -255,8 +262,21 @@ class PracticeService(
         val attempts = store.attempts(scope, mission.taskIds)
         val firstTry =
             attempts.count { it.attemptNo == 1 && it.correct && it.missionId == mission.missionId }
-        return SummaryData(mission.missionId, firstTry, mission.taskIds.size, completedReplay != null)
+        val xp = gamification.summary(mission, scope)
+        return SummaryData(
+            mission.missionId,
+            firstTry,
+            mission.taskIds.size,
+            completedReplay != null,
+            xp.xpEarned,
+            xp.rankUp,
+            xp.rankReachedDuringRun,
+        )
     }
+
+    /** `ackRankUp` (FR-36): marks the celebration of [rankIndex] as played. */
+    @Transactional
+    fun acknowledgeRankUp(rankIndex: Int) = gamification.acknowledge(rankIndex)
 
     private fun mission(missionId: UUID): ServedMission = served.mission(missionId) ?: throw PracticeNotFound()
 
@@ -326,6 +346,7 @@ class PracticeService(
             attemptsLeft = progress.attemptsLeft,
             feedback = tutor.feedback(TutorInput(task.parts, task.hints.size, hintsOpened, progress.state)),
             missionComplete = complete,
+            xp = gamification.ofAttempt(latest.id),
         )
     }
 }

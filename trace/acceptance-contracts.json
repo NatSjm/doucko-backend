@@ -159,48 +159,48 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-34": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/practice/GamificationConfigIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-35": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/practice/GamificationConfigIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-36": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/practice/GamificationConfigIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-38": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-39": [
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": null,
-        "status": "planned"
+        "artifact": "src/test/kotlin/cz/doucko/practice/GamificationConfigIT.kt",
+        "status": "artifact-ok"
       }
     ],
     "FR-42": [

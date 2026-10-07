@@ -48,6 +48,7 @@ class ContentAuthoringIT {
     @BeforeEach
     fun clean() {
         // Practice rows reference tasks (the practice ITs share this context and database).
+        jdbc.execute("TRUNCATE xp_award, rank_celebration")
         jdbc.update("DELETE FROM problem_report")
         jdbc.update("DELETE FROM opened_hint")
         jdbc.update("DELETE FROM attempt")

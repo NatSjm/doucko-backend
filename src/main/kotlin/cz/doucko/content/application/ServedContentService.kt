@@ -36,6 +36,8 @@ class ServedContentService(
         return missions.list().mapNotNull { served(it, servable::contains) }
     }
 
+    override fun missionsContaining(taskId: UUID): List<ServedMission> = missions.containing(taskId).mapNotNull { served(it, ::servable) }
+
     override fun mission(missionId: UUID): ServedMission? = missions.find(missionId)?.let { served(it, ::servable) }
 
     override fun isServed(taskId: UUID): Boolean = servable(taskId) && inPublishedMission(taskId)
