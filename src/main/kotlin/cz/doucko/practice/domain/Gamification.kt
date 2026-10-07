@@ -76,13 +76,14 @@ class RankLadder(
     ): Rank? = rankFor(after).takeIf { it.index > rankFor(before).index }
 }
 
-/** What an XP ledger row pays for. */
-enum class AwardKind { TASK, MISSION_BONUS }
+/** What an XP ledger row pays for: a first resolution, a completion bonus, or the difference a re-evaluation adds (FR-41). */
+enum class AwardKind { TASK, MISSION_BONUS, REEVALUATION }
 
 /**
  * One row of the append-only XP ledger (FR-38; design decision 5). [seq] orders the ledger; [attemptId] is
  * the resolution that caused the row, null for a bonus credited when a mission was published complete.
- * A `TASK` row's [missionId] is the mission the task was resolved through.
+ * A `TASK` row's [missionId] is the mission the task was resolved through. [reportId] is the report whose
+ * re-evaluation caused the row (a `REEVALUATION` row, or a bonus it paid); such rows never carry an attempt.
  */
 data class XpAward(
     val seq: Long,
@@ -93,6 +94,7 @@ data class XpAward(
     val attemptId: UUID?,
     val amount: Int,
     val createdAt: Instant,
+    val reportId: UUID? = null,
 )
 
 /** The XP part of a mission summary (contract `MissionSummary`, FR-32). */

@@ -9,7 +9,8 @@ import java.util.UUID
 
 /**
  * The two-attempt state machine of one task in one scope (FR-27, OQ-11; design decision 2), derived from
- * the stored attempts only: nothing about a task's state is stored besides the attempt log.
+ * the stored attempts only: nothing about a task's state is stored besides the attempt log. A first
+ * play-through attempt counts with its re-evaluated verdict when an admin recorded one (progress-stats, FR-41).
  */
 class TaskProgress(
     attempts: List<AttemptRecord>,
@@ -19,9 +20,9 @@ class TaskProgress(
     val state: TaskState =
         when {
             this.attempts.isEmpty() -> TaskState.UNRESOLVED
-            this.attempts[0].correct -> TaskState.CORRECT_FIRST_TRY
+            this.attempts[0].effectiveCorrect -> TaskState.CORRECT_FIRST_TRY
             this.attempts.size == 1 -> TaskState.UNRESOLVED
-            this.attempts[1].correct -> TaskState.CORRECT_SECOND_TRY
+            this.attempts[1].effectiveCorrect -> TaskState.CORRECT_SECOND_TRY
             else -> TaskState.REVEALED
         }
 
@@ -30,6 +31,12 @@ class TaskProgress(
     val attemptsLeft: Int get() = if (state.resolved) 0 else MAX_ATTEMPTS - attempts.size
 
     val latest: AttemptRecord? get() = attempts.lastOrNull()
+
+    /**
+     * The attempt that decides [state]: attempt 1 when it counts as correct (also after a re-evaluation made it
+     * correct while attempt 2 exists), else the latest.
+     */
+    val deciding: AttemptRecord? get() = attempts.firstOrNull()?.takeIf { it.effectiveCorrect } ?: latest
 
     /** Parts correct on attempt 1, locked for attempt 2 (OQ-11). Empty before attempt 1 and once resolved. */
     val locked: Map<String, PartRecord>

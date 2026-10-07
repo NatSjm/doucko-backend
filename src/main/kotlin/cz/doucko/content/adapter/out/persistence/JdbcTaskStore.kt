@@ -70,6 +70,18 @@ class JdbcTaskStore(
         return task.copy(images = images(listOf(id))[id].orEmpty())
     }
 
+    override fun prompts(ids: Collection<UUID>): Map<UUID, String> =
+        if (ids.isEmpty()) {
+            emptyMap()
+        } else {
+            jdbc
+                .sql("SELECT id, prompt FROM task WHERE id IN (:ids)")
+                .param("ids", ids.distinct())
+                .query { rs, _ -> rs.getObject("id", UUID::class.java) to rs.getString("prompt") }
+                .list()
+                .toMap()
+        }
+
     override fun imageOwner(imageId: UUID): UUID? =
         jdbc
             .sql("SELECT task_id FROM task_image WHERE id = ?")

@@ -5,6 +5,7 @@ import cz.doucko.content.ContentUsage
 import cz.doucko.content.adapter.`in`.web.ContentProblems
 import cz.doucko.content.adapter.out.pdf.PdfBoxInspector
 import cz.doucko.content.application.Conflicts
+import cz.doucko.content.application.ContentCatalogService
 import cz.doucko.content.application.ContentConfiguration
 import cz.doucko.content.application.ContentLock
 import cz.doucko.content.application.FileStoragePort
@@ -181,6 +182,8 @@ class InMemoryTaskStore : TaskStore {
 
     override fun find(id: UUID) = tasks[id]
 
+    override fun prompts(ids: Collection<UUID>) = ids.mapNotNull { id -> tasks[id]?.let { id to it.content.prompt } }.toMap()
+
     override fun lock(id: UUID) = Unit
 
     override fun imageOwner(imageId: UUID) = tasks.values.firstOrNull { t -> t.images.any { it.id == imageId } }?.id
@@ -325,6 +328,7 @@ class InMemoryFileStorage : FileStoragePort {
     TaskService::class,
     MissionService::class,
     ServedContentService::class,
+    ContentCatalogService::class,
     Conflicts::class,
     ReferenceService::class,
     PdfBoxInspector::class,

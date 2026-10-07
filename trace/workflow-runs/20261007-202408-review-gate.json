@@ -1,0 +1,780 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-07T20:24:08.797Z",
+  "finishedAt": "2026-10-07T20:29:40.889Z",
+  "args": {
+    "scope": "slice 9 progress-stats backend (implement-progress-stats-api)",
+    "baseRef": "7d86c33",
+    "headRef": "HEAD",
+    "change": "implement-progress-stats-api"
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": null,
+    "budgetPerAgentUsd": 2,
+    "maxTotalUsd": 25,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 8.8075,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 445,
+      "durationMs": 193800,
+      "sessionId": "755b2478-2e35-4d3d-bdae-54fa124b16c5",
+      "costUsd": 1.3153054000000004,
+      "numTurns": 24,
+      "result": {
+        "findings": [
+          {
+            "title": "Child task view shows the original WRONG verdicts next to a re-evaluated CORRECT state",
+            "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+            "line": 344,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "After this slice, `TaskProgress.state` reads `effectiveCorrect`, so a re-evaluated attempt 1 changes the task to CORRECT_FIRST_TRY. But `outcome()` still builds the parts from `latest.parts.map { PartOutcome(it.key, it.verdict, it.normalized, null, it.locked) }`, which are the original verdicts. It also picks `progress.latest`, which can be attempt 2 (originally wrong, the one that triggered the reveal). So `TaskView.lastResult` can show `state = CORRECT_FIRST_TRY` together with WRONG per-part verdicts, and the tutor feedback is computed from the new state. Design decision 8 says practice state everywhere reads the re-evaluated verdict, but the per-part feedback was not updated to match.",
+            "suggestion": "When the attempt has a primary-scope `reevaluation`, overlay `reevaluation.verdicts` onto the part verdicts in `outcome()`. When the task was resolved by re-evaluating an earlier attempt, show that attempt (or the state-determining one) rather than `progress.latest`. Add an IT covering 'reevaluate attempt 1 of a REVEALED task, then GET the task view'."
+          },
+          {
+            "title": "Zero-XP re-evaluation writes no ledger row, so startup reconciliation later pays a TASK award from a different attempt",
+            "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+            "line": 96,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`onReevaluation` inserts the REEVALUATION row only `if (amount > 0)`. A task that was UNRESOLVED (no TASK row) and is improved to resolved with an award of 0 (possible when `config.minimum` is 0 and hints cost all the XP) gets no row. `taskAwarded` then stays false, and `reconcile()` on the next startup inserts a TASK award tied to `progress.latest` and that attempt's hints. That attempt may not be the one the re-evaluation resolved, so the ledger records the resolution against the wrong attempt and hint count.",
+            "suggestion": "Always insert the REEVALUATION row when the task had no task XP before (amount 0 is allowed by the `BETWEEN 0 AND 1000` check). Alternatively, have `reconcile` skip tasks whose resolution comes from a re-evaluated attempt."
+          },
+          {
+            "title": "Flag queue listing does N+1 full task loads (all parts, specs converted) only to build an 80-char excerpt",
+            "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+            "line": 141,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "`list()` maps every report through `view`, which calls `catalog.task(report.taskId)` and `store.attempt(id)` per report. `ContentCatalogService.task` loads the whole task and runs `it.spec.toChecker()` on every part, but only `prompt` is used here. With no paging (design decision 6), the queue grows by two or more queries per report on every list.",
+            "suggestion": "Add a batch lookup to `ContentCatalog`, e.g. `prompts(taskIds): Map<UUID, String>`, plus `PracticeStore.attempts(ids)`. Build the views from those maps, or join the attempt in the `reports()` query."
+          },
+          {
+            "title": "Re-evaluation that cannot grade (shape mismatch / unreadable) returns the same 200 changed=false as 'still wrong'",
+            "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+            "line": 111,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`val grade = if (parts.isEmpty()) null else ReevaluationRules.regrade(parts, attempt)`. A null or Unreadable grade then falls into `decision == ReevaluationDecision.NoChange` and returns `ReevaluationOutcome(false, XpOutcome.NONE, view(report), null)`. The admin cannot tell 'the fixed spec still rejects the answer' from 'the stored input no longer fits the task's parts (e.g. part type changed or deleted)'. In the second case, re-trying after more spec edits will never help. This matches design decision 7, but the admin never learns why nothing happened.",
+            "suggestion": "If the contract allows, add a reason to `ReevaluationResult` (or a distinct 409 detail) when the attempt cannot be graded under the current parts. Otherwise, record this as an open question in the docs store."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 473,
+      "durationMs": 60932,
+      "sessionId": "afe035df-527d-40bd-b69f-d3b9960e4af7",
+      "costUsd": 0.5899367999999999,
+      "numTurns": 10,
+      "result": {
+        "findings": [
+          {
+            "title": "Flag queue is unpaginated and makes 2 extra queries per report, while anyone on the LAN can create reports without logging in",
+            "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+            "line": 94,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The child report endpoint needs no login and has no rate limit. `PracticeService.report` (PracticeService.kt:201-212) adds a `problem_report` row on every call. Any device on the home LAN, or a child repeatedly tapping 'report', can create thousands of reports for a served task. The new admin `GET /api/admin/reports` (AdminStatsController.listReports → FlagQueue.list) loads every report with no limit. `view()` (ProgressStats.kt:141) then runs `catalog.task()` and `store.attempt()` for each one, so the admin page gets slow and the real reports are lost in the noise. This is not a confidentiality or integrity issue: re-evaluate and dismiss are behind the admin session plus CSRF chain (`/api/admin/**`, AdminSecurityConfiguration.kt:71-79), and `attemptId` is set by the server (PracticeService.kt:210-211), so it cannot be used for IDOR.",
+            "suggestion": "Add a limit/offset (or a cap) to `PracticeStore.reports`. Fetch the task excerpts and attempts for the listed reports in one batch query each instead of one query per report. Put a simple limit on report creation on the child side, e.g. at most N OPEN reports per task, or a short per-task cooldown."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 416,
+      "durationMs": 147659,
+      "sessionId": "8c913a89-5d28-4f29-ad18-0066569e1b8c",
+      "costUsd": 1.1563231999999999,
+      "numTurns": 24,
+      "result": {
+        "findings": [
+          {
+            "title": "Coverage summary: 67 backend-applicable scenarios: 64 implemented, 3 partial, 0 missing, 0 contradicted",
+            "file": "openspec/changes/implement-progress-stats-api/specs/progress-stats/spec.md",
+            "line": 1,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "I mapped the store spec contract/openspec/specs/progress-stats/spec.md (60 scenarios, minus 'Child UI has no stats', which is frontend-only, and the UI-only halves of 'No data yet' and 'Topic with no resolved tasks') and the change delta (7 scenarios) to code and tests. Each requirement has an implementation and a test: StatsRules.sessions/weeks/metricMet/firstTry (practice/domain/Stats.kt), FlagQueue.list/reevaluate/dismiss (practice/application/ProgressStats.kt:89-150), AdminStatsController (weeks/status/reportId validation), and V6__progress_stats.sql (append-only attempt_reevaluation, REEVALUATION ledger kind with a unique index per report). The tests are StatsRulesTest (23 cases incl. DST and the Sunday-midnight session), ProgressStatsIT (12), FlagQueueIT (21 incl. 401/403/404/409/400 paths) and PracticeLogCaptureIT (NFR-3). The 5 Attempt-log scenarios (FR-42) were delivered by slice 7 and are only re-exposed here. The OpenAPI boundary matches: 4 operations, the documented 200/400/401/403/404/409 codes, no extra fields. FR-40 and FR-41 (backend+frontend in the plan) are both traced in the specs and tests.",
+            "suggestion": "None. This entry is the coverage line the output contract asks for; the partial items are listed separately."
+          },
+          {
+            "title": "taskPromptExcerpt trims trailing whitespace before the ellipsis, which differs from design decision 6; the field has no store-spec requirement",
+            "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+            "line": 146,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "design.md decision 6: \"`taskPromptExcerpt` = the first 80 code points of the task's current Czech prompt, with `…` appended when cut.\" Code: `return prompt.substring(0, prompt.offsetByCodePoints(0, EXCERPT_LENGTH)).trimEnd() + \"…\"`. If code point 80 falls on whitespace, the excerpt is shorter than 80 code points. The FlagQueueIT test (`excerpt.removeSuffix(\"…\").length shouldBe 80`) uses a prompt with no whitespace near the cut, so it cannot catch this. The store spec's Flag queue requirement only says each entry shows \"the task\". The 80-code-point excerpt (and the new public ContentCatalog content query that serves it) exists only in OpenAPI and design.md.",
+            "suggestion": "Either amend design decision 6 to say trailing whitespace is trimmed, or drop `.trimEnd()`. Add a test whose prompt has a space at code point 80. Consider adding the excerpt to the store spec's Flag queue requirement so this scope drift is documented."
+          },
+          {
+            "title": "A replay re-evaluation only counts as better when the whole attempt becomes correct; a per-part improvement is not covered by the spec",
+            "file": "src/main/kotlin/cz/doucko/practice/domain/Reevaluation.kt",
+            "line": 57,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "Store spec: \"If the new verdict is better than the attempt's recorded verdict, it is recorded alongside the original, the report becomes `FIXED`, and 0 XP is awarded; otherwise nothing changes.\" Code: `val wasCorrect = attempt.reevaluation?.correct ?: attempt.correct; return if (!wasCorrect && grade.correct) ReplayCorrected else NoChange`. On a multi-part replay attempt, a fix that turns one WRONG part CORRECT while another part stays WRONG is per-part better, but it returns NoChange and the report stays OPEN. The V6 migration comment also assumes \"a recorded re-evaluation is always all-correct\". ReevaluationRulesTest and FlagQueueIT only cover single-part replays.",
+            "suggestion": "Amend the store spec to define \"better\" for a replay attempt as \"the attempt is now correct as a whole\" (matching the code and the design note). Add a two-part replay test where only one part is fixed and assert changed=false."
+          },
+          {
+            "title": "The 'Rank-up from a re-evaluation' scenario is only partly tested: the 'celebration plays once' half is not asserted",
+            "file": "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+            "line": 308,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "Scenario: \"THEN HQ shows the 2nd rank and the rank-up celebration naming the 2nd rank plays once.\" The test checks `hq.read<Int>(\"$.rank.index\") shouldBe 1` and `hq.read<Int>(\"$.pendingRankUp.index\") shouldBe 1`. It never acknowledges the rank-up (`/api/child/hq/rank-up-ack`) or checks that a second HQ read returns no pendingRankUp. The one-shot behaviour comes from slice 8, but nothing checks it for a rank-up crossed by a REEVALUATION ledger row with no attempt_id.",
+            "suggestion": "Extend the test: call rank-up-ack and then assert `$.pendingRankUp` is null on the next HQ read."
+          },
+          {
+            "title": "Task 5.2 (openspec validate --strict) is ticked with no recorded evidence",
+            "file": "openspec/changes/implement-progress-stats-api/tasks.md",
+            "line": 25,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "tasks.md: \"- [x] 5.2 `npx openspec validate implement-progress-stats-api --strict`.\" Unlike 2.3 (docs/qa/evidence/slice9-red-run.md) and 5.1, this task points to no evidence file, and the diff 7d86c33..HEAD contains no validation output. All the other ticked tasks (1.1–4.2) have their artifacts: V6__progress_stats.sql, StatsRulesTest, ReevaluationRulesTest, ProgressStatsIT, FlagQueueIT, the PracticeLogCaptureIT extension, Stats.kt, Reevaluation.kt, ProgressStats/FlagQueue, Gamification.onReevaluation, ContentCatalog, JdbcPracticeStore/JdbcXpLedger, AdminStatsController and AdminStatsProblemAdvice. Unticked 5.1, 5.3–5.6 are correctly left open.",
+            "suggestion": "Re-run `npx openspec validate implement-progress-stats-api --strict` and record the output, e.g. in docs/qa/automated-verification-latest.md via qa:verify (task 5.1), so the tick has an evidence pointer. Otherwise untick it until 5.1 runs."
+          },
+          {
+            "title": "Design names a separate FlagQueue use case and StatsMapping, but both are inside other files",
+            "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+            "line": 89,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "design.md 'Module + hexagon placement': \"use cases `ProgressStats` and `FlagQueue` in `practice/application`\" and \"mapping in `StatsMapping`\". FlagQueue is a second class in ProgressStats.kt, and StatsMapping is an `internal object` at the bottom of AdminStatsController.kt:73. Behaviour is unaffected, but the design reads as if these were separate artifacts.",
+            "suggestion": "Either split them into FlagQueue.kt and StatsMapping.kt, or amend design.md to say where they live. This is documentation hygiene only."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 685,
+      "durationMs": 21466,
+      "sessionId": "75b2db6f-58e8-41da-96a8-5319850cb5d9",
+      "costUsd": 0.17488019999999999,
+      "numTurns": 4,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1714,
+      "durationMs": 46426,
+      "sessionId": "78e22b45-05f9-40ae-83be-eb58b67afb5e",
+      "costUsd": 0.36231360000000007,
+      "numTurns": 10,
+      "result": {
+        "refuted": false,
+        "reasoning": "The bug is real; I could not refute it.\n\n1. **State uses the new verdict.** `TaskProgress.state` (`Rules.kt:20-27`) reads `effectiveCorrect`. That is the re-evaluated verdict for primary-scope attempts (`Model.kt:87`). So after an admin re-evaluates attempt 1 of a REVEALED task, the state becomes CORRECT_FIRST_TRY.\n\n2. **The view uses the latest attempt and its original verdicts.** `screen()` (`PracticeService.kt:315-325`) builds `lastResult` from `outcome()` whenever `progress.latest != null`. `outcome()` (`:337-347`):\n   - takes `progress.latest`, which is attempt 2;\n   - builds `parts` from `latest.parts.map { PartOutcome(it.key, it.verdict, ...) }`, the original stored verdicts. `Reevaluation.verdicts` is never overlaid here, and nothing in the web mapping (`PracticeMapping.kt:128`) does it either;\n   - sets `state = progress.state` (CORRECT_FIRST_TRY);\n   - computes tutor feedback from that new state.\n\n   The response therefore shows attemptNo 2 with WRONG part verdicts next to state CORRECT_FIRST_TRY. The same happens with a single-attempt task: re-evaluate attempt 1 and the task view still shows that attempt's original WRONG parts with a CORRECT state.\n\n3. **The path is reachable.** `currentRun()` returns the PRIMARY scope whenever no replay run is open, so an ordinary GET of the task after a FIXED re-evaluation hits this code. The `Model.kt:57` comment (\"never in place of the attempt's own verdicts\") is about storage: the original verdicts are kept and the re-evaluation is stored beside them. It does not justify mixing the two in the response. Design decision 8 says the task screen reads the re-evaluated verdict.\n\n**Severity: downgrade.** This is a display inconsistency, not data corruption. Nothing stored is wrong, XP and state are right, and it only shows up after a rare admin-triggered re-evaluation of a primary-scope attempt.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1747,
+      "durationMs": 27329,
+      "sessionId": "40ec3232-d4e1-4a93-ae76-7adfa4df27b2",
+      "costUsd": 0.2628098,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the problem in the code, and it doesn't depend on unusual timing.\n\n1. **State uses the corrected verdict.** In `TaskProgress.state` (Rules.kt:20-27), attempts 1 and 2 are judged by `effectiveCorrect`. That property (Model.kt:87) returns the re-evaluated verdict for a first play-through attempt, if an admin recorded one.\n\n2. **Per-part results use the original verdict.** `outcome()` builds the parts from `latest.parts.map { PartOutcome(it.key, it.verdict, …) }` (PracticeService.kt:344), which is the verdict stored when the child answered. Nothing in this path applies `reevaluation.verdicts`.\n\n3. **`latest` is just the last attempt.** It is `attempts.lastOrNull()` (Rules.kt:33), not the attempt that now decides the task's state.\n\n4. **Re-evaluation is how the mismatch arises.** `ReevaluationRules.decide` stores a re-evaluation exactly when the new verdict improves the outcome (Reevaluation.kt:60-68).\n\nSo there are two realistic ways for the task view (`screen` → `lastResult`, PracticeService.kt:325) to contradict itself:\n- **Attempt 1 wrong, then corrected by the admin.** The state becomes CORRECT_FIRST_TRY, while the latest attempt (attempt 1, or attempt 2 if the task was already revealed) still shows its WRONG parts.\n- **Attempt 2 of a revealed task corrected.** Even here, where `latest` is the corrected attempt, the state becomes CORRECT_SECOND_TRY but the parts still come from the original WRONG verdicts.\n\nThe tutor feedback is computed from the new state (line 347), so it will also disagree with the per-part verdicts.\n\nNothing guards against this: re-evaluations only apply to the first play-through, and `screen` uses that scope whenever no replay run is active, which is the normal case after an admin re-evaluation. A child opening the task after an admin accepts their report will hit this. It's a confusing display, not a security or data-integrity problem, so \"major\" is about right, perhaps slightly high.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1428,
+      "durationMs": 18742,
+      "sessionId": "b893b872-b3bb-4bd8-91f0-ddc1df43173a",
+      "costUsd": 0.2975408,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding depends on `config.minimum` being 0, and that can't happen. `GamificationConfigParser.kt:47` parses every XP key with a lower bound of 0, except `minimum`, which gets a lower bound of 1 (`if (key == \"minimum\") 1 else 0`). The XpConfig doc comment also says \"minimum 1..1000\", and the shipped `gamification.json` sets `\"minimum\": 1`.\n\n`XpRules.taskAward` returns `maxOf(config.minimum, …)` for every resolved state (CORRECT_FIRST_TRY, CORRECT_SECOND_TRY and REVEALED), so any resolved state earns at least 1 XP no matter how many hints were used. In the finding's scenario the task had no TASK or REEVALUATION row, so `taskXp` is 0. That makes `amount = taskAward(resolved) - 0 ≥ 1`, so the `if (amount > 0)` branch always runs and a REEVALUATION row is inserted.\n\n`JdbcXpLedger.taskAwarded` counts both `TASK` and `REEVALUATION` rows, so `reconcile()` later sees the task as awarded and skips it. The finding's 'zero-XP re-evaluation of a previously unresolved task' can't happen with any configuration the parser accepts. The `amount > 0` guard only skips the case where the task already had task XP at or above the new award, and there `taskAwarded` is already true. The mechanism doesn't hold.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1461,
+      "durationMs": 20357,
+      "sessionId": "6bf840de-b43e-41dd-ab6c-3c8f6f9aa805",
+      "costUsd": 0.283457,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding depends on `config.minimum` being 0, and that can't happen. `GamificationConfigParser.kt:47` checks every XP key against 0..1000 except `minimum`, which must be 1..1000 (`if (key == \"minimum\") 1 else 0`). The `XpConfig` KDoc says the same (\"minimum 1..1000\"), and the shipped `gamification.json` uses minimum 1.\n\n`XpRules.taskAward` (domain/Gamification.kt:39-41) returns `maxOf(config.minimum, ...)` for every resolved state (CORRECT_FIRST_TRY, CORRECT_SECOND_TRY, REVEALED). So any resolved state gets an award of at least 1.\n\nTake the claimed scenario: the task had no TASK or REEVALUATION row, so `ledger.taskXp(taskId) == 0`. Re-evaluation then improves it to a resolved state. The amount is therefore `taskAward(...) - 0 >= 1 > 0`, so the `if (amount > 0)` guard at line 96 always inserts the REEVALUATION row. `taskAwarded` treats any non-MISSION_BONUS row for the task as awarded, so it becomes true and `reconcile()` will not add a second TASK award.\n\nThe amount can only be 0 when task XP was already paid. In that case `taskAwarded` is already true and reconcile skips the task anyway. A real user or admin can't reach the claimed path with a valid configuration.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1227,
+      "durationMs": 16237,
+      "sessionId": "767f1c04-ca9f-425d-8c51-76ad1faf1db8",
+      "costUsd": 0.2266432,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the mechanism; the code does what the finding says. `FlagQueue.list` (ProgressStats.kt:94) runs `store.reports(status).map(::view)`. `view` (ProgressStats.kt:141-142) calls `catalog.task(report.taskId)` and `report.attemptId?.let(store::attempt)` once per report. `ContentCatalogService.task` (ContentCatalogService.kt:30-38) loads the whole task through `tasks.find` and maps every part through `it.spec.toChecker()`. `view` then uses only `.prompt` for the 80-code-point excerpt. Nothing batches or caches these calls; the class's `@Transactional(readOnly = true)` does not combine separate repository lookups. So a list costs 1 + up to 2N queries plus unnecessary spec conversions.\n\nThis is an efficiency problem, not a correctness one. The output is still right: the excerpt, the attached attempt and the status filter all come out correctly. The app is single-user with one child, so the report queue should stay small, and the cost is linear and bounded. The finding is accurate but belongs under performance or maintainability, so I'd lower its severity rather than call it refuted.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1260,
+      "durationMs": 18799,
+      "sessionId": "d37a25d2-0ed9-4da5-87bb-78c3bea205ef",
+      "costUsd": 0.30787960000000003,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. `FlagQueue.list` (ProgressStats.kt:94) maps every row from `store.reports(status)` through `view` (line 141–142). For each report, `view` calls `catalog.task(report.taskId)` and, when the report has an attempt, `store.attempt(id)`. `ContentCatalogService.task` (ContentCatalogService.kt:30–38) runs `tasks.find(taskId)`, which is a per-id SQL query in JdbcTaskStore.kt:62 and may load more for the task's child data. It then builds a `CatalogPart` with `it.spec.toChecker()` for every part. `view` uses only `.prompt`. `store.attempt` is a separate `WHERE a.id = ?` query (JdbcPracticeStore.kt:193). I found no `@Cacheable` and no batching anywhere. `reports()` takes no paging parameters, so every list call costs 1 + about 2N queries for N reports.\n\nExploitability is negligible, though. This is an admin-only endpoint in a single-child tutoring app. Reports come from one child flagging tasks, so the queue will realistically hold tens of entries, not thousands. An attacker can't grow the queue without being that child, and can't call the listing without admin rights. The codebase already accepts this per-id pattern elsewhere (MissionService.kt:103, `ids.distinct().mapNotNull(tasks::find)`). The finding is also filed under the wrong dimension: this is a performance issue, not a correctness one, and it never produces a wrong result.\n\nVerdict: the mechanism is confirmed and reproducible, but the real-world impact is close to zero. Downgrade it to a nit or optional optimization.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1454,
+      "durationMs": 15454,
+      "sessionId": "fe705bee-5510-418d-afa8-d3a13a569307",
+      "costUsd": 0.23424,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding is refuted. The code does what the finding describes, but that is the specified behaviour, not a correctness defect. At `ProgressStats.kt:111-114`, an empty parts list gives a null grade, and a null or Unreadable grade falls into `NoChange || grade !is Grade.Graded`. That returns `ReevaluationOutcome(false, NONE, view(report), null)`. Nothing is persisted and the report stays OPEN. The design calls for exactly this. Design decision 7 (design.md:78-80) says: \"If the stored input no longer fits a part's shape ... or any part is unreadable under the new spec, nothing changes.\" The Risks section (design.md:178-179) repeats it: \"handled as 'no change' whenever the stored input cannot be graded.\" The finding itself admits the code \"matches design decision 7\". No state is corrupted, no XP is wrong, and no error is swallowed. The report stays OPEN, so the admin can still dismiss it or fix the spec and retry. The missing reason field is a suggestion to change the API contract (`ReevaluationResult`). That is a docs-store change and a UX/diagnostics request, not a wrong mechanism in this code. The finding's own confidence is low.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1487,
+      "durationMs": 21860,
+      "sessionId": "c245ddb4-cb26-4449-81c7-a60ed63fdbce",
+      "costUsd": 0.303193,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real and reachable. In `ProgressStats.kt:105-115`, `parts` comes from the task's current content. If `parts` is empty (task or parts deleted), `grade` is null. `ReevaluationRules.regrade` (`Reevaluation.kt:42`) also returns null when `Grading.shapeErrors` is not empty, for example after an admin switches a part between choice and text. `Grading.grade` returns `Grade.Unreadable` when the stored raw input is UNPARSEABLE under the edited spec. In every one of these cases `ReevaluationRules.decide` returns `NoChange` (line 55), and the service returns `ReevaluationOutcome(false, NONE, view(report), null)`. That response looks exactly like a genuine \"regraded, still wrong / not improved\" result. The report stays OPEN and nothing tells the admin why.\n\nAn admin can trigger this with ordinary actions: edit a task's part type or remove a part, then press re-evaluate. No attacker is needed. Nothing is exploitable, though. There is no security, data-integrity or XP impact, because nothing is written. The outcome is the \"nothing changes\" result that the design requires: `openspec/changes/implement-progress-stats-api/design.md` decision 7, lines 78-80, and the Risks section, lines 178-179. The code matches the contract exactly, so this is not a code bug. The real problem is that the API cannot tell the two cases apart, and fixing that needs a docs-store change to `api/openapi.yaml`, not a backend patch. The finding is correct on the facts and already concedes it matches the design. Verdict: not refuted, but downgrade it to a contract/UX open question (info level) rather than a correctness defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1841,
+      "durationMs": 24316,
+      "sessionId": "82845e46-36fc-474a-a6a6-c4b26ba7f6f7",
+      "costUsd": 0.32193720000000003,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "keep",
+        "reasoning": "The mechanism is accurate in this code. `FlagQueue.list` (ProgressStats.kt:94) calls `store.reports(status).map(::view)`. `JdbcPracticeStore.reports` (JdbcPracticeStore.kt:201-210) runs the query with no LIMIT. `view()` (ProgressStats.kt:141-142) then calls `catalog.task(report.taskId)` and `store.attempt(attemptId)` once per report, so the endpoint is N+1 with two extra lookups per report. On the child side, `PracticeService.report` (PracticeService.kt:201-212) inserts a new `problem_report` row on every call. It does not deduplicate and does not cap OPEN reports per task. Child endpoints are login-free: PracticeModule.kt:9 says `/api/child/` is login-free, and the shared SecurityConfiguration permits any request outside `/api/admin/**`. I found no rate limiting. The only guards are that the mission and task must be served and that the practice lock serializes inserts. Neither one limits volume.\n\nTwo mitigating points. First, the docs-store contract (contract/api/openapi.yaml:898-925) defines `listReports` as returning a plain array with no paging parameters. The unbounded list is therefore what the spec asks for, not an implementation slip. Adding limit/offset would need a docs-store spec change and a `contract/` bump first. Second, this is a single-child home LAN app, so in practice the impact is admin-page slowness and noise, not loss of correctness or data. The finding already says it is not a confidentiality or integrity issue. That is correct: admin routes are behind the session and CSRF chain, and `attemptId` is set by the server. The finding holds as a minor robustness/DoS-hygiene issue, so the severity stays minor."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1874,
+      "durationMs": 17252,
+      "sessionId": "81210013-b181-4681-b31a-31175e715a96",
+      "costUsd": 0.2804348,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds up in the code. `FlagQueue.list` (ProgressStats.kt:94) is `store.reports(status).map(::view)`. `JdbcPracticeStore.reports` (JdbcPracticeStore.kt:201-207) runs `SELECT … FROM problem_report WHERE … ORDER BY …` with no LIMIT or paging. `view()` (ProgressStats.kt:141-142) then calls `catalog.task(report.taskId)` and `store.attempt(attemptId)` for every row, so the query count grows linearly with the number of reports.\n\nOn the write side, `PracticeService.report` (PracticeService.kt:201-212) inserts a new `problem_report` row on every call. It does no dedup, has no cap on OPEN reports per task, and has no cooldown. Its only precondition is that the mission and task are being served, which is the normal child state. The child-facing chain in shared SecurityConfiguration.kt:64 is `authorize(anyRequest, permitAll)` with CSRF disabled and a stateless session, so any device that can reach the app can call it in a loop.\n\nThe finding is also right about what is not at risk. The admin chain requires authentication and CSRF (AdminSecurityConfiguration.kt:73-79), and `attemptId` is set by the server, so this is only about noise and slow loading, not confidentiality or integrity.\n\nI can't refute it. The impact is real but limited: this is a single-family home-LAN app, and the realistic triggers are a child tapping 'report' repeatedly or a hostile device on the LAN. The cost is a slow, cluttered admin queue, which is a nuisance-level denial of service. Minor severity fits.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-progress-stats-api/specs/progress-stats/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1928,
+      "durationMs": 10865,
+      "sessionId": "db25bcfb-bda5-4918-b035-118217526b7f",
+      "costUsd": 0.1736592,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "This \"finding\" doesn't describe a defect. It is the coverage-summary line the review's output contract asks for, and its own suggestion is \"None\". It names no code mechanism, so there is nothing to check for correctness. I spot-checked the files it cites: practice/domain/Stats.kt, practice/application/ProgressStats.kt, V6__progress_stats.sql, StatsRulesTest.kt, ProgressStatsIT.kt and FlagQueueIT.kt all exist. That means the summary isn't pointing at the wrong place. Still, a summary is not an actionable bug report. Any real gaps belong in the 3 \"partial\" items, which the finding says are filed separately. With no wrong behavior to positively confirm, it should not stand as a defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-progress-stats-api/specs/progress-stats/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1961,
+      "durationMs": 9022,
+      "sessionId": "11dbf037-31ab-4cc4-ac98-da5f868ef350",
+      "costUsd": 0.0489496,
+      "numTurns": 2,
+      "result": {
+        "refuted": true,
+        "reasoning": "This entry isn't a defect. It's a coverage summary line (64 implemented, 3 partial, 0 missing, 0 contradicted), and its own suggestion field says \"None\". It names no bug, input or code path that a user or attacker could trigger, so there's nothing to reproduce or exploit. The 3 partial scenarios are listed as separate findings and should be judged on their own. Because this one makes no claim of a problem I could confirm, it should not be counted as a defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1644,
+      "durationMs": 23707,
+      "sessionId": "9803523a-d60d-4a60-82f6-66e9601a0975",
+      "costUsd": 0.21142140000000004,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the mechanism; it holds. `ProgressStats.kt:149-152` (the finding cites line 146, which is the `EXCERPT_LENGTH` constant just above) reads `prompt.substring(0, prompt.offsetByCodePoints(0, EXCERPT_LENGTH)).trimEnd() + \"…\"`. design.md decision 6 (lines 67-68) says the excerpt is \"the first 80 code points of the task's current Czech prompt, with `…` appended when cut\", and says nothing about trimming. One correction to the finding's wording: the cut is the half-open range [0, 80), so the excerpt gets shorter when the last kept code points (index 79, 78, …) are whitespace, not when code point 80 is.\n\nNothing else guards or normalises this. `view()` passes `catalog.task(...).prompt` straight into `excerpt()`. The binding contract (`contract/api/openapi.yaml:1814-1816`) only says \"First characters of the Czech prompt\", so the trim does not break the API. It is a gap between the code and the change's own design text, and the existing test cannot catch it.\n\nThe practical impact is cosmetic: an excerpt ending in \"word…\" instead of \"word …\" is arguably better UX. Minor severity is right. The scope-drift part is weaker: the store's archived add-api-contract-v0 proposal explicitly makes `taskPromptExcerpt` required, so the field was a deliberate docs-store decision, not drift. Still, the core claim, that the code does not match design decision 6 as written, is confirmed.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1677,
+      "durationMs": 19434,
+      "sessionId": "15eecd16-cc94-404c-b99f-7053a271b23e",
+      "costUsd": 0.2111918,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real and easy to reproduce. ProgressStats.kt:149-152 does `prompt.substring(0, prompt.offsetByCodePoints(0, 80)).trimEnd() + \"…\"`. Any task prompt longer than 80 code points with whitespace at position 80 (or just before it) gets a shorter excerpt. Normal Czech prose hits this often, so no attacker is needed; an ordinary admin flag-queue view will show it. design.md decision 6 (lines 67-68) says \"the first 80 code points … with `…` appended when cut\" and says nothing about trimming, so the code does differ from the design doc. I found nothing else that guards or normalises this: view() at line 142 sends the catalog prompt straight to excerpt(). The finding is also right that the field has no store-spec requirement. The only external contract is the OpenAPI schema (contract/api/openapi.yaml:1814-1816), which just says \"First characters of the Czech prompt\". The code meets that contract, so the mismatch is with the internal design.md only. Impact is cosmetic: at most a few trailing spaces are dropped before the ellipsis, which arguably reads better, and nothing about security, data or answer keys is affected. The finding is confirmed as a small mismatch between doc and code, and 'minor' is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Reevaluation.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1615,
+      "durationMs": 22324,
+      "sessionId": "fc200475-27a0-490f-9f05-0a8d2210ce09",
+      "costUsd": 0.2678912,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "I could not confirm a correctness defect, so I'm marking this refuted.\n\nWhat the code does: `Reevaluation.kt:56-58` returns `ReplayCorrected` for a replay attempt only when it was wrong before (counting any earlier re-evaluation) and is now correct as a whole. Otherwise it returns `NoChange`.\n\nWhy that is not wrong:\n1. **The design matches the code.** `design.md` decision 8 says: \"Replay attempt: … If the attempt was wrong and is now correct, the new verdicts are recorded, the report becomes FIXED…\". The code follows this word for word.\n2. **The spec's \"verdict\" means the whole-attempt verdict.** The store spec (progress-stats, lines 353-358) talks about \"the attempt's recorded verdict\". The same spec uses verdict at attempt level elsewhere, e.g. line 362 \"attempts 1 and 2 were both `0,5` and marked `WRONG`\". The spec never defines an order between per-part verdict vectors. Reading \"better\" as WRONG → CORRECT for the attempt is the natural reading, not a deviation.\n3. **The replay rule follows the primary-scope rule.** For primary attempts, \"better\" is decided on the task outcome (`TaskProgress`), and that outcome only changes when the attempt as a whole becomes correct. A per-part improvement changes nothing there either.\n\nThe finding's own suggestion is to amend the spec to match the code. It doesn't claim the code misbehaves against any defined requirement. At most this is a wording ambiguity in the spec plus a missing two-part test, which is a test-coverage nit, not a correctness bug in this code.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Reevaluation.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1648,
+      "durationMs": 31772,
+      "sessionId": "e07be133-fb29-4094-ae73-d810a4a8b0e0",
+      "costUsd": 0.3349336,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The behaviour the finding describes is real. At `Reevaluation.kt:56-58` a replay attempt counts as improved (`ReplayCorrected`) only when the whole attempt goes from not-correct to correct (`!wasCorrect && grade.correct`). If a fix turns one part of a multi-part replay attempt from WRONG to CORRECT while another part stays WRONG, the result is `NoChange` and the report stays `OPEN`. Nothing elsewhere handles this case. The tests only cover single-part replays (`ReevaluationRulesTest` around line 125).\n\nIt is not clearly a spec violation, though. Store spec `progress-stats` lines 353-358 say \"If the new verdict is better than the attempt's recorded verdict\". Every scenario uses \"verdict\" for the whole attempt: WRONG → CORRECT at lines 74-76, 384-388 and 398-400. On that reading, a partly fixed attempt is WRONG before and after, so nothing is \"better\" and the code complies. The ambiguity comes from the flag-queue requirement (lines 282-285), which also shows \"the checker's per-part verdict\". That makes a per-part reading of \"better\" possible, so the finding is fair to call the spec under-specified.\n\nThe code is also consistent with the first-attempt path. `TaskProgress`/`OutcomeOrder` judge improvement on whole-attempt correctness, so a partial fix there also gives `NoChange`. The V6 migration comment (\"a recorded re-evaluation is always all-correct\") matches this design.\n\nImpact if someone hits it: the admin is told \"nothing changed\" and the report stays `OPEN` until they fix the remaining wrong part. No XP, outcome or data is affected, and nothing can be exploited. The finding's own suggestion is a spec clarification plus a test, not a code change.\n\nVerdict: the mechanism is confirmed, so the finding is not refuted. Because it is a spec-clarity and test-coverage gap rather than a functional defect, I recommend downgrading it from minor to a nit or documentation issue."
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1253,
+      "durationMs": 19737,
+      "sessionId": "a7c92c36-fb29-46f1-a378-e1cc8f55d241",
+      "costUsd": 0.26639419999999997,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The factual claim holds. The test at FlagQueueIT.kt:308-320 only asserts `$.rank.index == 1` and `$.pendingRankUp.index == 1` after the re-evaluation. It never calls `/api/child/hq/rank-up-ack` and never re-reads HQ to check that the celebration is cleared, so the \"plays once\" half of the scenario has no test in this slice.\n\nThe concern behind the finding (that a REEVALUATION row with no attempt_id might behave differently) does not hold up in the code. `Gamification.progress()` (Gamification.kt:165-169) works out pendingRankUp only from `ledger.total()` and `ledger.celebrated()`. `acknowledge()` (Gamification.kt:173-178) clamps to `ladder.rankFor(ledger.total())` and writes the celebrated index. Neither looks at attempt_id or the award kind. `onReevaluation` stores no celebration (it returns `null` for rankUp), which is why the rank-up waits for HQ, and the test does check that. After that, the acknowledge path is the same one slice 8 already tests in GamificationIT (lines 469-590: ack clears it, repeat reads stay null, an older ack keeps a newer pending rank-up). So the code is correct and the risk is very low.\n\nVerdict: a real but cosmetic gap in spec-to-test traceability, not a correctness defect. Not refuted. Downgraded, because the mechanism it worries about is shared code that is already covered.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1286,
+      "durationMs": 26497,
+      "sessionId": "15a0f041-e4f0-40d1-ac5b-624fa3d52fee",
+      "costUsd": 0.2595034,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The factual part is right: the test at FlagQueueIT.kt:308-320 checks `rank.index` and `pendingRankUp.index` but never calls rank-up-ack or re-reads HQ. Viewed through exploitability, though, there is no way for this to show up as a defect. The one-shot behaviour does not depend on how the XP was earned. In Gamification.kt:165-169, `progress()` computes `pendingRankUp` as `rank.takeIf { it.index > ledger.celebrated() }`, where `rank = ladder.rankFor(ledger.total())`. In Gamification.kt:173-178, `acknowledge()` stores `min(rankIndex, current.index)` in the celebrated marker. Neither function reads the row kind (TASK / REEVALUATION / MISSION_BONUS) or `attempt_id`. A REEVALUATION row affects them only through `ledger.total()`, which the existing test already shows is raised: `rank.index == 1` and `pendingRankUp.index == 1`. The ack-then-clear path is already covered for the same total/celebrated logic in GamificationIT.kt:542-554 and 576-590. `onReevaluation` (lines 88-106) deliberately stores no celebration and returns `rankUp = null`, so the celebration has to go through the HQ pending path, which the test does assert. So no user can hit a case where a re-evaluation rank-up plays twice or never clears; the code path is the same one already tested. What remains is a small spec-traceability gap in the test, not a reachable bug, so I'm refuting it.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-progress-stats-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1533,
+      "durationMs": 17521,
+      "sessionId": "11c34cc0-a85d-4a26-9aae-6dce90d5a582",
+      "costUsd": 0.25819580000000003,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. Line 25 of tasks.md is ticked with `- [x] 5.2 npx openspec validate implement-progress-stats-api --strict` and cites no evidence file, while 2.3 and 5.1 both do. I looked for anything else that would back the tick. The only recorded openspec validation is `docs/qa/automated-verification-latest.md`, which ran `npx openspec validate --all --strict` from 10:46 to 10:55 UTC on 2026-10-07. Its output lists only 7 items, and the one active change it validated is `change/implement-gamification-api`. `implement-progress-stats-api` is not in that list, so the run came before this change existed and says nothing about it. No other file in the repo records a validate run for this change, apart from earlier review-gate notes that mention it as still to do. So the tick has no evidence behind it.\n\nThere are reasons it might not matter much. The backend template (`change.backend.md:62`) gives 5.2 no evidence pointer, and every earlier slice also ticked 5.2 without one (an earlier review flagged the same gap on slice 3). The repo's \"done-claims-need-evidence\" rule names current-state.md, PR bodies and handoff docs, not tasks.md checkboxes. And task 5.1, which is still open, will re-run `openspec validate --all --strict` through qa:verify and cover this change anyway. That makes this a process and evidence gap, not a correctness defect, so minor/low is the right rating.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-progress-stats-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1566,
+      "durationMs": 34218,
+      "sessionId": "af1acc2e-b99f-4421-bb85-5c4cab1acc9f",
+      "costUsd": 0.233684,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The facts in the finding are right, but it isn't an exploitable or reproducible defect. tasks.md:25 is a process checkbox. It is not code, so no user or attacker can trigger anything through it. Here is why I'm refuting it:\n\n(1) Every archived change in this repo (gamification, practice-flow, child-profile, admin-access, authoring-*, answer-checking, platform-foundation, fix-restore-schema-drift) ticks its `openspec validate <change> --strict` task the same way, with no evidence pointer. That is the template convention here, not a lapse specific to this slice. The template only asks for an evidence pointer on 5.1 and 5.4.\n\n(2) The \"done-claims-need-evidence\" rule in AGENTS.md covers current-state.md, PR bodies and handoff docs, not individual tasks.md checkboxes.\n\n(3) The evidence the finding asks for is already structurally required. Task 5.1 (`npm run qa:verify`, still correctly unticked) runs `npx openspec validate --all --strict`, which includes this change, and writes the output to docs/qa/automated-verification-latest.md. Task 5.3 then requires 5.1 to be re-run before archive.\n\nOne fair point: the current automated-verification-latest.md (2026-10-07T10:46Z) lists change/implement-gamification-api, not implement-progress-stats-api. So that run predates this change and isn't evidence for the 5.2 tick. Even so, nothing goes wrong for any user. At worst this is a bookkeeping nit that the pending 5.1 run will clear before archive.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1169,
+      "durationMs": 26637,
+      "sessionId": "2df49776-3e1e-44a3-bcc4-cd5c87ca02b2",
+      "costUsd": 0.21094600000000002,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The facts in the finding are accurate: `FlagQueue` is a second class in `practice/application/ProgressStats.kt:89`, and `StatsMapping` is an `internal object` at `AdminStatsController.kt:73`. But that is not a deviation from the design.\n\ndesign.md names types and the package each one lives in. It does not say which file each type goes in:\n- Line 35 says \"use cases `ProgressStats` and `FlagQueue` in `practice/application`\". `FlagQueue` is a class in package `cz.doucko.practice.application`, so that holds.\n- Line 143 says \"`practice/adapter/in/web`: … mapping in `StatsMapping`\". `StatsMapping` is an object in that package and holds the mapping, so that holds too.\n\nThe same document shows the difference between naming a file and naming a type. Where it means a file it adds the `.kt` suffix: `practice/domain/Stats.kt`, `Reevaluation.kt`, `Model.kt`, `Gamification.kt`. `ProgressStats`, `FlagQueue` and `StatsMapping` never get that suffix. Line 136 also lists `Gamification.onReevaluation`, which is a method, so that list is plainly naming code elements, not files.\n\nKotlin allows several top-level declarations in one file, and package placement is what the hexagonal rule and Modulith `verify()` care about. Behaviour is unchanged, as the finding itself says. The design does not require separate files, so there is no spec-compliance gap to fix.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1202,
+      "durationMs": 34882,
+      "sessionId": "866ba298-543e-4caa-961b-6749cdd993a9",
+      "costUsd": 0.21385919999999997,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "I checked the code and the design, and the design is followed. design.md names classes and objects by package, not by file. Line 35 says \"use cases `ProgressStats` and `FlagQueue` in `practice/application`\". `class FlagQueue` is in package `cz.doucko.practice.application`, at ProgressStats.kt:89. Lines 135–136 list the `practice/application` entries in the same style, and one of them is `Gamification.onReevaluation`, which is a method. So these entries name code units, not files. When the design does mean files it says so with `.kt` (`Stats.kt`, `Reevaluation.kt`, `Model.kt`, `Gamification.kt` on lines 130–133). It never says `FlagQueue.kt` or `StatsMapping.kt`. Line 143 says \"mapping in `StatsMapping`\", and `internal object StatsMapping` exists at AdminStatsController.kt:73 in `practice/adapter/in/web`, the package the design names. AdminStatsController uses both (`FlagQueue` injected at line 40, `StatsMapping.*` at lines 49–64). Nothing here can reach a user or an attacker, and the finding itself says behaviour is unaffected. What remains is a style preference about one class per file, not a gap between the spec and the code.",
+        "severityAdjustment": "downgrade"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "11 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 4, contested: 4, rejected: 3"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/implement-progress-stats-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "slice 9 progress-stats backend (implement-progress-stats-api)",
+    "summary": "Review gate for slice 9 progress-stats backend (implement-progress-stats-api): 4 confirmed, 4 contested (treat as confirmed unless trivially wrong), 3 rejected.",
+    "confirmed": [
+      {
+        "title": "Child task view shows the original WRONG verdicts next to a re-evaluated CORRECT state",
+        "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+        "line": 344,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "After this slice, `TaskProgress.state` reads `effectiveCorrect`, so a re-evaluated attempt 1 changes the task to CORRECT_FIRST_TRY. But `outcome()` still builds the parts from `latest.parts.map { PartOutcome(it.key, it.verdict, it.normalized, null, it.locked) }`, which are the original verdicts. It also picks `progress.latest`, which can be attempt 2 (originally wrong, the one that triggered the reveal). So `TaskView.lastResult` can show `state = CORRECT_FIRST_TRY` together with WRONG per-part verdicts, and the tutor feedback is computed from the new state. Design decision 8 says practice state everywhere reads the re-evaluated verdict, but the per-part feedback was not updated to match.",
+        "suggestion": "When the attempt has a primary-scope `reevaluation`, overlay `reevaluation.verdicts` onto the part verdicts in `outcome()`. When the task was resolved by re-evaluating an earlier attempt, show that attempt (or the state-determining one) rather than `progress.latest`. Add an IT covering 'reevaluate attempt 1 of a REVEALED task, then GET the task view'.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The bug is real; I could not refute it.\n\n1. **State uses the new verdict.** `TaskProgress.state` (`Rules.kt:20-27`) reads `effectiveCorrect`. That is the re-evaluated verdict for primary-scope attempts (`Model.kt:87`). So after an admin re-evaluates attempt 1 of a REVEALED task, the state becomes CORRECT_FIRST_TRY.\n\n2. **The view uses the latest attempt and its original verdicts.** `screen()` (`PracticeService.kt:315-325`) builds `lastResult` from `outcome()` whenever `progress.latest != null`. `outcome()` (`:337-347`):\n   - takes `progress.latest`, which is attempt 2;\n   - builds `parts` from `latest.parts.map { PartOutcome(it.key, it.verdict, ...) }`, the original stored verdicts. `Reevaluation.verdicts` is never overlaid here, and nothing in the web mapping (`PracticeMapping.kt:128`) does it either;\n   - sets `state = progress.state` (CORRECT_FIRST_TRY);\n   - computes tutor feedback from that new state.\n\n   The response therefore shows attemptNo 2 with WRONG part verdicts next to state CORRECT_FIRST_TRY. The same happens with a single-attempt task: re-evaluate attempt 1 and the task view still shows that attempt's original WRONG parts with a CORRECT state.\n\n3. **The path is reachable.** `currentRun()` returns the PRIMARY scope whenever no replay run is open, so an ordinary GET of the task after a FIXED re-evaluation hits this code. The `Model.kt:57` comment (\"never in place of the attempt's own verdicts\") is about storage: the original verdicts are kept and the re-evaluation is stored beside them. It does not justify mixing the two in the response. Design decision 8 says the task screen reads the re-evaluated verdict.\n\n**Severity: downgrade.** This is a display inconsistency, not data corruption. Nothing stored is wrong, XP and state are right, and it only shows up after a rare admin-triggered re-evaluation of a primary-scope attempt.",
+          "I confirmed the problem in the code, and it doesn't depend on unusual timing.\n\n1. **State uses the corrected verdict.** In `TaskProgress.state` (Rules.kt:20-27), attempts 1 and 2 are judged by `effectiveCorrect`. That property (Model.kt:87) returns the re-evaluated verdict for a first play-through attempt, if an admin recorded one.\n\n2. **Per-part results use the original verdict.** `outcome()` builds the parts from `latest.parts.map { PartOutcome(it.key, it.verdict, …) }` (PracticeService.kt:344), which is the verdict stored when the child answered. Nothing in this path applies `reevaluation.verdicts`.\n\n3. **`latest` is just the last attempt.** It is `attempts.lastOrNull()` (Rules.kt:33), not the attempt that now decides the task's state.\n\n4. **Re-evaluation is how the mismatch arises.** `ReevaluationRules.decide` stores a re-evaluation exactly when the new verdict improves the outcome (Reevaluation.kt:60-68).\n\nSo there are two realistic ways for the task view (`screen` → `lastResult`, PracticeService.kt:325) to contradict itself:\n- **Attempt 1 wrong, then corrected by the admin.** The state becomes CORRECT_FIRST_TRY, while the latest attempt (attempt 1, or attempt 2 if the task was already revealed) still shows its WRONG parts.\n- **Attempt 2 of a revealed task corrected.** Even here, where `latest` is the corrected attempt, the state becomes CORRECT_SECOND_TRY but the parts still come from the original WRONG verdicts.\n\nThe tutor feedback is computed from the new state (line 347), so it will also disagree with the per-part verdicts.\n\nNothing guards against this: re-evaluations only apply to the first play-through, and `screen` uses that scope whenever no replay run is active, which is the normal case after an admin re-evaluation. A child opening the task after an admin accepts their report will hit this. It's a confusing display, not a security or data-integrity problem, so \"major\" is about right, perhaps slightly high."
+        ]
+      },
+      {
+        "title": "Flag queue listing does N+1 full task loads (all parts, specs converted) only to build an 80-char excerpt",
+        "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+        "line": 141,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "`list()` maps every report through `view`, which calls `catalog.task(report.taskId)` and `store.attempt(id)` per report. `ContentCatalogService.task` loads the whole task and runs `it.spec.toChecker()` on every part, but only `prompt` is used here. With no paging (design decision 6), the queue grows by two or more queries per report on every list.",
+        "suggestion": "Add a batch lookup to `ContentCatalog`, e.g. `prompts(taskIds): Map<UUID, String>`, plus `PracticeStore.attempts(ids)`. Build the views from those maps, or join the attempt in the `reports()` query.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute the mechanism; the code does what the finding says. `FlagQueue.list` (ProgressStats.kt:94) runs `store.reports(status).map(::view)`. `view` (ProgressStats.kt:141-142) calls `catalog.task(report.taskId)` and `report.attemptId?.let(store::attempt)` once per report. `ContentCatalogService.task` (ContentCatalogService.kt:30-38) loads the whole task through `tasks.find` and maps every part through `it.spec.toChecker()`. `view` then uses only `.prompt` for the 80-code-point excerpt. Nothing batches or caches these calls; the class's `@Transactional(readOnly = true)` does not combine separate repository lookups. So a list costs 1 + up to 2N queries plus unnecessary spec conversions.\n\nThis is an efficiency problem, not a correctness one. The output is still right: the excerpt, the attached attempt and the status filter all come out correctly. The app is single-user with one child, so the report queue should stay small, and the cost is linear and bounded. The finding is accurate but belongs under performance or maintainability, so I'd lower its severity rather than call it refuted.",
+          "The mechanism is real. `FlagQueue.list` (ProgressStats.kt:94) maps every row from `store.reports(status)` through `view` (line 141–142). For each report, `view` calls `catalog.task(report.taskId)` and, when the report has an attempt, `store.attempt(id)`. `ContentCatalogService.task` (ContentCatalogService.kt:30–38) runs `tasks.find(taskId)`, which is a per-id SQL query in JdbcTaskStore.kt:62 and may load more for the task's child data. It then builds a `CatalogPart` with `it.spec.toChecker()` for every part. `view` uses only `.prompt`. `store.attempt` is a separate `WHERE a.id = ?` query (JdbcPracticeStore.kt:193). I found no `@Cacheable` and no batching anywhere. `reports()` takes no paging parameters, so every list call costs 1 + about 2N queries for N reports.\n\nExploitability is negligible, though. This is an admin-only endpoint in a single-child tutoring app. Reports come from one child flagging tasks, so the queue will realistically hold tens of entries, not thousands. An attacker can't grow the queue without being that child, and can't call the listing without admin rights. The codebase already accepts this per-id pattern elsewhere (MissionService.kt:103, `ids.distinct().mapNotNull(tasks::find)`). The finding is also filed under the wrong dimension: this is a performance issue, not a correctness one, and it never produces a wrong result.\n\nVerdict: the mechanism is confirmed and reproducible, but the real-world impact is close to zero. Downgrade it to a nit or optional optimization."
+        ]
+      },
+      {
+        "title": "Flag queue is unpaginated and makes 2 extra queries per report, while anyone on the LAN can create reports without logging in",
+        "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+        "line": 94,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The child report endpoint needs no login and has no rate limit. `PracticeService.report` (PracticeService.kt:201-212) adds a `problem_report` row on every call. Any device on the home LAN, or a child repeatedly tapping 'report', can create thousands of reports for a served task. The new admin `GET /api/admin/reports` (AdminStatsController.listReports → FlagQueue.list) loads every report with no limit. `view()` (ProgressStats.kt:141) then runs `catalog.task()` and `store.attempt()` for each one, so the admin page gets slow and the real reports are lost in the noise. This is not a confidentiality or integrity issue: re-evaluate and dismiss are behind the admin session plus CSRF chain (`/api/admin/**`, AdminSecurityConfiguration.kt:71-79), and `attemptId` is set by the server (PracticeService.kt:210-211), so it cannot be used for IDOR.",
+        "suggestion": "Add a limit/offset (or a cap) to `PracticeStore.reports`. Fetch the task excerpts and attempts for the listed reports in one batch query each instead of one query per report. Put a simple limit on report creation on the child side, e.g. at most N OPEN reports per task, or a short per-task cooldown.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is accurate in this code. `FlagQueue.list` (ProgressStats.kt:94) calls `store.reports(status).map(::view)`. `JdbcPracticeStore.reports` (JdbcPracticeStore.kt:201-210) runs the query with no LIMIT. `view()` (ProgressStats.kt:141-142) then calls `catalog.task(report.taskId)` and `store.attempt(attemptId)` once per report, so the endpoint is N+1 with two extra lookups per report. On the child side, `PracticeService.report` (PracticeService.kt:201-212) inserts a new `problem_report` row on every call. It does not deduplicate and does not cap OPEN reports per task. Child endpoints are login-free: PracticeModule.kt:9 says `/api/child/` is login-free, and the shared SecurityConfiguration permits any request outside `/api/admin/**`. I found no rate limiting. The only guards are that the mission and task must be served and that the practice lock serializes inserts. Neither one limits volume.\n\nTwo mitigating points. First, the docs-store contract (contract/api/openapi.yaml:898-925) defines `listReports` as returning a plain array with no paging parameters. The unbounded list is therefore what the spec asks for, not an implementation slip. Adding limit/offset would need a docs-store spec change and a `contract/` bump first. Second, this is a single-child home LAN app, so in practice the impact is admin-page slowness and noise, not loss of correctness or data. The finding already says it is not a confidentiality or integrity issue. That is correct: admin routes are behind the session and CSRF chain, and `attemptId` is set by the server. The finding holds as a minor robustness/DoS-hygiene issue, so the severity stays minor.",
+          "The finding holds up in the code. `FlagQueue.list` (ProgressStats.kt:94) is `store.reports(status).map(::view)`. `JdbcPracticeStore.reports` (JdbcPracticeStore.kt:201-207) runs `SELECT … FROM problem_report WHERE … ORDER BY …` with no LIMIT or paging. `view()` (ProgressStats.kt:141-142) then calls `catalog.task(report.taskId)` and `store.attempt(attemptId)` for every row, so the query count grows linearly with the number of reports.\n\nOn the write side, `PracticeService.report` (PracticeService.kt:201-212) inserts a new `problem_report` row on every call. It does no dedup, has no cap on OPEN reports per task, and has no cooldown. Its only precondition is that the mission and task are being served, which is the normal child state. The child-facing chain in shared SecurityConfiguration.kt:64 is `authorize(anyRequest, permitAll)` with CSRF disabled and a stateless session, so any device that can reach the app can call it in a loop.\n\nThe finding is also right about what is not at risk. The admin chain requires authentication and CSRF (AdminSecurityConfiguration.kt:73-79), and `attemptId` is set by the server, so this is only about noise and slow loading, not confidentiality or integrity.\n\nI can't refute it. The impact is real but limited: this is a single-family home-LAN app, and the realistic triggers are a child tapping 'report' repeatedly or a hostile device on the LAN. The cost is a slow, cluttered admin queue, which is a nuisance-level denial of service. Minor severity fits."
+        ]
+      },
+      {
+        "title": "taskPromptExcerpt trims trailing whitespace before the ellipsis, which differs from design decision 6; the field has no store-spec requirement",
+        "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+        "line": 146,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "design.md decision 6: \"`taskPromptExcerpt` = the first 80 code points of the task's current Czech prompt, with `…` appended when cut.\" Code: `return prompt.substring(0, prompt.offsetByCodePoints(0, EXCERPT_LENGTH)).trimEnd() + \"…\"`. If code point 80 falls on whitespace, the excerpt is shorter than 80 code points. The FlagQueueIT test (`excerpt.removeSuffix(\"…\").length shouldBe 80`) uses a prompt with no whitespace near the cut, so it cannot catch this. The store spec's Flag queue requirement only says each entry shows \"the task\". The 80-code-point excerpt (and the new public ContentCatalog content query that serves it) exists only in OpenAPI and design.md.",
+        "suggestion": "Either amend design decision 6 to say trailing whitespace is trimmed, or drop `.trimEnd()`. Add a test whose prompt has a space at code point 80. Consider adding the excerpt to the store spec's Flag queue requirement so this scope drift is documented.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute the mechanism; it holds. `ProgressStats.kt:149-152` (the finding cites line 146, which is the `EXCERPT_LENGTH` constant just above) reads `prompt.substring(0, prompt.offsetByCodePoints(0, EXCERPT_LENGTH)).trimEnd() + \"…\"`. design.md decision 6 (lines 67-68) says the excerpt is \"the first 80 code points of the task's current Czech prompt, with `…` appended when cut\", and says nothing about trimming. One correction to the finding's wording: the cut is the half-open range [0, 80), so the excerpt gets shorter when the last kept code points (index 79, 78, …) are whitespace, not when code point 80 is.\n\nNothing else guards or normalises this. `view()` passes `catalog.task(...).prompt` straight into `excerpt()`. The binding contract (`contract/api/openapi.yaml:1814-1816`) only says \"First characters of the Czech prompt\", so the trim does not break the API. It is a gap between the code and the change's own design text, and the existing test cannot catch it.\n\nThe practical impact is cosmetic: an excerpt ending in \"word…\" instead of \"word …\" is arguably better UX. Minor severity is right. The scope-drift part is weaker: the store's archived add-api-contract-v0 proposal explicitly makes `taskPromptExcerpt` required, so the field was a deliberate docs-store decision, not drift. Still, the core claim, that the code does not match design decision 6 as written, is confirmed.",
+          "The mechanism is real and easy to reproduce. ProgressStats.kt:149-152 does `prompt.substring(0, prompt.offsetByCodePoints(0, 80)).trimEnd() + \"…\"`. Any task prompt longer than 80 code points with whitespace at position 80 (or just before it) gets a shorter excerpt. Normal Czech prose hits this often, so no attacker is needed; an ordinary admin flag-queue view will show it. design.md decision 6 (lines 67-68) says \"the first 80 code points … with `…` appended when cut\" and says nothing about trimming, so the code does differ from the design doc. I found nothing else that guards or normalises this: view() at line 142 sends the catalog prompt straight to excerpt(). The finding is also right that the field has no store-spec requirement. The only external contract is the OpenAPI schema (contract/api/openapi.yaml:1814-1816), which just says \"First characters of the Czech prompt\". The code meets that contract, so the mismatch is with the internal design.md only. Impact is cosmetic: at most a few trailing spaces are dropped before the ellipsis, which arguably reads better, and nothing about security, data or answer keys is affected. The finding is confirmed as a small mismatch between doc and code, and 'minor' is the right severity."
+        ]
+      }
+    ],
+    "contested": [
+      {
+        "title": "Re-evaluation that cannot grade (shape mismatch / unreadable) returns the same 200 changed=false as 'still wrong'",
+        "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+        "line": 111,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`val grade = if (parts.isEmpty()) null else ReevaluationRules.regrade(parts, attempt)`. A null or Unreadable grade then falls into `decision == ReevaluationDecision.NoChange` and returns `ReevaluationOutcome(false, XpOutcome.NONE, view(report), null)`. The admin cannot tell 'the fixed spec still rejects the answer' from 'the stored input no longer fits the task's parts (e.g. part type changed or deleted)'. In the second case, re-trying after more spec edits will never help. This matches design decision 7, but the admin never learns why nothing happened.",
+        "suggestion": "If the contract allows, add a reason to `ReevaluationResult` (or a distinct 409 detail) when the attempt cannot be graded under the current parts. Otherwise, record this as an open question in the docs store.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The finding is refuted. The code does what the finding describes, but that is the specified behaviour, not a correctness defect. At `ProgressStats.kt:111-114`, an empty parts list gives a null grade, and a null or Unreadable grade falls into `NoChange || grade !is Grade.Graded`. That returns `ReevaluationOutcome(false, NONE, view(report), null)`. Nothing is persisted and the report stays OPEN. The design calls for exactly this. Design decision 7 (design.md:78-80) says: \"If the stored input no longer fits a part's shape ... or any part is unreadable under the new spec, nothing changes.\" The Risks section (design.md:178-179) repeats it: \"handled as 'no change' whenever the stored input cannot be graded.\" The finding itself admits the code \"matches design decision 7\". No state is corrupted, no XP is wrong, and no error is swallowed. The report stays OPEN, so the admin can still dismiss it or fix the spec and retry. The missing reason field is a suggestion to change the API contract (`ReevaluationResult`). That is a docs-store change and a UX/diagnostics request, not a wrong mechanism in this code. The finding's own confidence is low.",
+          "The mechanism is real and reachable. In `ProgressStats.kt:105-115`, `parts` comes from the task's current content. If `parts` is empty (task or parts deleted), `grade` is null. `ReevaluationRules.regrade` (`Reevaluation.kt:42`) also returns null when `Grading.shapeErrors` is not empty, for example after an admin switches a part between choice and text. `Grading.grade` returns `Grade.Unreadable` when the stored raw input is UNPARSEABLE under the edited spec. In every one of these cases `ReevaluationRules.decide` returns `NoChange` (line 55), and the service returns `ReevaluationOutcome(false, NONE, view(report), null)`. That response looks exactly like a genuine \"regraded, still wrong / not improved\" result. The report stays OPEN and nothing tells the admin why.\n\nAn admin can trigger this with ordinary actions: edit a task's part type or remove a part, then press re-evaluate. No attacker is needed. Nothing is exploitable, though. There is no security, data-integrity or XP impact, because nothing is written. The outcome is the \"nothing changes\" result that the design requires: `openspec/changes/implement-progress-stats-api/design.md` decision 7, lines 78-80, and the Risks section, lines 178-179. The code matches the contract exactly, so this is not a code bug. The real problem is that the API cannot tell the two cases apart, and fixing that needs a docs-store change to `api/openapi.yaml`, not a backend patch. The finding is correct on the facts and already concedes it matches the design. Verdict: not refuted, but downgrade it to a contract/UX open question (info level) rather than a correctness defect."
+        ]
+      },
+      {
+        "title": "A replay re-evaluation only counts as better when the whole attempt becomes correct; a per-part improvement is not covered by the spec",
+        "file": "src/main/kotlin/cz/doucko/practice/domain/Reevaluation.kt",
+        "line": 57,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "Store spec: \"If the new verdict is better than the attempt's recorded verdict, it is recorded alongside the original, the report becomes `FIXED`, and 0 XP is awarded; otherwise nothing changes.\" Code: `val wasCorrect = attempt.reevaluation?.correct ?: attempt.correct; return if (!wasCorrect && grade.correct) ReplayCorrected else NoChange`. On a multi-part replay attempt, a fix that turns one WRONG part CORRECT while another part stays WRONG is per-part better, but it returns NoChange and the report stays OPEN. The V6 migration comment also assumes \"a recorded re-evaluation is always all-correct\". ReevaluationRulesTest and FlagQueueIT only cover single-part replays.",
+        "suggestion": "Amend the store spec to define \"better\" for a replay attempt as \"the attempt is now correct as a whole\" (matching the code and the design note). Add a two-part replay test where only one part is fixed and assert changed=false.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "I could not confirm a correctness defect, so I'm marking this refuted.\n\nWhat the code does: `Reevaluation.kt:56-58` returns `ReplayCorrected` for a replay attempt only when it was wrong before (counting any earlier re-evaluation) and is now correct as a whole. Otherwise it returns `NoChange`.\n\nWhy that is not wrong:\n1. **The design matches the code.** `design.md` decision 8 says: \"Replay attempt: … If the attempt was wrong and is now correct, the new verdicts are recorded, the report becomes FIXED…\". The code follows this word for word.\n2. **The spec's \"verdict\" means the whole-attempt verdict.** The store spec (progress-stats, lines 353-358) talks about \"the attempt's recorded verdict\". The same spec uses verdict at attempt level elsewhere, e.g. line 362 \"attempts 1 and 2 were both `0,5` and marked `WRONG`\". The spec never defines an order between per-part verdict vectors. Reading \"better\" as WRONG → CORRECT for the attempt is the natural reading, not a deviation.\n3. **The replay rule follows the primary-scope rule.** For primary attempts, \"better\" is decided on the task outcome (`TaskProgress`), and that outcome only changes when the attempt as a whole becomes correct. A per-part improvement changes nothing there either.\n\nThe finding's own suggestion is to amend the spec to match the code. It doesn't claim the code misbehaves against any defined requirement. At most this is a wording ambiguity in the spec plus a missing two-part test, which is a test-coverage nit, not a correctness bug in this code.",
+          "The behaviour the finding describes is real. At `Reevaluation.kt:56-58` a replay attempt counts as improved (`ReplayCorrected`) only when the whole attempt goes from not-correct to correct (`!wasCorrect && grade.correct`). If a fix turns one part of a multi-part replay attempt from WRONG to CORRECT while another part stays WRONG, the result is `NoChange` and the report stays `OPEN`. Nothing elsewhere handles this case. The tests only cover single-part replays (`ReevaluationRulesTest` around line 125).\n\nIt is not clearly a spec violation, though. Store spec `progress-stats` lines 353-358 say \"If the new verdict is better than the attempt's recorded verdict\". Every scenario uses \"verdict\" for the whole attempt: WRONG → CORRECT at lines 74-76, 384-388 and 398-400. On that reading, a partly fixed attempt is WRONG before and after, so nothing is \"better\" and the code complies. The ambiguity comes from the flag-queue requirement (lines 282-285), which also shows \"the checker's per-part verdict\". That makes a per-part reading of \"better\" possible, so the finding is fair to call the spec under-specified.\n\nThe code is also consistent with the first-attempt path. `TaskProgress`/`OutcomeOrder` judge improvement on whole-attempt correctness, so a partial fix there also gives `NoChange`. The V6 migration comment (\"a recorded re-evaluation is always all-correct\") matches this design.\n\nImpact if someone hits it: the admin is told \"nothing changed\" and the report stays `OPEN` until they fix the remaining wrong part. No XP, outcome or data is affected, and nothing can be exploited. The finding's own suggestion is a spec clarification plus a test, not a code change.\n\nVerdict: the mechanism is confirmed, so the finding is not refuted. Because it is a spec-clarity and test-coverage gap rather than a functional defect, I recommend downgrading it from minor to a nit or documentation issue."
+        ]
+      },
+      {
+        "title": "The 'Rank-up from a re-evaluation' scenario is only partly tested: the 'celebration plays once' half is not asserted",
+        "file": "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "line": 308,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "Scenario: \"THEN HQ shows the 2nd rank and the rank-up celebration naming the 2nd rank plays once.\" The test checks `hq.read<Int>(\"$.rank.index\") shouldBe 1` and `hq.read<Int>(\"$.pendingRankUp.index\") shouldBe 1`. It never acknowledges the rank-up (`/api/child/hq/rank-up-ack`) or checks that a second HQ read returns no pendingRankUp. The one-shot behaviour comes from slice 8, but nothing checks it for a rank-up crossed by a REEVALUATION ledger row with no attempt_id.",
+        "suggestion": "Extend the test: call rank-up-ack and then assert `$.pendingRankUp` is null on the next HQ read.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The factual claim holds. The test at FlagQueueIT.kt:308-320 only asserts `$.rank.index == 1` and `$.pendingRankUp.index == 1` after the re-evaluation. It never calls `/api/child/hq/rank-up-ack` and never re-reads HQ to check that the celebration is cleared, so the \"plays once\" half of the scenario has no test in this slice.\n\nThe concern behind the finding (that a REEVALUATION row with no attempt_id might behave differently) does not hold up in the code. `Gamification.progress()` (Gamification.kt:165-169) works out pendingRankUp only from `ledger.total()` and `ledger.celebrated()`. `acknowledge()` (Gamification.kt:173-178) clamps to `ladder.rankFor(ledger.total())` and writes the celebrated index. Neither looks at attempt_id or the award kind. `onReevaluation` stores no celebration (it returns `null` for rankUp), which is why the rank-up waits for HQ, and the test does check that. After that, the acknowledge path is the same one slice 8 already tests in GamificationIT (lines 469-590: ack clears it, repeat reads stay null, an older ack keeps a newer pending rank-up). So the code is correct and the risk is very low.\n\nVerdict: a real but cosmetic gap in spec-to-test traceability, not a correctness defect. Not refuted. Downgraded, because the mechanism it worries about is shared code that is already covered.",
+          "The factual part is right: the test at FlagQueueIT.kt:308-320 checks `rank.index` and `pendingRankUp.index` but never calls rank-up-ack or re-reads HQ. Viewed through exploitability, though, there is no way for this to show up as a defect. The one-shot behaviour does not depend on how the XP was earned. In Gamification.kt:165-169, `progress()` computes `pendingRankUp` as `rank.takeIf { it.index > ledger.celebrated() }`, where `rank = ladder.rankFor(ledger.total())`. In Gamification.kt:173-178, `acknowledge()` stores `min(rankIndex, current.index)` in the celebrated marker. Neither function reads the row kind (TASK / REEVALUATION / MISSION_BONUS) or `attempt_id`. A REEVALUATION row affects them only through `ledger.total()`, which the existing test already shows is raised: `rank.index == 1` and `pendingRankUp.index == 1`. The ack-then-clear path is already covered for the same total/celebrated logic in GamificationIT.kt:542-554 and 576-590. `onReevaluation` (lines 88-106) deliberately stores no celebration and returns `rankUp = null`, so the celebration has to go through the HQ pending path, which the test does assert. So no user can hit a case where a re-evaluation rank-up plays twice or never clears; the code path is the same one already tested. What remains is a small spec-traceability gap in the test, not a reachable bug, so I'm refuting it."
+        ]
+      },
+      {
+        "title": "Task 5.2 (openspec validate --strict) is ticked with no recorded evidence",
+        "file": "openspec/changes/implement-progress-stats-api/tasks.md",
+        "line": 25,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "tasks.md: \"- [x] 5.2 `npx openspec validate implement-progress-stats-api --strict`.\" Unlike 2.3 (docs/qa/evidence/slice9-red-run.md) and 5.1, this task points to no evidence file, and the diff 7d86c33..HEAD contains no validation output. All the other ticked tasks (1.1–4.2) have their artifacts: V6__progress_stats.sql, StatsRulesTest, ReevaluationRulesTest, ProgressStatsIT, FlagQueueIT, the PracticeLogCaptureIT extension, Stats.kt, Reevaluation.kt, ProgressStats/FlagQueue, Gamification.onReevaluation, ContentCatalog, JdbcPracticeStore/JdbcXpLedger, AdminStatsController and AdminStatsProblemAdvice. Unticked 5.1, 5.3–5.6 are correctly left open.",
+        "suggestion": "Re-run `npx openspec validate implement-progress-stats-api --strict` and record the output, e.g. in docs/qa/automated-verification-latest.md via qa:verify (task 5.1), so the tick has an evidence pointer. Otherwise untick it until 5.1 runs.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The finding holds. Line 25 of tasks.md is ticked with `- [x] 5.2 npx openspec validate implement-progress-stats-api --strict` and cites no evidence file, while 2.3 and 5.1 both do. I looked for anything else that would back the tick. The only recorded openspec validation is `docs/qa/automated-verification-latest.md`, which ran `npx openspec validate --all --strict` from 10:46 to 10:55 UTC on 2026-10-07. Its output lists only 7 items, and the one active change it validated is `change/implement-gamification-api`. `implement-progress-stats-api` is not in that list, so the run came before this change existed and says nothing about it. No other file in the repo records a validate run for this change, apart from earlier review-gate notes that mention it as still to do. So the tick has no evidence behind it.\n\nThere are reasons it might not matter much. The backend template (`change.backend.md:62`) gives 5.2 no evidence pointer, and every earlier slice also ticked 5.2 without one (an earlier review flagged the same gap on slice 3). The repo's \"done-claims-need-evidence\" rule names current-state.md, PR bodies and handoff docs, not tasks.md checkboxes. And task 5.1, which is still open, will re-run `openspec validate --all --strict` through qa:verify and cover this change anyway. That makes this a process and evidence gap, not a correctness defect, so minor/low is the right rating.",
+          "The facts in the finding are right, but it isn't an exploitable or reproducible defect. tasks.md:25 is a process checkbox. It is not code, so no user or attacker can trigger anything through it. Here is why I'm refuting it:\n\n(1) Every archived change in this repo (gamification, practice-flow, child-profile, admin-access, authoring-*, answer-checking, platform-foundation, fix-restore-schema-drift) ticks its `openspec validate <change> --strict` task the same way, with no evidence pointer. That is the template convention here, not a lapse specific to this slice. The template only asks for an evidence pointer on 5.1 and 5.4.\n\n(2) The \"done-claims-need-evidence\" rule in AGENTS.md covers current-state.md, PR bodies and handoff docs, not individual tasks.md checkboxes.\n\n(3) The evidence the finding asks for is already structurally required. Task 5.1 (`npm run qa:verify`, still correctly unticked) runs `npx openspec validate --all --strict`, which includes this change, and writes the output to docs/qa/automated-verification-latest.md. Task 5.3 then requires 5.1 to be re-run before archive.\n\nOne fair point: the current automated-verification-latest.md (2026-10-07T10:46Z) lists change/implement-gamification-api, not implement-progress-stats-api. So that run predates this change and isn't evidence for the 5.2 tick. Even so, nothing goes wrong for any user. At worst this is a bookkeeping nit that the pending 5.1 run will clear before archive."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "Zero-XP re-evaluation writes no ledger row, so startup reconciliation later pays a TASK award from a different attempt",
+        "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+        "line": 96,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`onReevaluation` inserts the REEVALUATION row only `if (amount > 0)`. A task that was UNRESOLVED (no TASK row) and is improved to resolved with an award of 0 (possible when `config.minimum` is 0 and hints cost all the XP) gets no row. `taskAwarded` then stays false, and `reconcile()` on the next startup inserts a TASK award tied to `progress.latest` and that attempt's hints. That attempt may not be the one the re-evaluation resolved, so the ledger records the resolution against the wrong attempt and hint count.",
+        "suggestion": "Always insert the REEVALUATION row when the task had no task XP before (amount 0 is allowed by the `BETWEEN 0 AND 1000` check). Alternatively, have `reconcile` skip tasks whose resolution comes from a re-evaluated attempt.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding depends on `config.minimum` being 0, and that can't happen. `GamificationConfigParser.kt:47` parses every XP key with a lower bound of 0, except `minimum`, which gets a lower bound of 1 (`if (key == \"minimum\") 1 else 0`). The XpConfig doc comment also says \"minimum 1..1000\", and the shipped `gamification.json` sets `\"minimum\": 1`.\n\n`XpRules.taskAward` returns `maxOf(config.minimum, …)` for every resolved state (CORRECT_FIRST_TRY, CORRECT_SECOND_TRY and REVEALED), so any resolved state earns at least 1 XP no matter how many hints were used. In the finding's scenario the task had no TASK or REEVALUATION row, so `taskXp` is 0. That makes `amount = taskAward(resolved) - 0 ≥ 1`, so the `if (amount > 0)` branch always runs and a REEVALUATION row is inserted.\n\n`JdbcXpLedger.taskAwarded` counts both `TASK` and `REEVALUATION` rows, so `reconcile()` later sees the task as awarded and skips it. The finding's 'zero-XP re-evaluation of a previously unresolved task' can't happen with any configuration the parser accepts. The `amount > 0` guard only skips the case where the task already had task XP at or above the new award, and there `taskAwarded` is already true. The mechanism doesn't hold.",
+          "The finding depends on `config.minimum` being 0, and that can't happen. `GamificationConfigParser.kt:47` checks every XP key against 0..1000 except `minimum`, which must be 1..1000 (`if (key == \"minimum\") 1 else 0`). The `XpConfig` KDoc says the same (\"minimum 1..1000\"), and the shipped `gamification.json` uses minimum 1.\n\n`XpRules.taskAward` (domain/Gamification.kt:39-41) returns `maxOf(config.minimum, ...)` for every resolved state (CORRECT_FIRST_TRY, CORRECT_SECOND_TRY, REVEALED). So any resolved state gets an award of at least 1.\n\nTake the claimed scenario: the task had no TASK or REEVALUATION row, so `ledger.taskXp(taskId) == 0`. Re-evaluation then improves it to a resolved state. The amount is therefore `taskAward(...) - 0 >= 1 > 0`, so the `if (amount > 0)` guard at line 96 always inserts the REEVALUATION row. `taskAwarded` treats any non-MISSION_BONUS row for the task as awarded, so it becomes true and `reconcile()` will not add a second TASK award.\n\nThe amount can only be 0 when task XP was already paid. In that case `taskAwarded` is already true and reconcile skips the task anyway. A real user or admin can't reach the claimed path with a valid configuration."
+        ]
+      },
+      {
+        "title": "Coverage summary: 67 backend-applicable scenarios: 64 implemented, 3 partial, 0 missing, 0 contradicted",
+        "file": "openspec/changes/implement-progress-stats-api/specs/progress-stats/spec.md",
+        "line": 1,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "I mapped the store spec contract/openspec/specs/progress-stats/spec.md (60 scenarios, minus 'Child UI has no stats', which is frontend-only, and the UI-only halves of 'No data yet' and 'Topic with no resolved tasks') and the change delta (7 scenarios) to code and tests. Each requirement has an implementation and a test: StatsRules.sessions/weeks/metricMet/firstTry (practice/domain/Stats.kt), FlagQueue.list/reevaluate/dismiss (practice/application/ProgressStats.kt:89-150), AdminStatsController (weeks/status/reportId validation), and V6__progress_stats.sql (append-only attempt_reevaluation, REEVALUATION ledger kind with a unique index per report). The tests are StatsRulesTest (23 cases incl. DST and the Sunday-midnight session), ProgressStatsIT (12), FlagQueueIT (21 incl. 401/403/404/409/400 paths) and PracticeLogCaptureIT (NFR-3). The 5 Attempt-log scenarios (FR-42) were delivered by slice 7 and are only re-exposed here. The OpenAPI boundary matches: 4 operations, the documented 200/400/401/403/404/409 codes, no extra fields. FR-40 and FR-41 (backend+frontend in the plan) are both traced in the specs and tests.",
+        "suggestion": "None. This entry is the coverage line the output contract asks for; the partial items are listed separately.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "This \"finding\" doesn't describe a defect. It is the coverage-summary line the review's output contract asks for, and its own suggestion is \"None\". It names no code mechanism, so there is nothing to check for correctness. I spot-checked the files it cites: practice/domain/Stats.kt, practice/application/ProgressStats.kt, V6__progress_stats.sql, StatsRulesTest.kt, ProgressStatsIT.kt and FlagQueueIT.kt all exist. That means the summary isn't pointing at the wrong place. Still, a summary is not an actionable bug report. Any real gaps belong in the 3 \"partial\" items, which the finding says are filed separately. With no wrong behavior to positively confirm, it should not stand as a defect.",
+          "This entry isn't a defect. It's a coverage summary line (64 implemented, 3 partial, 0 missing, 0 contradicted), and its own suggestion field says \"None\". It names no bug, input or code path that a user or attacker could trigger, so there's nothing to reproduce or exploit. The 3 partial scenarios are listed as separate findings and should be judged on their own. Because this one makes no claim of a problem I could confirm, it should not be counted as a defect."
+        ]
+      },
+      {
+        "title": "Design names a separate FlagQueue use case and StatsMapping, but both are inside other files",
+        "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+        "line": 89,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "design.md 'Module + hexagon placement': \"use cases `ProgressStats` and `FlagQueue` in `practice/application`\" and \"mapping in `StatsMapping`\". FlagQueue is a second class in ProgressStats.kt, and StatsMapping is an `internal object` at the bottom of AdminStatsController.kt:73. Behaviour is unaffected, but the design reads as if these were separate artifacts.",
+        "suggestion": "Either split them into FlagQueue.kt and StatsMapping.kt, or amend design.md to say where they live. This is documentation hygiene only.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The facts in the finding are accurate: `FlagQueue` is a second class in `practice/application/ProgressStats.kt:89`, and `StatsMapping` is an `internal object` at `AdminStatsController.kt:73`. But that is not a deviation from the design.\n\ndesign.md names types and the package each one lives in. It does not say which file each type goes in:\n- Line 35 says \"use cases `ProgressStats` and `FlagQueue` in `practice/application`\". `FlagQueue` is a class in package `cz.doucko.practice.application`, so that holds.\n- Line 143 says \"`practice/adapter/in/web`: … mapping in `StatsMapping`\". `StatsMapping` is an object in that package and holds the mapping, so that holds too.\n\nThe same document shows the difference between naming a file and naming a type. Where it means a file it adds the `.kt` suffix: `practice/domain/Stats.kt`, `Reevaluation.kt`, `Model.kt`, `Gamification.kt`. `ProgressStats`, `FlagQueue` and `StatsMapping` never get that suffix. Line 136 also lists `Gamification.onReevaluation`, which is a method, so that list is plainly naming code elements, not files.\n\nKotlin allows several top-level declarations in one file, and package placement is what the hexagonal rule and Modulith `verify()` care about. Behaviour is unchanged, as the finding itself says. The design does not require separate files, so there is no spec-compliance gap to fix.",
+          "I checked the code and the design, and the design is followed. design.md names classes and objects by package, not by file. Line 35 says \"use cases `ProgressStats` and `FlagQueue` in `practice/application`\". `class FlagQueue` is in package `cz.doucko.practice.application`, at ProgressStats.kt:89. Lines 135–136 list the `practice/application` entries in the same style, and one of them is `Gamification.onReevaluation`, which is a method. So these entries name code units, not files. When the design does mean files it says so with `.kt` (`Stats.kt`, `Reevaluation.kt`, `Model.kt`, `Gamification.kt` on lines 130–133). It never says `FlagQueue.kt` or `StatsMapping.kt`. Line 143 says \"mapping in `StatsMapping`\", and `internal object StatsMapping` exists at AdminStatsController.kt:73 in `practice/adapter/in/web`, the package the design names. AdminStatsController uses both (`FlagQueue` injected at line 40, `StatsMapping.*` at lines 49–64). Nothing here can reach a user or an attacker, and the finding itself says behaviour is unaffected. What remains is a style preference about one class per file, not a gap between the spec and the code."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/implement-progress-stats-api/review-findings.json"
+  }
+}

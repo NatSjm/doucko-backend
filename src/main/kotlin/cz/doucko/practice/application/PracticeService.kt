@@ -261,7 +261,7 @@ class PracticeService(
                 ?: throw PracticeConflict("summary-not-complete")
         val attempts = store.attempts(scope, mission.taskIds)
         val firstTry =
-            attempts.count { it.attemptNo == 1 && it.correct && it.missionId == mission.missionId }
+            attempts.count { it.attemptNo == 1 && it.effectiveCorrect && it.missionId == mission.missionId }
         val xp = gamification.summary(mission, scope)
         return SummaryData(
             mission.missionId,
@@ -326,7 +326,11 @@ class PracticeService(
         )
     }
 
-    /** The result of the latest attempt in [progress]: per-part verdicts, state, and feedback from the tutor (FR-44). */
+    /**
+     * The result of the attempt that decides [progress] (the latest, or attempt 1 once a re-evaluation made it
+     * correct): per-part verdicts (re-evaluated ones for a first play-through attempt, review F01), state, and
+     * feedback from the tutor (FR-44).
+     */
     private fun outcome(
         mission: ServedMission,
         task: ServedTask,
@@ -334,14 +338,19 @@ class PracticeService(
         progress: TaskProgress,
         hintsOpened: Int,
     ): AttemptOutcome {
-        val latest = checkNotNull(progress.latest)
+        val latest = checkNotNull(progress.deciding)
+        val verdicts =
+            latest.reevaluation
+                ?.takeIf { !latest.replay }
+                ?.verdicts
+                .orEmpty()
         val complete =
             progress.state.resolved &&
                 states(run.scope, mission.taskIds).let { s -> mission.taskIds.all { it == task.taskId || s[it]?.resolved == true } }
         return AttemptOutcome(
             graded = true,
             attemptNo = latest.attemptNo,
-            parts = latest.parts.map { PartOutcome(it.key, it.verdict, it.normalized, null, it.locked) },
+            parts = latest.parts.map { PartOutcome(it.key, verdicts[it.key] ?: it.verdict, it.normalized, null, it.locked) },
             state = progress.state,
             attemptsLeft = progress.attemptsLeft,
             feedback = tutor.feedback(TutorInput(task.parts, task.hints.size, hintsOpened, progress.state)),

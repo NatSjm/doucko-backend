@@ -1,6 +1,7 @@
 package cz.doucko.practice.adapter.`in`.web
 
 import cz.doucko.api.model.FeedbackRevealedAnswersInnerAnswer
+import cz.doucko.api.model.LoggedAttemptRawInputValue
 import cz.doucko.practice.domain.RawAnswer
 import org.springframework.stereotype.Component
 import tools.jackson.core.JsonGenerator
@@ -14,21 +15,23 @@ import java.lang.reflect.Proxy
  * The contract's `Feedback.revealedAnswers[].answer` is `oneOf: string | array of strings`. The generator
  * turns it into the sealed interface [FeedbackRevealedAnswersInnerAnswer] with no implementation (design
  * decision 6), so a revealed answer is a JDK proxy of that interface holding the value, and this Jackson
- * module writes the held string or array. Responses stay generated models (NFR-12).
+ * module writes the held string or array. Responses stay generated models (NFR-12). The flag queue's
+ * `LoggedAttempt.rawInput` values (progress-stats, FR-41) have the same shape and are written the same way.
  */
 @Component
 class RevealedAnswers : SimpleModule("practice-revealed-answers") {
     init {
-        addSerializer(FeedbackRevealedAnswersInnerAnswer::class.java, Writer)
+        addSerializer(FeedbackRevealedAnswersInnerAnswer::class.java, Writer())
+        addSerializer(LoggedAttemptRawInputValue::class.java, Writer())
     }
 
-    private object Writer : ValueSerializer<FeedbackRevealedAnswersInnerAnswer>() {
+    private class Writer<T : Any> : ValueSerializer<T>() {
         override fun serialize(
-            value: FeedbackRevealedAnswersInnerAnswer,
+            value: T,
             gen: JsonGenerator,
             ctxt: SerializationContext,
         ) {
-            when (val raw = held(value)) {
+            when (val raw = checkNotNull(holderOf(value)).value) {
                 is RawAnswer.Text -> {
                     gen.writeString(raw.value)
                 }
@@ -67,7 +70,15 @@ class RevealedAnswers : SimpleModule("practice-revealed-answers") {
                 Holder(value),
             ) as FeedbackRevealedAnswersInnerAnswer
 
-        fun held(answer: FeedbackRevealedAnswersInnerAnswer): RawAnswer = checkNotNull(holderOf(answer)).value
+        /** A raw input of a logged attempt (`LoggedAttempt.rawInput` value). */
+        fun logged(value: RawAnswer): LoggedAttemptRawInputValue =
+            Proxy.newProxyInstance(
+                LoggedAttemptRawInputValue::class.java.classLoader,
+                arrayOf(LoggedAttemptRawInputValue::class.java),
+                Holder(value),
+            ) as LoggedAttemptRawInputValue
+
+        fun held(answer: Any): RawAnswer = checkNotNull(holderOf(answer)).value
 
         private fun holderOf(candidate: Any): Holder? =
             if (Proxy.isProxyClass(candidate.javaClass)) Proxy.getInvocationHandler(candidate) as? Holder else null

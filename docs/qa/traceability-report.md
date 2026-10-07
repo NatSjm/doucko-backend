@@ -5,7 +5,7 @@ requirements/spec/test/recording change; CI runs `--check-fresh`.
 
 Repo: backend (contract: submodule).
 Scope: 48 MVP functional requirements, 47 owned by backend.
-Result: PASS, 2 warning(s)
+Result: PASS
 
 | FR | Spec | Plan | Owner repo(s) | Test trace here | Recording here |
 |---|---|---|---|---|---|
@@ -52,8 +52,8 @@ Result: PASS, 2 warning(s)
 | FR-38 | yes | yes | backend, frontend | 6 | - |
 | FR-39 | yes | yes | backend, frontend | 6 | - |
 | FR-58 | yes | yes | frontend | n/a | n/a |
-| FR-40 | yes | yes | backend, frontend | - | - |
-| FR-41 | yes | yes | backend, frontend | - | - |
+| FR-40 | yes | yes | backend, frontend | 42 | - |
+| FR-41 | yes | yes | backend, frontend | 41 | - |
 | FR-42 | yes | yes | backend | 1 | - |
 | FR-43 | yes | yes | backend | 52 | - |
 | FR-44 | yes | yes | backend | 10 | - |
@@ -97,5 +97,4 @@ None.
 
 ## Warnings
 
-- **test-trace**: FR-40 (owned by backend) has no test annotated "@trace FR-40"
-- **test-trace**: FR-41 (owned by backend) has no test annotated "@trace FR-41"
+None.
