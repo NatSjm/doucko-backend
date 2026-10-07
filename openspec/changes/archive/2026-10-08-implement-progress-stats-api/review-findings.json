@@ -1,0 +1,127 @@
+{
+  "generatedBy": "review-gate",
+  "scope": "slice 9 progress-stats backend (implement-progress-stats-api)",
+  "change": "implement-progress-stats-api",
+  "baseRef": "7d86c33",
+  "headRef": "HEAD",
+  "dimensions": {
+    "correctness": {
+      "confirmed": 2,
+      "contested": 1,
+      "rejected": 1
+    },
+    "security": {
+      "confirmed": 1,
+      "contested": 0,
+      "rejected": 0
+    },
+    "spec-compliance": {
+      "confirmed": 1,
+      "contested": 3,
+      "rejected": 2
+    },
+    "visual": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "major",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Child task view shows the original WRONG verdicts next to a re-evaluated CORRECT state",
+      "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "line": 344,
+      "status": "fixed",
+      "fixCommit": "2dfbb77",
+      "resolution": "PracticeService.outcome shows TaskProgress.deciding (attempt 1 once it counts as correct, else the latest) and overlays the re-evaluated verdicts of a first play-through attempt (design decision 8). FlagQueueIT \"the task screen shows the re-evaluated attempt 1 of a revealed task\" and the extended \"re-evaluation awards the missing XP\" assert state, attemptNo and per-part verdicts."
+    },
+    {
+      "id": "F02",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Flag queue listing does N+1 full task loads (all parts, specs converted) only to build an 80-char excerpt",
+      "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "line": 141,
+      "status": "fixed",
+      "fixCommit": "2dfbb77",
+      "resolution": "FlagQueue.list reads the prompts with one ContentCatalog.prompts (TaskStore.prompts, one SELECT id, prompt) and the attempts with one PracticeStore.attemptsById query; no per-report lookup (design decision 6). Covered by FlagQueueIT queue tests."
+    },
+    {
+      "id": "F03",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "Flag queue is unpaginated and makes 2 extra queries per report, while anyone on the LAN can create reports without logging in",
+      "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "line": 94,
+      "status": "waived",
+      "reason": "The per-report queries are removed by the F02 fix (2dfbb77). Paging is not possible without a contract change: listReports in API 0.5.1 has no limit/offset and returns a plain array; contract changes are out of scope for this slice (contract impact: none). Limiting report creation is child-side practice-flow behaviour not in any store spec; the app runs for one child on a home LAN (NFR-2 binding). Recorded for the docs store as a possible follow-up."
+    },
+    {
+      "id": "F04",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "taskPromptExcerpt trims trailing whitespace before the ellipsis, which differs from design decision 6; the field has no store-spec requirement",
+      "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "line": 146,
+      "status": "fixed",
+      "fixCommit": "2dfbb77",
+      "resolution": "excerpt no longer trims: exactly the first 80 code points plus an ellipsis, as design decision 6 says. FlagQueueIT \"a long prompt is cut to an excerpt\" now covers a space at code point 80."
+    },
+    {
+      "id": "F05",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "Re-evaluation that cannot grade (shape mismatch / unreadable) returns the same 200 changed=false as 'still wrong'",
+      "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "line": 111,
+      "status": "waived",
+      "reason": "ReevaluationResult in API 0.5.1 has no reason field and the store spec scenario \"Attempt is unparseable under the new spec\" requires exactly \"reported as no change\"; design decision 7 documents that an ungradable input is no change, and the frontend behaviour note says so. Adding a reason needs a contract change (out of scope)."
+    },
+    {
+      "id": "F06",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "A replay re-evaluation only counts as better when the whole attempt becomes correct; a per-part improvement is not covered by the spec",
+      "file": "src/main/kotlin/cz/doucko/practice/domain/Reevaluation.kt",
+      "line": 57,
+      "status": "fixed",
+      "fixCommit": "2dfbb77",
+      "resolution": "Design decision 8 now defines \"better\" for a replay attempt as correct as a whole; ReevaluationRulesTest \"a replay attempt counts as better only when it becomes correct as a whole\" covers a two-part attempt with one part fixed (NoChange, also for a primary attempt). Clarifying the store-spec wording is noted for the docs store."
+    },
+    {
+      "id": "F07",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "The 'Rank-up from a re-evaluation' scenario is only partly tested: the 'celebration plays once' half is not asserted",
+      "file": "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+      "line": 308,
+      "status": "fixed",
+      "fixCommit": "2dfbb77",
+      "resolution": "FlagQueueIT \"a rank-up from a re-evaluation waits for HQ\" now acknowledges the rank-up and asserts that pendingRankUp is null on the next HQ read while the rank stays 1."
+    },
+    {
+      "id": "F08",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "Task 5.2 (openspec validate --strict) is ticked with no recorded evidence",
+      "file": "openspec/changes/implement-progress-stats-api/tasks.md",
+      "line": 25,
+      "status": "fixed",
+      "fixCommit": "2dfbb77",
+      "resolution": "Evidence: the pre-commit hooks of 9c24960 and 2dfbb77 ran `npx openspec validate --all --strict` (8 passed, incl. change/implement-progress-stats-api), and qa:verify re-runs it; tasks.md 5.2 now names that evidence."
+    }
+  ],
+  "clean": false,
+  "generatedAt": "2026-10-07T20:29:40Z"
+}

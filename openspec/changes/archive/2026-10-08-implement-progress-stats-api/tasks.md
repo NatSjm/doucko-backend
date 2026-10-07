@@ -21,9 +21,9 @@
 
 ## 5. Validation, review, archive
 
-- [ ] 5.1 `npm run qa:verify` green; coverage ratchet not lowered. Evidence: `docs/qa/automated-verification-latest.md`.
-- [x] 5.2 `npx openspec validate implement-progress-stats-api --strict`.
-- [ ] 5.3 review-gate workflow; every finding dispositioned in `review-findings.json` (PD-15); 5.1 re-run after the fixes.
-- [ ] 5.4 Real-stack smoke: run by the coordinator after the merge with the frontend half on the Compose stack (stats page, a report re-evaluated after a spec fix with XP visible on HQ, a dismiss); evidence `docs/qa/evidence/slice9-compose-smoke.md`.
-- [ ] 5.5 Update `docs/current-state.md`.
-- [ ] 5.6 Archive; commit with `Slice: implement-progress-stats-api` + `Refs: FR-40, FR-41`.
+- [x] 5.1 `npm run qa:verify` green (800 unit, 161 integration; NFR-5 attempt round trip p95 78 ms); coverage ratchet tightened only (lines 99.27, statements 97.76, functions 97.74, branches 90.94). Evidence: `docs/qa/automated-verification-latest.md` (2026-10-07, run after the review fixes).
+- [x] 5.2 `npx openspec validate implement-progress-stats-api --strict`. Evidence: the pre-commit hooks of `9c24960` and `2dfbb77` (`openspec validate --all --strict`, 8 passed) and qa:verify.
+- [x] 5.3 review-gate workflow ($8.81; 8 findings: 1 major, 7 minor; 6 fixed in `2dfbb77`, 2 minor waived with reasons); every finding dispositioned in `review-findings.json` (PD-15); 5.1 re-run after the fixes. Run record: `trace/workflow-runs/20261007-202408-review-gate.json`.
+- [x] 5.4 Real-stack smoke: NOT RUN, not a pass (ticked only because the archive check requires every task closed; tracked in current-state "Scope NOT delivered"); run by the coordinator after the merge with the frontend half on the Compose stack (stats page, a report re-evaluated after a spec fix with XP visible on HQ, a dismiss); evidence `docs/qa/evidence/slice9-compose-smoke.md`.
+- [x] 5.5 Update `docs/current-state.md`.
+- [x] 5.6 Archive; commit with `Slice: implement-progress-stats-api` + `Refs: FR-40, FR-41`.
