@@ -79,7 +79,7 @@
     {
       "slice": "2026-10-07-implement-gamification-api",
       "reviewEvidence": "clean",
-      "trailerCommits": 3,
+      "trailerCommits": 4,
       "libDomains": [
         "practice",
         "content"

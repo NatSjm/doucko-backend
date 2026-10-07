@@ -8,7 +8,7 @@
 - **Date and time:** 2026-10-07 (Europe/Prague)
 - **Current phase:** Phase 4
 - **Last completed gate:** G3
-- **Active change:** none. Slice 8 backend `implement-gamification-api` archived 2026-10-07 on branch `slice8-gamification` (not yet merged into `main`; the coordinator merges it with the frontend half and runs the real-stack smoke). Before it: fix `fix-restore-schema-drift` and slice 7 backend `implement-practice-flow-api`, both merged.
+- **Active change:** none. Slice 8 backend `implement-gamification-api` archived 2026-10-07 and merged into `main` (`9527006`) with the frontend half; real-stack smoke PASS 2026-10-07. Before it: fix `fix-restore-schema-drift` and slice 7 backend `implement-practice-flow-api`, both merged.
 - **Contract pin:** `contract/` submodule at docs `0168eba`, API 0.5.1
 - **Progress:** Spring Boot 4.1.1 / Kotlin 2.3 / JVM 21 scaffold (ADR-0003) plus slice 1 platform
   foundation: Compose stack (db, backend, frontend; only the frontend's 8081 published, on
@@ -45,6 +45,7 @@
   `Gamification` (append-only; it can raise `HqView.pendingRankUp`; design in
   `openspec/changes/archive/*implement-gamification-api/design.md`). Serialize: it needs a V6 migration.
 - **Claims:**
+  - Slice 8 merged into `main` (`9527006`); real-stack smoke PASS after the merge (2026-10-07: XP table, UNPARSEABLE neutral, completion and publish-time bonus, rank-up offered by summary and HQ and acknowledged, replay at 0 XP, 405 for HQ writes, 404/409 summaries, HQ and summary rendered from the stack; restore of the pre-smoke V4 dump restarted the V5 backend itself) — evidence: `docs/qa/evidence/slice8-compose-smoke.md`
   - Slice 8 QA battery passes after the review fixes (755 unit, 124 integration tests incl. `GamificationIT`, `GamificationConfigIT`, `PracticeTimingIT` NFR-5 p95 78 ms) — evidence: `docs/qa/automated-verification-latest.md` (2026-10-07)
   - Slice 8 review gate dispositioned (6 findings: 2 major, 4 minor, all fixed in `33f5bf2`; run cost $8.88) — evidence: `openspec/changes/archive/2026-10-07-implement-gamification-api/review-findings.json`
   - Slice 8 RED run — evidence: `docs/qa/evidence/slice8-red-run.md`
@@ -72,7 +73,7 @@
     `openspec/changes/archive/*implement-platform-foundation-api/review-findings.json`
   - G0, G2, G4, G5, G6, G8 PASS (G4 audits the archived slice); G1 and G3 need the owner's sign-off; G7 (release) fails until every
     MVP slice is archived. Evidence: `npm run gate:status`
-- **Scope NOT delivered:** slice 8: the real-stack smoke (NOT RUN; the coordinator runs it after the merge, `docs/qa/evidence/slice8-compose-smoke.md`); the frontend half (celebration animation, reduced motion, XP bar, skin, themes, e2e, recordings, vision-verify); admin re-evaluation awarding XP (slice 9); final rank names (placeholders, OQ-1); the store spec does not state the 50-character rank-name limit (backend implementation bound); slice 7: the Compose-stack NFR-5 measurement and task-screen load time, NFR-7 and the UI scenarios (frontend half); stats, flag queue and re-evaluation over the stored reports and attempt log (slice 9); slice 5: child serving (slice 7), backup of the `doucko-storage` volume (NFR-10 covers only Postgres), the real-stack smoke; the answer-checking endpoint rules (FR-22 whole-submission refusal, answer tester, re-evaluation: slices 5, 7, 9); slice 4 parts that need later slices or other repos (HQ `displayName`, XP/resolved tasks surviving a restart, e2e profile count, translation toggle, privacy scan, recordings; see `openspec/changes/archive/2026-10-04-implement-child-profile-api/design.md` Non-goals); the product capabilities still open (gamification,
+- **Scope NOT delivered:** slice 8: the rank-up celebration played in a browser on the real stack (covered by the frontend e2e and vision-verify against the stub); admin re-evaluation awarding XP (slice 9); final rank names (placeholders, OQ-1); the store spec does not state the 50-character rank-name limit (backend implementation bound); slice 7: the Compose-stack NFR-5 measurement and task-screen load time, NFR-7 and the UI scenarios (frontend half); stats, flag queue and re-evaluation over the stored reports and attempt log (slice 9); slice 5: child serving (slice 7), backup of the `doucko-storage` volume (NFR-10 covers only Postgres), the real-stack smoke; the answer-checking endpoint rules (FR-22 whole-submission refusal, answer tester, re-evaluation: slices 5, 7, 9); slice 4 parts that need later slices or other repos (HQ `displayName`, XP/resolved tasks surviving a restart, e2e profile count, translation toggle, privacy scan, recordings; see `openspec/changes/archive/2026-10-04-implement-child-profile-api/design.md` Non-goals); the product capabilities still open (gamification,
   admin-access, stats); Modulith JPA event registry (deferred, ADR-0003); the round-3 review fixes
   were not re-confirmed by a further review round (owner's choice).
 
