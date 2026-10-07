@@ -18,7 +18,7 @@ Result: PASS, 3 warning(s)
 | 2026-10-04-implement-platform-foundation-api | clean | 8 | yes | shared |
 | 2026-10-05-fix-restore-schema-drift | clean | 3 | yes | - |
 | 2026-10-05-implement-practice-flow-api | clean | 4 | yes | practice, content, profile, shared |
-| 2026-10-07-implement-gamification-api | clean | 2 | yes | practice, content |
+| 2026-10-07-implement-gamification-api | clean | 3 | yes | practice, content |
 
 ## Cross-slice module overlap
 
