@@ -23,6 +23,9 @@ interface PracticeStore {
         taskIds: Collection<UUID>,
     ): List<AttemptRecord>
 
+    /** Every attempt in [scope], all tasks (the startup reconciliation of the XP ledger). */
+    fun attemptsIn(scope: UUID): List<AttemptRecord>
+
     /** The opened hints of [taskIds] in [scope]. */
     fun hints(
         scope: UUID,
@@ -83,4 +86,36 @@ data class Feedback(
  */
 fun interface TutorPort {
     fun feedback(input: TutorInput): Feedback
+}
+
+/**
+ * The append-only XP ledger and the played rank-up celebrations (FR-38; design decisions 5 and 6). Rows are
+ * only inserted; the database refuses updates and deletes of awards. Writers hold the practice lock.
+ */
+interface XpLedger {
+    /** Every award, in ledger order. */
+    fun awards(): List<cz.doucko.practice.domain.XpAward>
+
+    /** The awards caused by one attempt, in ledger order. */
+    fun awardsOf(attemptId: UUID): List<cz.doucko.practice.domain.XpAward>
+
+    /** The ledger total. */
+    fun total(): Int
+
+    /** True when [taskId] already has its task award. */
+    fun taskAwarded(taskId: UUID): Boolean
+
+    /** The missions among [missionIds] whose completion bonus is already paid. */
+    fun bonusesPaid(missionIds: Collection<UUID>): Set<UUID>
+
+    fun insert(award: cz.doucko.practice.domain.XpAward)
+
+    /** The highest rank index whose celebration has played; 0 when none has. */
+    fun celebrated(): Int
+
+    /** Records that the celebration of rank [index] has played. */
+    fun celebrate(
+        index: Int,
+        at: java.time.Instant,
+    )
 }

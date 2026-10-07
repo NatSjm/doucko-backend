@@ -1,0 +1,15 @@
+{
+  "xp": {
+    "firstAttempt": 12,
+    "secondAttempt": 5,
+    "revealed": 1,
+    "hintCost": 2,
+    "minimum": 1,
+    "missionBonus": 30
+  },
+  "ranks": [
+    { "name": "Učeň", "minXp": 0 },
+    { "name": "Pomocník", "minXp": 150 },
+    { "name": "Ochránce města", "minXp": 160 }
+  ]
+}

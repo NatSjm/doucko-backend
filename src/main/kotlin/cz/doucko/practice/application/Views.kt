@@ -23,13 +23,14 @@ data class TopicView(
     val missions: List<MissionCardView>,
 )
 
-/** HQ (contract `HqView`); XP and ranks are the slice-8 placeholders (design decision 7). */
+/** HQ (contract `HqView`). */
 data class HqData(
     val displayName: String,
     val totalXp: Int,
     val solvedTasks: Int,
     val rank: Rank,
     val nextRank: Rank?,
+    val pendingRankUp: Rank?,
     val continueTarget: Pair<UUID, UUID>?,
     val topics: List<TopicView>,
 )
@@ -47,6 +48,7 @@ data class BriefingData(
     val position: Int,
     val topicName: String,
     val state: MissionState,
+    val xpAvailable: Int,
     val tasks: List<BriefingTask>,
 )
 
@@ -68,6 +70,8 @@ data class AttemptOutcome(
     val attemptsLeft: Int,
     val feedback: Feedback?,
     val missionComplete: Boolean,
+    val xp: XpOutcome = XpOutcome.NONE,
+    val rankUp: Rank? = null,
 )
 
 /**
@@ -93,10 +97,13 @@ data class HintOpened(
     val locale: String?,
 )
 
-/** The mission-complete data available before slice 8: counts only, no XP or rank (design decision 7). */
+/** The mission-complete screen of the latest completed run (contract `MissionSummary`, FR-32). */
 data class SummaryData(
     val missionId: UUID,
     val firstTryCount: Int,
     val taskCount: Int,
     val replay: Boolean,
+    val xpEarned: Int,
+    val rankUp: Rank?,
+    val rankReachedDuringRun: Rank?,
 )

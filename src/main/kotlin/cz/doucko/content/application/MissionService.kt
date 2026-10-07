@@ -1,6 +1,7 @@
 package cz.doucko.content.application
 
 import cz.doucko.content.ContentUsage
+import cz.doucko.content.PublishedMissionChanged
 import cz.doucko.content.domain.In
 import cz.doucko.content.domain.Mission
 import cz.doucko.content.domain.MissionContent
@@ -11,6 +12,7 @@ import cz.doucko.content.domain.PublishStatus
 import cz.doucko.content.domain.Task
 import cz.doucko.content.domain.Validation
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -35,6 +37,7 @@ class MissionService(
     private val lock: ContentLock,
     private val conflicts: Conflicts,
     private val usageProvider: ObjectProvider<ContentUsage>,
+    private val events: ApplicationEventPublisher,
 ) {
     private val usage: ContentUsage get() = usageProvider.getIfAvailable { ContentUsage.NONE }
 
@@ -67,6 +70,7 @@ class MissionService(
         MissionRules.edit(stored, content, taskMap(stored.content.taskIds + content.taskIds))?.let { throw conflicts.of(it, stored) }
         val updated = stored.copy(content = content)
         missions.update(updated)
+        if (stored.status == PublishStatus.PUBLISHED) events.publishEvent(PublishedMissionChanged(id))
         return view(updated)
     }
 
@@ -82,6 +86,7 @@ class MissionService(
             MissionRules.publish(list)?.let { throw conflicts.of(it, stored) }
         }
         if (stored.status != status) missions.setStatus(id, status)
+        if (status == PublishStatus.PUBLISHED && stored.status != PublishStatus.PUBLISHED) events.publishEvent(PublishedMissionChanged(id))
         return view(stored.copy(status = status))
     }
 

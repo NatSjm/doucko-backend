@@ -79,7 +79,8 @@ class PracticeIT {
 
     @AfterEach
     fun clean() {
-        for (table in listOf("problem_report", "opened_hint", "attempt", "practice_run", "mission", "task_image", "task", "source")) {
+        jdbc.cleanPractice()
+        for (table in listOf("mission", "task_image", "task", "source")) {
             jdbc.update("DELETE FROM $table")
         }
     }
@@ -329,7 +330,8 @@ class PracticeIT {
         val briefing = read(mvc.get("/api/child/missions/$m").andExpect { status { isOk() } })
         briefing.read<String>("$.topicName") shouldBe "Desetinná čísla"
         briefing.read<String>("$.state") shouldBe "IN_PROGRESS"
-        briefing.read<Int>("$.xpAvailable") shouldBe 0
+        // Slice 8: two unresolved tasks at the 1st-attempt rate plus the unpaid bonus (gamification).
+        briefing.read<Int>("$.xpAvailable") shouldBe 40
         briefing.read<List<String>>("$.tasks[*].state") shouldContainExactly listOf("UNRESOLVED", "REVEALED", "UNRESOLVED")
         briefing.read<List<Int>>("$.tasks[*].position") shouldContainExactly listOf(1, 2, 3)
     }
@@ -483,9 +485,10 @@ class PracticeIT {
         second.read<List<String>>("$.parts[*].verdict") shouldContainExactly listOf("CORRECT", "CORRECT")
         second.read<String>("$.parts[0].normalized") shouldBe "12"
         second.read<Boolean>("$.missionComplete") shouldBe true
-        second.read<Int>("$.xpAwarded") shouldBe 0
-        second.read<Int>("$.bonusXp") shouldBe 0
-        second.read<List<Any>>("$.completedMissionIds") shouldBe emptyList()
+        // Slice 8: 5 XP for the 2nd try and the bonus of the completed one-task mission (gamification).
+        second.read<Int>("$.xpAwarded") shouldBe 5
+        second.read<Int>("$.bonusXp") shouldBe 20
+        second.read<List<String>>("$.completedMissionIds") shouldContainExactly listOf(m)
         second.read<Any?>("$.rankUp").shouldBeNull()
         attempt(m, t, """{"b":"0.5"}""").isProblem(409)
     }
@@ -806,11 +809,11 @@ class PracticeIT {
         mvc.adminDelete(admin, "/api/admin/tasks/$unused").andExpect { status { isNoContent() } }
     }
 
-    // ---------------------------------------------------------------- slice-8 placeholders (design decision 7)
+    // ---------------------------------------------------------------- replay and summary runs
 
     // @trace FR-31
     @Test
-    fun `replay and summary placeholders keep runs apart and HQ complete`() {
+    fun `replay and summary keep runs apart and HQ complete`() {
         val ids = List(2) { task() }
         val m = mission(ids)
         mvc.post("/api/child/missions/$m/replay").isProblem(409)
@@ -821,7 +824,7 @@ class PracticeIT {
             it.read<Int>("$.firstTryCount") shouldBe 1
             it.read<Int>("$.taskCount") shouldBe 2
             it.read<Boolean>("$.replay") shouldBe false
-            it.read<Int>("$.xpEarned") shouldBe 0
+            it.read<Int>("$.xpEarned") shouldBe 31
         }
         val replay = read(mvc.post("/api/child/missions/$m/replay").andExpect { status { isOk() } })
         replay.read<String>("$.taskId") shouldBe ids[0]

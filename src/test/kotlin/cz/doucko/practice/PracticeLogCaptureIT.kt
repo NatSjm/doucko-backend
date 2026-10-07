@@ -64,7 +64,8 @@ class PracticeLogCaptureIT {
     @AfterEach
     fun clean() {
         configuredLogLevels(javaClass.classLoader)
-        for (table in listOf("problem_report", "opened_hint", "attempt", "practice_run", "mission", "task_image", "task", "source")) {
+        jdbc.cleanPractice()
+        for (table in listOf("mission", "task_image", "task", "source")) {
             jdbc.update("DELETE FROM $table")
         }
     }

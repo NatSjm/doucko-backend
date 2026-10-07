@@ -75,6 +75,16 @@
         "shared"
       ],
       "processComplete": true
+    },
+    {
+      "slice": "2026-10-07-implement-gamification-api",
+      "reviewEvidence": "clean",
+      "trailerCommits": 3,
+      "libDomains": [
+        "practice",
+        "content"
+      ],
+      "processComplete": true
     }
   ],
   "overlaps": [
@@ -83,7 +93,8 @@
       "slices": [
         "2026-10-04-implement-authoring-missions-api",
         "2026-10-04-implement-authoring-tasks-api",
-        "2026-10-05-implement-practice-flow-api"
+        "2026-10-05-implement-practice-flow-api",
+        "2026-10-07-implement-gamification-api"
       ]
     },
     {
@@ -92,17 +103,28 @@
         "2026-10-04-implement-child-profile-api",
         "2026-10-05-implement-practice-flow-api"
       ]
+    },
+    {
+      "domain": "practice",
+      "slices": [
+        "2026-10-05-implement-practice-flow-api",
+        "2026-10-07-implement-gamification-api"
+      ]
     }
   ],
   "failures": [],
   "warnings": [
     {
       "check": "in-scope",
-      "msg": "lib/content/ modified by 3 slices (2026-10-04-implement-authoring-missions-api, 2026-10-04-implement-authoring-tasks-api, 2026-10-05-implement-practice-flow-api) — review for scope drift"
+      "msg": "lib/content/ modified by 4 slices (2026-10-04-implement-authoring-missions-api, 2026-10-04-implement-authoring-tasks-api, 2026-10-05-implement-practice-flow-api, 2026-10-07-implement-gamification-api) — review for scope drift"
     },
     {
       "check": "in-scope",
       "msg": "lib/profile/ modified by 2 slices (2026-10-04-implement-child-profile-api, 2026-10-05-implement-practice-flow-api) — review for scope drift"
+    },
+    {
+      "check": "in-scope",
+      "msg": "lib/practice/ modified by 2 slices (2026-10-05-implement-practice-flow-api, 2026-10-07-implement-gamification-api) — review for scope drift"
     }
   ]
 }

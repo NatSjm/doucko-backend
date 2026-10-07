@@ -167,19 +167,22 @@ class BackupRestoreIT {
     fun `restoring a dump from before the newest migration restarts the running backend, which migrates it again`() {
         compose("up", "-d", "--wait", "db")
         buildAndStartBackend()
-        // The database as it was before V4 (V4__practice.sql; applied migrations never change).
-        sql("DROP TABLE problem_report, opened_hint, attempt, practice_run; DELETE FROM flyway_schema_history WHERE version = '4'")
+        // The database as it was before V5 (V5__gamification.sql, the newest migration; applied migrations never change).
+        sql(
+            "DROP TABLE xp_award, rank_celebration; DROP FUNCTION xp_award_append_only(); " +
+                "DELETE FROM flyway_schema_history WHERE version = '5'",
+        )
         val dump = backup()
-        // Back to the newest schema, as a backend that has been running since V4 has it.
+        // Back to the newest schema, as a backend that has been running since V5 has it.
         compose("restart", "backend")
         compose("up", "-d", "--wait", "--no-build", "backend")
-        sql("SELECT count(*) FROM information_schema.tables WHERE table_name = 'practice_run'") shouldBe "1"
+        sql("SELECT count(*) FROM information_schema.tables WHERE table_name = 'xp_award'") shouldBe "1"
 
         val output = restore(dump, timeoutSec = 600)
 
         output shouldContain "restarted"
-        sql("SELECT count(*) FROM flyway_schema_history WHERE version = '4' AND success") shouldBe "1"
-        sql("SELECT count(*) FROM information_schema.tables WHERE table_name = 'practice_run'") shouldBe "1"
+        sql("SELECT count(*) FROM flyway_schema_history WHERE version = '5' AND success") shouldBe "1"
+        sql("SELECT count(*) FROM information_schema.tables WHERE table_name = 'xp_award'") shouldBe "1"
         // The restarted backend serves the child area.
         compose("exec", "-T", "backend", "wget", "-qO-", "http://localhost:8080/api/child/hq") shouldContain "\"rank\""
     }
@@ -220,8 +223,8 @@ class BackupRestoreIT {
     fun `when the restarted backend cannot migrate the restored schema, restore exits 1 and says the data is restored`() {
         compose("up", "-d", "--wait", "db")
         buildAndStartBackend()
-        // History says V3 but V4's tables exist: Flyway's V4 fails on restart and the backend crash-loops.
-        sql("DELETE FROM flyway_schema_history WHERE version = '4'")
+        // History says V4 but V5's tables exist: Flyway's V5 fails on restart and the backend crash-loops.
+        sql("DELETE FROM flyway_schema_history WHERE version = '5'")
         val dump = backup()
 
         val (exit, output) =

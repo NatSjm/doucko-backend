@@ -100,29 +100,3 @@ data class FieldError(
     val code: String,
     val args: List<Any> = emptyList(),
 )
-
-/** A rank of the placeholder ladder (contract `Rank`). */
-data class Rank(
-    val index: Int,
-    val name: String,
-    val minXp: Int,
-)
-
-/**
- * The placeholder rank ladder of gamification ("Rank ladder": five ranks at 0, 150, 400, 800 and 1500 XP
- * with placeholder names). XP is slice 8, so every child is on the first rank until then (design decision 7).
- */
-object PlaceholderLadder {
-    val ranks =
-        listOf(
-            Rank(0, "Nováček", 0),
-            Rank(1, "Stopař", 150),
-            Rank(2, "Pátrač", 400),
-            Rank(3, "Detektiv", 800),
-            Rank(4, "Mistr detektiv", 1500),
-        )
-
-    fun rankFor(xp: Int): Rank = ranks.last { it.minXp <= xp }
-
-    fun nextAfter(rank: Rank): Rank? = ranks.getOrNull(rank.index + 1)
-}

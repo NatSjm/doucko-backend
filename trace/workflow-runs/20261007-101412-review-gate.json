@@ -1,0 +1,839 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-07T10:14:12.795Z",
+  "finishedAt": "2026-10-07T10:21:10.318Z",
+  "args": {
+    "scope": "slice 8 gamification backend (implement-gamification-api)",
+    "baseRef": "da5f9a9",
+    "headRef": "HEAD",
+    "change": "implement-gamification-api"
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": null,
+    "budgetPerAgentUsd": 2,
+    "maxTotalUsd": 25,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 8.8795,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 441,
+      "durationMs": 128406,
+      "sessionId": "edb87281-43af-4237-97f7-4d307994e956",
+      "costUsd": 0.77344,
+      "numTurns": 9,
+      "result": {
+        "findings": [
+          {
+            "title": "Missions completed by a task-side admin change never get their completion bonus",
+            "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+            "line": 145,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "`PublishedMissionChanged` is only published from `MissionService.edit` and `MissionService.setStatus` (MissionService.kt:73, :89). A served mission's task list also shrinks when a task is deleted (`TaskService.delete` → `missions.removeTask(id)`, line 150), unpublished (`TaskService.setStatus`, line 156), or made unservable some other way, because `ServedContentService.served` drops non-PUBLISHED/non-TEXT tasks. If the removed task was the mission's last unresolved one, the mission is now complete but no event fires. `Gamification.onAttempt` only pays bonuses on a new primary resolution, and no task in that mission can be resolved any more, so the bonus is never paid unless an admin happens to re-save the mission. The design (decision 4, OQ-28) says that removing the last unresolved task completes the mission 'the same way'.",
+            "suggestion": "Publish `PublishedMissionChanged` (or a broader `ServedMissionsChanged`) for every published mission affected by a task delete, status change or modality change in TaskService. One option is to have `removeTask` return the affected mission ids, which it already collects. Add an IT that deletes or unpublishes the last unresolved task and checks that the bonus row is written."
+          },
+          {
+            "title": "Briefing xpAvailable offers the mission bonus for a complete mission that has no bonus row",
+            "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+            "line": 442,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "`available()` returns `open * config.xp.firstAttempt + if (paid) 0 else config.xp.missionBonus` and never checks whether the mission is already complete. Design decision 8 says xpAvailable is '0 for a complete mission and during a replay'. A complete mission with no bonus row will therefore show 20 XP available that can never be earned (replays earn nothing). This happens when the task-side change above completes a mission, and for missions completed in the primary scope before V5. The child sees XP on offer that will never be awarded.",
+            "suggestion": "Add the bonus only when `open > 0`, or when `!complete(mission)`. Better still, also fix the missing-bonus paths so a complete, unpaid mission cannot exist."
+          },
+          {
+            "title": "No ledger backfill for primary-scope resolutions and completed missions from before V5",
+            "file": "src/main/resources/db/migration/V5__gamification.sql",
+            "line": 27,
+            "severity": "major",
+            "confidence": "low",
+            "evidence": "V5 creates an empty `xp_award` table. `Gamification.onAttempt` awards XP only on a new resolving attempt (`state.resolved` after the insert), and `complete()` is only evaluated for missions containing the task just resolved. Any task resolved, or mission completed, under slice 7 therefore never earns XP or its bonus. HQ shows `totalXp` 0 next to a non-zero `solvedTasks`. If a deployed database already has slice-7 attempts, this is effectively lost XP (FR-38).",
+            "suggestion": "Confirm whether any deployed data predates V5. If it does, add an append-only backfill: a new migration, or a startup task under the practice lock. It should insert TASK rows for each first primary resolution (using `hints_used`) and MISSION_BONUS rows for served missions that are already complete. If no such data exists, record that decision in design.md."
+          },
+          {
+            "title": "Admin publish/edit now fails if the synchronous gamification listener throws",
+            "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+            "line": 411,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`onPublishedMissionChanged` is a plain `@EventListener` running inside the admin's content transaction. It takes the practice advisory lock, reads every primary attempt for the mission and inserts a ledger row. Any exception it raises propagates out of `events.publishEvent(...)` in `MissionService.setStatus`/`edit`, so the admin's publish fails and rolls back, probably as a generic 500. Examples are a unique-index violation if an invariant is ever broken, or a row rejected by `CHECK amount`. The content module now depends at runtime on practice for its own writes to succeed.",
+            "suggestion": "This coupling may be what you want, since the bonus is atomic with the publish. If so, map any listener failure to an RFC 7807 response with a human-readable message, or use an idempotent insert (`ON CONFLICT DO NOTHING` on the partial unique index) so a race cannot block publishing."
+          },
+          {
+            "title": "Summary's completing attempt re-implements resolution logic instead of using TaskProgress",
+            "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+            "line": 454,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`.filter { it.correct || it.attemptNo == TaskProgress.MAX_ATTEMPTS }` restates the rule for when an attempt resolves a task, which `TaskProgress(...).state.resolved` already encodes. If resolution rules change (for example, more attempts or reveal-on-request), the summary's `completing` attempt, and with it `rankUp`, will silently drift from the state machine used everywhere else.",
+            "suggestion": "Derive the resolving attempt per task from `TaskProgress` (e.g. `groupBy taskId → TaskProgress(list).takeIf { state.resolved }?.latest`), then take the latest by `createdAt`."
+          },
+          {
+            "title": "Every read and write reloads and sums the entire XP ledger several times per request",
+            "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+            "line": 462,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`ofAttempt` calls `ledger.awards()` and filters it in memory. It runs for each `outcome()`, so for every task screen and every submit. `onAttempt`, `available`, `progress`, `acknowledge` and `summary` each load the full table again, and `progress` also queries `celebrated()`. A single submit loads the full ledger at least twice. The design accepts in-memory sums, but `ofAttempt` could use the existing `xp_award_attempt_idx`.",
+            "suggestion": "Add targeted port methods: `awardsOf(attemptId)`, `total()` as SQL `sum(amount)`, `bonusPaid(missionId)` and `taskAwarded(taskId)`. Keep `awards()` for the summary only."
+          },
+          {
+            "title": "Unreadable config resource surfaces as a raw IOException rather than InvalidGamificationConfig",
+            "file": "src/main/kotlin/cz/doucko/practice/application/GamificationSettings.kt",
+            "line": 636,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "Only `!resource.exists()` is mapped to `InvalidGamificationConfig`. If `doucko.gamification.config` points at an existing but unreadable path (a directory, or a file with denied permissions), `resource.inputStream` throws an IOException. That stops startup with a stack trace that does not name the key, contrary to the KDoc ('An unreadable or invalid file stops the start with [InvalidGamificationConfig] naming the key').",
+            "suggestion": "Check `resource.isReadable` and wrap the read in try/catch(IOException), rethrowing `InvalidGamificationConfig(\"doucko.gamification.config\", \"names no readable file\")`."
+          },
+          {
+            "title": "xpAvailable assumes firstAttempt is the maximum award, which is wrong when minimum > firstAttempt",
+            "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+            "line": 442,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "The parser accepts `firstAttempt` 0..1000 and `minimum` 1..1000 independently. `XpRules.taskAward` pays `maxOf(config.minimum, ...)`, so with e.g. `firstAttempt: 0, minimum: 5` each task earns 5, but `available()` computes `open * config.xp.firstAttempt` = 0. The same mismatch applies if `secondAttempt` or `revealed` is greater than `firstAttempt`.",
+            "suggestion": "Use `XpRules.taskAward(config.xp, CORRECT_FIRST_TRY, 0)`, or the maximum over states, as the per-task figure. Alternatively, add cross-field validation in the parser (minimum ≤ firstAttempt, secondAttempt ≤ firstAttempt) if the spec intends that ordering."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 469,
+      "durationMs": 44686,
+      "sessionId": "bcfc2879-0319-4d9e-9f17-cc35a61b18df",
+      "costUsd": 0.4748722,
+      "numTurns": 6,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 412,
+      "durationMs": 174011,
+      "sessionId": "38cd04fa-2e16-498a-a0b5-2d81007aa481",
+      "costUsd": 1.085226,
+      "numTurns": 24,
+      "result": {
+        "findings": [
+          {
+            "title": "COVERAGE SUMMARY: 16 delta scenarios: 16 implemented, 0 partial, 0 missing, 0 contradicted",
+            "file": "openspec/changes/implement-gamification-api/specs/gamification/spec.md",
+            "line": 1,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "I traced each of the 16 delta scenarios to code and to a matching test. Award table, Neutral submissions and Hints/replays: Gamification.kt:63-83 and XpRules (domain/Gamification.kt:32-42), tested at GamificationIT.kt:210/242/266/377. Shared task, two missions and published-already-complete: Gamification.kt:74-80 and 95-104, plus the MissionService events, tested at GamificationIT.kt:401/424/459/486. Config keys, ladder and alternate file: GamificationConfigParser.kt, tested in GamificationConfigTest and GamificationConfigIT.kt:136/149. Mid-mission rank-up, pending rank-up with ack, and older ack: PracticeService submit, Gamification.acknowledge and progress(), tested at GamificationIT.kt:501/530/573. Summary/replay and available XP: RunXp.summarize and Gamification.available, tested at GamificationIT.kt:634/377/678. Append-only ledger and XP never goes down: V5 trigger, tested at GamificationIT.kt:695/707. Every FR assigned to this repo for slice 8 (FR-32..FR-39) appears in the delta spec and has @trace tests. No NFR travels with this slice. The OpenAPI fields used (AttemptResult xpAwarded/bonusXp/completedMissionIds/rankUp, HqView.pendingRankUp, Rank{index,name,minXp}, MissionBriefing.xpAvailable, MissionSummary xpEarned/rankUp/rankReachedDuringRun, ackRankUp 204/400) match contract/api/openapi.yaml. No new endpoints or status codes were added. Ticked tasks 1.1–4.2 all have their artifacts (V5__gamification.sql, the test classes, docs/qa/evidence/slice8-red-run.md, the domain types, PlaceholderLadder removed, PublishedMissionChanged, missionsContaining, JdbcXpLedger, gamification.json). Tasks 5.1–5.6 are honestly left unticked.",
+            "suggestion": "Nothing to fix here; this row is the coverage summary. Finish tasks 5.1–5.6 (qa:verify, openspec validate --strict, review-gate with review-findings.json, compose smoke, current-state, archive) before calling the slice done."
+          },
+          {
+            "title": "Mid-mission rank-up is marked as played by the server on the POST response, but the store spec says a celebration counts as played only once the client acknowledges it",
+            "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+            "line": 175,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "The store spec contract/openspec/specs/gamification/spec.md:261 says: \"A celebration counts as played once the client acknowledges it.\" The delta spec (line 92-93) says the opposite for AttemptResult.rankUp: \"that celebration counts as played\". OpenAPI AttemptResult.rankUp agrees with the delta (\"one-shot: the POST response is its only carrier\"). The code follows the delta and contract: `val rankUp = xp.crossing?.takeIf { !result.missionComplete }; rankUp?.let { gamification.celebrated(it, record.createdAt) }`. It writes rank_celebration with no client ack. So if the POST response is lost (tab closed or network drop), the mid-mission celebration never plays again. Under the store spec it would still be pending on HQ.",
+            "suggestion": "Amend the store spec (a docs-store change) so it says a mid-mission AttemptResult.rankUp is one-shot and counts as played when the response is sent, and that only mission-complete and out-of-session crossings need ackRankUp. The other option is to make mid-mission crossings pending until acknowledged as well, but that would also need a contract change."
+          },
+          {
+            "title": "Undocumented rule: rank names are limited to 50 characters and duplicate JSON keys are refused",
+            "file": "src/main/kotlin/cz/doucko/practice/application/GamificationConfigParser.kt",
+            "line": 70,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "The delta spec (line 63-69) says startup is refused only when \"a rank name is missing or blank\". It sets no length limit and says nothing about duplicate keys. The code also refuses names longer than NAME_MAX = 50 code points (`name.codePointCount(0, name.length) > NAME_MAX` → \"must be a text of 1 to 50 characters\"). It also turns on `StreamReadFeature.STRICT_DUPLICATE_DETECTION`, so a duplicated key makes the backend refuse to start. Neither rule comes from any requirement, and no scenario covers the 50-character limit.",
+            "suggestion": "Amend the delta spec (and the store spec's \"Swappable skin\"/\"Rank ladder\") to state the 1..50 character limit for rank names and that duplicate keys are refused, and add a boundary test for 50 and 51 characters. Or drop the limit if the spec isn't changed."
+          },
+          {
+            "title": "Reloaded TaskView.lastFeedback now shows the stored XP of the last attempt and drops its rank-up; no requirement covers this",
+            "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeMapping.kt",
+            "line": 128,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The delta spec only covers XP in the POST AttemptResult, the summary, the briefing and HQ. The code also fills `lastFeedback` on GET task screens from the ledger (`xp = gamification.ofAttempt(latest.id)` in PracticeService.outcome) and forces `rankUp = null` (`lastFeedback = screen.lastResult?.let { attempt(it.copy(rankUp = null)) }`). The comment points to \"design decision 9\" in design.md, not to a spec requirement. It fits the schema (lastFeedback is an AttemptResult), but no scenario says reloaded feedback must repeat xpAwarded/bonusXp/completedMissionIds or never carry rankUp. No test asserting it was visible in the gamification test names.",
+            "suggestion": "Add a scenario to the delta spec (e.g. \"Reloaded task feedback shows the stored award and no rank-up\") and an IT that reloads the task after a crossing attempt and checks the XP fields and rankUp null."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 681,
+      "durationMs": 18919,
+      "sessionId": "18b7ce21-34aa-47d5-a8cb-daf84f344136",
+      "costUsd": 0.168387,
+      "numTurns": 3,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1865,
+      "durationMs": 27104,
+      "sessionId": "2f324088-663f-42b0-a894-8619bc1f5975",
+      "costUsd": 0.27703479999999997,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "I could not reproduce the finding. Each task-side path it names is blocked by `MissionRules` (`content/domain/Missions.kt`) before any change is made, whenever the task belongs to a PUBLISHED mission. All of these checks run under `lock.exclusive()`.\n- **Delete:** `TaskService.delete` calls `MissionRules.taskDelete` before `missions.removeTask(id)`. That check returns `Refusal.TaskDeleteInPublished` if any containing mission is published (Missions.kt:249-251). So `removeTask` only runs for tasks that are in draft missions only, and those missions are never served and pay no bonus.\n- **Unpublish:** `TaskService.setStatus` calls `MissionRules.taskStatus`. Moving a task to DRAFT is refused with `TaskDraftInPublished` if any containing mission is published (Missions.kt:222-224). `PublishStatus` has only DRAFT and PUBLISHED, so there is no other way to unpublish.\n- **Modality change:** `TaskService.update` calls `MissionRules.taskEdit`. Changing a task to GRAPHIC is refused with `TaskGraphicInPublished` if any containing mission is published (Missions.kt:237-238). Topic and grade changes are refused for any containing mission.\n- **Other writers:** `bulkPublish` only publishes tasks. A search finds no other callers of `tasks.delete`, `tasks.setStatus` or `missions.removeTask`.\n\nSo a served (published) mission's task list cannot shrink through TaskService. Its task set changes only through `MissionService.edit` or `setStatus`, and those already publish `PublishedMissionChanged`. The case the finding describes, where a task-side admin change completes a published mission without firing the event, cannot happen.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1898,
+      "durationMs": 25526,
+      "sessionId": "afd50ff6-dba3-449f-b8fb-f240742cc6b1",
+      "costUsd": 0.26517939999999995,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding says a mission can lose its last unresolved task without any event firing. That can't happen: every path it names is blocked by `MissionRules` in `content/domain/Missions.kt` whenever the task belongs to a published mission.\n\n- **Deleting a task:** `TaskService.delete` (line 149) calls `MissionRules.taskDelete`. That returns `Refusal.TaskDeleteInPublished` if any mission containing the task is PUBLISHED, so the request fails before `missions.removeTask(id)` runs.\n- **Unpublishing a task:** `TaskService.setStatus` (line 162) calls `MissionRules.taskStatus`. That refuses `DRAFT` (`TaskDraftInPublished`) for a task in a published mission. `PublishStatus` has only DRAFT and PUBLISHED, so there is no other way to unpublish.\n- **Changing modality:** `TaskService.update` calls `MissionRules.taskEdit`. That refuses switching a task to GRAPHIC (`TaskGraphicInPublished`) while it is in a published mission, so it can't become non-servable that way either.\n- **Bulk publish:** `bulkPublish` only publishes tasks, never unpublishes them.\n\nThe only way to shrink a mission's task list is to set the mission to DRAFT first. Children aren't served draft missions. Re-publishing the mission goes through `MissionService.setStatus`, which publishes `PublishedMissionChanged` (MissionService.kt:89), and `Gamification.onPublishedMissionChanged` then pays the bonus. Editing a published mission likewise fires the event (line 73).\n\nSo the scenario of an admin removing the last unresolved task from a served mission without any event is not reachable, and no real user can trigger it.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1363,
+      "durationMs": 55753,
+      "sessionId": "4be5a4c3-7b37-4a13-8592-43ad375ffdf9",
+      "costUsd": 0.5219698,
+      "numTurns": 16,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real, but only one of the two trigger paths the finding names can actually happen.\n\nWhat's confirmed: in `Gamification.available()` (`src/main/kotlin/cz/doucko/practice/application/Gamification.kt:122-127`; the file has 176 lines, so the cited line 442 doesn't exist), the code returns `open * firstAttempt + if (paid) 0 else missionBonus`. It never checks `complete(mission)`. Design decision 8 (`openspec/changes/implement-gamification-api/design.md:111-113`) says xpAvailable is \"0 for a complete mission\". So a complete mission with no MISSION_BONUS row shows 20 XP that can't be earned: `onAttempt` only pays the bonus when a task is resolved for the first time, and replays earn nothing.\n\nCan a complete, unpaid mission exist?\n- Task-side path: mostly blocked. The served task list (`ServedContentService.served`) filters to published TEXT tasks. However:\n  - `MissionRules.taskStatus` refuses to set a task back to DRAFT while it is in a published mission.\n  - `MissionRules.taskEdit` refuses changing a task to GRAPHIC in a published mission.\n  - Mission edits and publishes fire `PublishedMissionChanged`, and `onPublishedMissionChanged` then pays the bonus for a complete mission.\n\n  So nothing on the task side makes a mission complete without paying the bonus.\n- Data from before V5: reachable. `V5__gamification.sql` only creates the tables and has no backfill. Slice 7 practice is already merged to main, so primary-scope attempts from before V5 (live data, or a restored older dump migrated forward) can leave a mission fully resolved with no bonus row. Its briefing then shows `xpAvailable = 20` permanently, or until an admin republishes or edits the mission.\n\nSo the deviation from the spec is real and reachable, but only with legacy data. The impact is a display-only number in the briefing; no wrong XP is written and the ledger is not corrupted. Adding `if (open == 0) return 0` (or checking `complete()`) would fix it. Downgrading from major to minor.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1396,
+      "durationMs": 70645,
+      "sessionId": "d6b696ca-62c6-4eb4-a567-c7a45dd6b02e",
+      "costUsd": 0.47445020000000004,
+      "numTurns": 17,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The flaw is real, but it is a display bug, so I'd rate it minor rather than major.\n\n**The code does what the finding says.** The finding cites line 442, but the method is at `Gamification.kt:122-127`. `available()` returns `open * firstAttempt + (if (paid) 0 else missionBonus)`. It never checks `complete(mission)` or `open == 0`. So a mission whose tasks are all resolved in the primary scope, but which has no MISSION_BONUS row, shows `xpAvailable = 20`. Design decision 8 (`design.md:111-113`) says it should be 0 for a complete mission. Nothing in `PracticeService.briefing` (line 101) or the web mapping catches this, so the value goes straight to the API.\n\n**Can a complete mission be missing its bonus row?**\n- **Task-side admin paths: no.** I checked these and they do not create that state. `MissionRules.taskDelete` refuses to delete a task that is in a published mission. `taskStatus` refuses to move such a task back to draft. `taskEdit` refuses a TEXT→GRAPHIC change when the task is in a published mission. Publishing a mission, or editing a published mission's task list, fires `PublishedMissionChanged`. `onPublishedMissionChanged` then pays the bonus if the mission is already complete. `onAttempt` pays the bonus for every served mission that contains the resolved task. So the finding's first trigger does not hold.\n- **Data from before V5: yes.** `V5__gamification.sql` creates `xp_award` with no backfill. Any mission completed through primary-scope attempts before V5 has open = 0 and no bonus row, so the briefing shows 20 XP. Restoring an older (pre-V5) backup into the V5 app does the same, and the project has explicit restore-vs-newer-schema support (fix-restore-schema-drift). Those missions can never earn the bonus: `onAttempt` only runs on a new primary resolution, and every task is already resolved. Replays earn nothing.\n\n**Impact.** The child sees \"20 XP available\" on an already-finished mission, and it can never be earned. That is misleading UI. There is no XP corruption, the ledger is untouched, and there is no security effect. It also only happens with existing pre-V5 or restored data, not in fresh use. Adding `if (open == 0) return 0` (or checking `complete()`) fixes it."
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V5__gamification.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1469,
+      "durationMs": 45944,
+      "sessionId": "c2027844-c350-43ad-b75b-51380a16a4e4",
+      "costUsd": 0.2852142,
+      "numTurns": 11,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The mechanism is real. V5__gamification.sql (lines 6-39) only creates an empty `xp_award` table and its triggers. It has no INSERT…SELECT backfill. No startup task exists either: src/main has no ApplicationRunner, ApplicationReadyEvent or @PostConstruct. In Gamification.kt, XP is written in only two places. `onAttempt` (line 68) returns NONE unless the attempt just stored is PRIMARY and resolving, and it only checks bonuses for missions containing that task. `onPublishedMissionChanged` (lines 97-104) runs only when a mission is published or edited. So a task that was resolved before V5 never gets a TASK row. A later attempt on it would be in practice/retry scope or wouldn't count as a new resolution. A mission that was already complete only gets its bonus if it is republished or edited. `progress()` adds up the ledger, so on a database that already has slice-7 data, HQ would show totalXp=0 even though tasks are solved.\n\nThe impact, though, depends entirely on a deployed database that already holds slice-7 attempts, and I found no evidence of one. docs/current-state.md says G7 (release) \"fails until every…\" and lists the last completed gate as G3 (Phase 4). The product hasn't been released. The only pre-V5 data I found is the local compose/dev dump mentioned in docs/qa/evidence/slice7-compose-smoke.md, and that's test data, not a child's real progress. Neither design.md nor the spec says anything about backfill, so the decision isn't recorded either way.\n\nSo the finding is accurate as a gap, but before release it isn't a real loss of XP (FR-38). I'm downgrading it from major to minor. The right fix is to record in design.md that there is no pre-V5 production data. Alternatively, add an append-only backfill before the first release if real data might predate V5."
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V5__gamification.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1502,
+      "durationMs": 31867,
+      "sessionId": "44484354-9807-46e4-a72e-395bda08c1e2",
+      "costUsd": 0.297708,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding says. V5 (`V5__gamification.sql:6-28`) creates an empty `xp_award` ledger with no backfill, so any resolution or mission completion stored before V5 would never earn XP. But that only matters if a real database holds slice-7 practice data, and the repo's evidence says none does.\n\n1. **The only real stack was emptied after the slice-7 smoke.** That stack holds the owner's data. The smoke run (`docs/qa/evidence/slice7-compose-smoke.md:70-75`) ended with the pre-smoke dump restored. That dump was taken at V3, before practice tables existed. The recorded final state is \"0 sources, tasks, missions, attempts and reports\". So the database has no attempts and not even any content a child could practise on.\n2. **The product is not released.** `docs/current-state.md` says G7 (release) fails until every MVP slice is archived. It lists the slice-7 XP and rank fields as placeholders (0 / [] / null) under \"Scope NOT delivered\". It also says the task-screen UI was never driven in the browser.\n3. **The window was short and empty.** Slice 7 merged on 2026-10-05, and slice 8 (`ae434be`) is the next feature commit. In between, the stack had no published missions, so no task could be resolved through the child API.\n\nNobody can trigger the problem today: no real user has pre-V5 resolutions, so no XP is lost. Severity \"major\" is not justified. The most it supports is a minor documentation note that no pre-V5 data exists, which the finding's own fallback suggests. The reviewer also rated their confidence low and made the issue depend on deployed data that the evidence shows does not exist.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1514,
+      "durationMs": 45896,
+      "sessionId": "d19c0249-7e36-436c-82f3-cdb3a38c3494",
+      "costUsd": 0.2873742,
+      "numTurns": 8,
+      "result": {
+        "refuted": true,
+        "reasoning": "I refuted this finding: the failure it describes is either prevented or already turned into a proper error response.\n\n1. **Wrong line.** `Gamification.kt` has only 176 lines. The listener is at lines 95–104, not 411.\n\n2. **The duplicate-row case can't happen.** The listener first takes the advisory lock (`store.lock()`). It then checks whether a MISSION_BONUS row already exists for the mission, and only inserts if none does. Every path that awards XP takes the same lock, so two writers cannot race past the check. The partial unique index `xp_award_bonus_once_uq` is only a backstop.\n\n3. **The `CHECK amount` case can't happen either.** The column requires `amount BETWEEN 0 AND 1000`. The bonus is `config.xp.missionBonus`, and `GamificationConfigParser` refuses any value outside that range (`XP_MAX = 1000`) when the config is loaded. The shipped value is 20.\n\n4. **It would not be a raw 500 anyway.** Both of the finding's examples raise `DataIntegrityViolationException`. `ContentProblemAdvice` has `@Order(HIGHEST_PRECEDENCE)` and covers `MissionController`. Its handler at lines 60–61 maps that exception to a 409 `content-conflict` problem response with a message from the catalog. An admin publish or edit therefore gets an RFC 7807 response with a readable message, not a generic 500.\n\n5. **The coupling is intended.** OQ-28 wants the bonus written atomically with the publish, which a synchronous listener inside the content transaction provides. The finding itself concedes this may be wanted.\n\nWhat remains is \"some unexpected exception might happen\", which applies to any code in the transaction. That is not a correctness bug in this code.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1547,
+      "durationMs": 45548,
+      "sessionId": "be85cae9-4ea1-40e3-a4b3-a52d517f0b6c",
+      "costUsd": 0.32068759999999996,
+      "numTurns": 9,
+      "result": {
+        "refuted": true,
+        "reasoning": "The location is cited wrong: Gamification.kt is only 176 lines long, and the listener is at line 97, not 411. The coupling is real. `onPublishedMissionChanged` is a synchronous `@EventListener` with `@Transactional` (REQUIRED), so it joins the admin's transaction, and an exception thrown there would fail the publish. But neither failure the finding names can actually happen:\n\n1. **Unique-index violation from a race:** both writers to `xp_award` call `store.lock()` before their check-then-insert. That lock is `pg_advisory_xact_lock` in JdbcPracticeStore. `onAttempt` is called with the practice lock held (see the class doc), and `onPublishedMissionChanged` calls `store.lock()` itself on line 98. Both check whether the bonus was already paid under that same lock, so they run one after the other and cannot race. With no race, `ON CONFLICT DO NOTHING` has nothing to guard against.\n\n2. **`CHECK (amount BETWEEN 0 AND 1000)` rejecting a row:** the amount is always `config.xp.missionBonus`. GamificationConfigParser checks every XP value at startup to be within 0..`XP_MAX` (1000) and refuses unknown or missing keys. A bad config stops the app from starting, so no publish request ever reaches this insert with an out-of-range value.\n\nThe only failures left are general ones, such as the database being unreachable or a lock timeout. Those would break any write in the admin transaction, not something this listener introduces. Making the bonus atomic with the publish is also the intended design (OQ-28, design.md). No real user or attacker can trigger the claimed failure.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1222,
+      "durationMs": 33802,
+      "sessionId": "c00efc7b-c8f6-4c50-8548-6fb3264f6ec8",
+      "costUsd": 0.2362902,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The cited line is wrong. Gamification.kt has only 176 lines, so line 454 doesn't exist. The code the finding describes is at line 138, inside `summary()`.\n\nThe code gives the right answer today. `TaskProgress.state` (domain/Rules.kt:19-26) marks a task resolved exactly when attempt 1 is correct, attempt 2 is correct, or there are 2 attempts. The filter `correct || attemptNo == MAX_ATTEMPTS` picks out exactly the attempts that cause that change. No attempt can be stored after a task is resolved, because PracticeService.kt:140 rejects it with `PracticeConflict(\"resolved\")`. So every attempt that passes the filter is the one that resolved its task. `summary()` only runs for a completed run, so the newest of those attempts is the one that completed the mission. The filter and `TaskProgress(...).state.resolved` always pick the same attempts. It also uses the shared `TaskProgress.MAX_ATTEMPTS` constant instead of a hard-coded 2, so changing the attempt limit carries over automatically.\n\nThe finding admits it is only about future drift (\"If resolution rules change…\"). That is a maintainability/duplication point, not a bug in the current code. Through the correctness lens, the mechanism is not wrong in this code. At most it is a refactoring nit.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1255,
+      "durationMs": 35607,
+      "sessionId": "dece1055-ec09-4986-9646-89c8e4e8de19",
+      "costUsd": 0.201886,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The cited line is wrong: Gamification.kt has only 176 lines, so line 454 doesn't exist. The filter is actually at line 138 (in the run-summary method). That filter, `it.correct || it.attemptNo == TaskProgress.MAX_ATTEMPTS`, gives the same result as `TaskProgress.state.resolved` under today's rules. In Rules.kt:19-26, a task is resolved if attempt 1 is correct, attempt 2 is correct, or there are two attempts (REVEALED). Attempts per task are capped at MAX_ATTEMPTS = 2, and the filter reads the shared constant. So an attempt resolves a task exactly when it is correct or is attempt #2.\n\nOne edge case: the filter would also match a correct attempt #2 that followed a correct attempt #1. That can't happen, because a resolved task has attemptsLeft = 0, so no second attempt is stored. No user or attacker can make the summary's `completing` value or the rankUp differ from the state machine today. The finding only warns about drift if the rules change in the future, which is a duplication/maintainability concern, not a correctness bug that can be reproduced. Under the exploitability/reproducibility lens there is no real-world trigger, and the location in the finding is wrong.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1257,
+      "durationMs": 39875,
+      "sessionId": "3c1b7c9e-421d-453b-ae0e-7715acb5ed77",
+      "costUsd": 0.2197558,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The observation is mostly accurate, but it isn't a correctness defect. In `Gamification.kt`, `ofAttempt` (line 145, not 462 as cited) does call `ledger.awards()` and filter in memory. `onAttempt` (line 69), `available` (125), `progress` (107), `acknowledge` (116), `summary` (141) and `onPublishedMissionChanged` (100) also each load the full ledger.\n\nEvery one of these paths still gives the right answer:\n- `onAttempt` runs under the caller's store lock and reads the ledger once. It uses that same snapshot for the once-per-task check, the \"before\" total and the set of missions already paid, so the result is consistent.\n- `acknowledge` and `onPublishedMissionChanged` call `store.lock()` before reading.\n- `ofAttempt` sums the rows for one attempt id correctly.\n\nNo wrong total, missed bonus, double award, rank error or answer-key leak follows from this. The cost is only the extra reads. This is a single-child app (NFR-3), so the XP ledger stays small (about one task award per task plus mission bonuses), and the finding admits the design accepts in-memory sums. The \"at least twice per submit\" claim is also overstated. In `PracticeService`, the submit path calls `onAttempt` (line 173) and maybe `celebrated` (176, which only reads the celebrated value). The `ofAttempt` call (line 349) builds `TaskView.lastFeedback` for the task screen, not the submit response.\n\nAt most this is a minor performance or design-quality suggestion; the mechanism is not wrong. Refuted on correctness.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1290,
+      "durationMs": 38751,
+      "sessionId": "ca05cee3-909a-4116-926d-5564bbf818c8",
+      "costUsd": 0.21626879999999998,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real, but the line number is wrong and the impact is negligible.\n\nWhat the code does:\n- `JdbcXpLedger.awards()` (JdbcXpLedger.kt:22) runs `SELECT ... FROM xp_award ORDER BY seq` with no filter.\n- `ofAttempt` (Gamification.kt:145, not line 462; the file is only about 150 lines) calls `ledger.awards().filter { it.attemptId == attemptId }`. `PracticeService.kt:349` calls it when building the task outcome.\n- `onAttempt` (:69), `available` (:100 and :125), `progress` (:107), `acknowledge` (:116) and `summary` (:141) each load the full table again. `progress`, `onAttempt`, `acknowledge` and `summary` also call `celebrated()`.\n- `PracticeService` calls `progress` (:67), `available` (:101), `onAttempt` (:173) and `summary` (:265). Several full-ledger reads per request are therefore confirmed.\n\nWhy it doesn't matter in practice:\n- This is a single-child tutoring app. The ledger only grows through legitimate award events (task awards and mission bonuses), roughly one or two rows per solved task. Even after years of use it stays in the low thousands of narrow rows. Reading that a few times on localhost Postgres takes about a millisecond.\n- No user or attacker can grow the ledger faster than real practice does, so there is no denial-of-service or slowdown path.\n- No correctness is affected. The reads are consistent and nothing is returned wrong, so labelling this as \"correctness\" is inaccurate. It is a scalability and efficiency note.\n\nVerdict: the redundant full-table reads happen as described, but they have no observable effect for the real user. Downgrade to a nit or performance-hygiene suggestion.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/GamificationSettings.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1273,
+      "durationMs": 36608,
+      "sessionId": "3a590060-7a00-4204-8b82-8700f4ceffc4",
+      "costUsd": 0.1880916,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real, although the cited line is wrong: the file is only 27 lines long, and the code in question is at GamificationSettings.kt:23-24. Line 23 handles only `!resource.exists()`. Line 24 calls `resource.inputStream` without checking `isReadable` and without a try/catch. Nothing else guards this: the method is a plain @Bean factory, and the parser only sees the text after it has been read.\n\nTwo cases reach the gap. If `doucko.gamification.config=file:/some/dir` points at a directory, `FileSystemResource.exists()` returns true, but `getInputStream()` throws a `FileSystemException`/`IOException`. The same happens for a file that exists but whose permissions deny reading.\n\nSpring then wraps the IOException in a BeanCreationException, not in `InvalidGamificationConfig` naming `doucko.gamification.config`. That contradicts the KDoc on line 12: \"An unreadable or invalid file stops the start with [InvalidGamificationConfig] naming the key\".\n\nWhy the impact is small:\n- The app still fails closed: startup aborts, so no XP is ever computed from a bad config. The OQ-29 intent holds.\n- The IOException message usually includes the path.\n- Only the exception type and the property-key-naming diagnostic differ from what the KDoc promises.\n\nSo this is a real contract/diagnostic gap, not a correctness hazard. \"Minor\" is appropriate, and arguably generous.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/GamificationSettings.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1306,
+      "durationMs": 35842,
+      "sessionId": "3b7e3653-cf46-4281-b02a-e8fe77a130fc",
+      "costUsd": 0.194143,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. The line number is wrong, though: the file is 27 lines long and the code is at GamificationSettings.kt:22-24, not line 636. Line 23 checks only `!resource.exists()`. Line 24 then calls `resource.inputStream` with no `isReadable` check and no try/catch. Spring returns a FileSystemResource or FileUrlResource for a `file:` location. For one of these that points at a directory, or at a file the process may not read, `exists()` returns true. `getInputStream()` then throws FileNotFoundException, which is an IOException (\"Is a directory\" / \"Access is denied\"). That exception is not an InvalidGamificationConfig. So the KDoc promise on line 12 (\"An unreadable or invalid file stops the start with [InvalidGamificationConfig] naming the key\") is broken for this case. Nothing else guards it: the bean method is the only loader, and Spring just wraps the IOException in a BeanCreationException.\n\nExploitability is close to zero. No user or attacker can reach this path. It only happens when an operator sets `doucko.gamification.config` to a directory or an unreadable file at deploy time. The failure is still fail-closed: startup aborts and no XP is ever computed from a bad config, so the safety goal (OQ-29) holds. Spring's BeanCreationException names the bean `gamificationConfig`, and the FileNotFoundException message includes the path, so an operator can still diagnose it. The only real harm is a contract mismatch with the KDoc and a less consistent error message. The finding is valid but should be downgraded to a nit.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1275,
+      "durationMs": 49721,
+      "sessionId": "484721c5-2509-4691-9a35-41b71ba93816",
+      "costUsd": 0.26517860000000004,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism holds, but only for unusual configs. The cited line number is off: the code is at Gamification.kt:122-127, not 442.\n\nWhat the code does:\n- `available()` returns `open * config.xp.firstAttempt + bonus`.\n- `XpRules.taskAward` (domain/Gamification.kt:39) pays `maxOf(config.minimum, config.firstAttempt - hints*hintCost)` for a first-try correct answer.\n- The parser (GamificationConfigParser.kt:47) checks each xp key separately: `minimum` must be 1..1000 and the other keys 0..1000. No rule says `minimum ≤ firstAttempt`, so a config with `firstAttempt=0, minimum=5` is accepted.\n- With that config, a first-try correct answer earns 5 XP, but the briefing shows 0 per open task. That is wrong under the spec's own wording: spec.md:122 says \"the unresolved tasks at the 1st-attempt award\", and the award actually paid for a first-try answer is `max(minimum, firstAttempt)`.\n\nWhere the finding goes too far: design.md decision 8 explicitly sets the per-task figure to `xp.firstAttempt` and never promises the maximum earnable XP. So \"secondAttempt or revealed > firstAttempt\" is not a bug by spec. The only real divergence is `minimum > firstAttempt`.\n\nImpact is small: it needs an odd admin-written config file, it only affects a display value in the briefing, and it never touches the ledger. Minor/low is the right rating. A one-line fix would be `taskAward(config.xp, CORRECT_FIRST_TRY, 0)`, or the parser could reject `minimum > firstAttempt`.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1308,
+      "durationMs": 53035,
+      "sessionId": "fd17f257-a392-4f99-a08b-41183c24e5b4",
+      "costUsd": 0.2568302,
+      "numTurns": 9,
+      "result": {
+        "refuted": true,
+        "reasoning": "The arithmetic is real. `available()` (`practice/application/Gamification.kt:122-127`; the finding cites line 442, but the code is here) returns `open * config.xp.firstAttempt + bonus`. Meanwhile `XpRules.taskAward` (`practice/domain/Gamification.kt:39-41`) pays `maxOf(minimum, ...)`. The parser (`GamificationConfigParser.kt:47`) checks each field's range on its own, with no checks between fields. So a config like `firstAttempt: 0, minimum: 5` would give an `xpAvailable` lower than what a task actually pays.\n\nBut this is not a defect, for three reasons:\n1. **It is what the spec says.** The store spec delta (`openspec/changes/implement-gamification-api/specs/gamification/spec.md:122-123`) requires `xpAvailable` to count \"the unresolved tasks at the 1st-attempt award plus the bonus when it was never paid\". Design decision 8 (`design.md:111-113`) spells out the same formula, `× xp.firstAttempt`. The code follows both exactly. Changing the formula would mean changing the spec first, not fixing a bug.\n2. **No user or attacker can trigger it.** The values come from an operator-controlled JSON file read once at startup (`doucko.gamification.config`, default `classpath:gamification.json`; `GamificationSettings.kt:11-19`). The child UI and the API cannot change it. The shipped config (10/5/…/minimum 1) does not hit the case. Getting there takes a deliberately odd config (first-try award below the minimum, or second-try/reveal paying more than first-try) that contradicts the meaning of a first-attempt reward.\n3. **The impact is small.** If it did happen, a briefing would show a lower XP preview. The XP ledger, awards and ranks are not affected (FR-38 holds).\n\nAt most, adding checks between fields in the parser would be an optional hardening of operator input. As a correctness bug in `available()`, the finding does not hold.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-gamification-api/specs/gamification/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2555,
+      "durationMs": 37177,
+      "sessionId": "d0c708bf-31c8-48da-85e3-726547a926f4",
+      "costUsd": 0.21292859999999997,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "This is a coverage summary, not a defect report. It points to no wrong behaviour, so a correctness check has nothing to confirm. I checked its factual claims and they hold: the delta spec has exactly 16 `#### Scenario` headers. The Gamification.kt files (application and domain), GamificationConfigParser.kt and V5__gamification.sql all exist. V5 has an append-only trigger (`xp_award_append_only_trg`, RAISE EXCEPTION 'xp_award is append-only (FR-38)'). There are 57 `@trace FR-32..39` annotations across GamificationIT, GamificationRulesTest, GamificationConfigTest and GamificationConfigIT. In tasks.md, 4.2 is ticked and 5.1–5.6 are not, as the summary says. Because the summary is accurate and reports no defect, it should be treated as informational and not as a 'minor' bug. Its one actionable point, finishing tasks 5.1–5.6 before calling the slice done, is already tracked by the unticked tasks.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/implement-gamification-api/specs/gamification/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 2588,
+      "durationMs": 31352,
+      "sessionId": "0cac94c4-6b86-48e1-8e5e-96e51b81f6e3",
+      "costUsd": 0.17848319999999998,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "I'm marking this refuted because it isn't a defect. The \"finding\" is a coverage summary: all 16 delta scenarios are reported as implemented, with 0 partial, 0 missing and 0 contradicted. It names no faulty mechanism, no reachable bad path and no way for a user or attacker to trigger a problem. Its own suggestion says \"Nothing to fix here\". The cited file, openspec/changes/implement-gamification-api/specs/gamification/spec.md, exists. Line 1 is just a header anchor, not a code location with a bug. The only open work it mentions (tasks 5.1–5.6 left unticked) is process follow-up the finding itself says was honestly left open, not something that can go wrong in the product. Under an exploitability/reproducibility lens there is nothing to confirm, so this should not stay in the list as a severity-bearing issue. Keep it as an informational note.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1834,
+      "durationMs": 37713,
+      "sessionId": "3bd22fdd-30e3-44ab-94be-5080d44fbef9",
+      "costUsd": 0.25924159999999996,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding describes. `PracticeService.kt:175-176` records `rank_celebration` for a mid-mission crossing right away, without waiting for the client to acknowledge it. But that is not a code defect. It is the behaviour the authoritative API contract requires:\n\n- **OpenAPI `AttemptResult.rankUp` (`contract/api/openapi.yaml:1416`):** \"animated now (one-shot: the POST response is its only carrier)\".\n- **OpenAPI `HqView.pendingRankUp` (`openapi.yaml:1236`):** lists only out-of-session crossings and a mission-complete crossing whose summary was never acknowledged. Mid-mission crossings are deliberately left out.\n- **`ackRankUp` and `MissionSummary.rankUp` (`openapi.yaml:999` and `:1469`):** the ack flow is defined only for mission-complete and HQ celebrations.\n- **Archived contract proposal (`add-api-contract-v0`, line 110):** describes the same one-shot design.\n- **Backend delta spec (lines 92-95):** says the same.\n\nIf the server left mid-mission crossings pending, the contract would have no field to deliver them through. `pendingRankUp` does not cover them, so the server would break the OpenAPI semantics.\n\nThe sentence the finding quotes, \"A celebration counts as played once the client acknowledges it\" (`contract/openspec/specs/gamification/spec.md:261`), sits in the paragraph about HQ and mission-complete celebrations. It is followed directly by the rule for an unshown mission-complete celebration. The same requirement also says a mid-mission celebration plays \"on the task's feedback\". So at worst the store spec's wording is ambiguous or inconsistent with the contract.\n\nThe finding admits all of this: it says the code \"follows the delta and contract\", and its main fix is to change the docs-store wording. The concern about a lost response is real, but it is a trade-off the contract chose on purpose, not a wrong mechanism in this code. This is a docs-store wording issue, not a correctness bug in `PracticeService`.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1867,
+      "durationMs": 30118,
+      "sessionId": "24038bdd-7323-49d5-a3a7-072ee778c53a",
+      "costUsd": 0.244332,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding describes the code accurately. `PracticeService.kt:175-176` records a mid-mission crossing as celebrated as soon as the POST response is built, with no client acknowledgement. It is still not a real defect, for four reasons:\n\n1. **The code follows the store's own contract.** `contract/api/openapi.yaml:1416` is part of the docs store and is the API contract (NFR-12). It says `AttemptResult.rankUp` is \"animated now (one-shot: the POST response is its only carrier)\". The archived store change `add-api-contract-v0/proposal.md:110` also says the rank-up celebration is \"one-shot end to end\". The backend delta spec (lines 91-93) says the same. The code matches all three.\n\n2. **The cited store-spec sentence covers a different case.** `gamification/spec.md:261`, \"A celebration counts as played once the client acknowledges it\", sits between the sentences about rank-ups caused outside a child session (HQ, publish-time bonus, admin re-evaluation) and mission-complete rank-ups whose screen was never shown. Those are the HQ and summary cases, and `ackRankUp` exists for them. For a mid-mission crossing, the same requirement says it plays \"on the task's feedback\", and only the POST response carries that. The store spec also says the mission-complete screen after a mid-mission rank-up \"does not play the animation again\", which means the mid-mission celebration is never re-offered. Reading line 261 as a rule that mid-mission crossings stay pending on HQ contradicts the rest of that paragraph.\n\n3. **The scenario does happen, but it is intended, not exploitable.** If the POST response is lost (tab closed or network drop), the celebration never plays. That is what the contract asks for. A child gains nothing and loses no XP (XP stays an append-only ledger, FR-38). The only effect is a missed animation.\n\n4. **No code change is called for.** The finding itself suggests a docs-store wording fix. At most that is a small editorial clarification of the store spec. It is not a backend spec-compliance defect at `PracticeService.kt:175`.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/GamificationConfigParser.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1473,
+      "durationMs": 38011,
+      "sessionId": "9d600082-b643-40d9-a3e4-bec3561f5a2f",
+      "costUsd": 0.26782459999999997,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "Through a correctness lens, the code is not wrong. The finding's main claim, that the 50-character limit comes from nowhere, is false.\n\n1. **The limit is documented.** Decision 2 of the change's own design, `openspec/changes/implement-gamification-api/design.md:45`, says \"`name` 1..50 code points after trimming\". The code matches this exactly: it trims the name, counts code points, and uses `NAME_MAX = 50` (`GamificationConfigParser.kt:30,69-71`). The rule is a documented design decision, not an invented one. It also matches the 1..50 code-point rule the child-profile spec already uses for names.\n2. **A test exists.** \"No scenario covers the 50-character limit\" is only partly true. `GamificationConfigTest.kt:166` checks that a 51-character name is refused and that the error names `ranks[1] (rank 2).name`. Only the accept-at-50 case is missing.\n3. **Duplicate-key refusal is consistent with the design.** `STRICT_DUPLICATE_DETECTION` follows the design's stated principle: every key is required, unknown keys are refused, and \"a typo never silently falls back\" (design.md:46-47). Without it, Jackson would quietly keep the last of two duplicate keys. That is exactly the silent override the design forbids. The refusal happens at startup, the message names the file rather than its content, and it adds no reachable error path at runtime.\n\nWhat remains is a documentation gap: the delta spec's scenario text doesn't repeat the length limit or the duplicate-key rule from the design. That is a spec-wording nit, not a behaviour that is actually wrong. The mechanism the finding claims (rules with no source and no test) does not hold.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/GamificationConfigParser.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1506,
+      "durationMs": 46690,
+      "sessionId": "188639d3-65b4-4a84-b64d-5ff3708d215a",
+      "costUsd": 0.2732038,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism in the code, but the impact is smaller than the finding suggests.\n\n**What the code does:**\n- `GamificationConfigParser.kt:70-71` rejects a trimmed rank name longer than `NAME_MAX` (50) code points, with the message \"must be a text of 1 to 50 characters\".\n- Line 33 turns on `StreamReadFeature.STRICT_DUPLICATE_DETECTION`. When a key appears twice, Jackson throws, line 39 catches it, and line 42 raises `InvalidGamificationConfig(\"(file)\", \"must be one JSON object\")`. The backend then refuses to start.\n\n**What the spec says:** The delta spec (`specs/gamification/spec.md:61-69`) lists startup refusals only for a rank name that is \"missing or blank\". It sets no length limit and says nothing about duplicate keys. So a file the spec treats as valid (for example a 51-character rank name, or a repeated key) will stop startup. That gap is real.\n\n**Why it matters less:**\n1. **Part of it is documented.** `design.md:45` states \"`name` 1..50 code points after trimming\". The finding says the rule comes from nothing, but the 50-character limit is a recorded design decision; only the store/delta spec leaves it out. The duplicate-key rule is not documented anywhere I found, though it follows the design's own principle that \"a typo never silently falls back\".\n2. **Not exploitable.** Only the person who deploys the backend can reach this. They provide the classpath/`file:` resource named by `doucko.gamification.config`. No child or admin HTTP endpoint can change it, so no attacker can trigger it.\n3. **It fails safely.** The backend refuses at startup with a message that names the key and the rule. Nothing is silently corrupted, there is no raw 500, and no XP is computed wrongly. The duplicate-key error is vaguer (\"(file) must be one JSON object\") but still stops the start.\n\n**Verdict:** This is a real but cosmetic gap between the spec and the code, and part of it is already in `design.md`. It is not a defect a real user or attacker can hit, so I recommend downgrading it from minor to a nit or documentation item. The suggested fix still applies: add the 1..50 limit and the duplicate-key refusal to the spec, plus a test at 50 and 51 characters.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeMapping.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1567,
+      "durationMs": 33051,
+      "sessionId": "ce09d7f6-5780-4ac2-9aa6-0433f85ac4fb",
+      "costUsd": 0.22126,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "Seen through correctness, nothing here is broken. `PracticeMapping.kt:128` sets `lastFeedback = screen.lastResult?.let { attempt(it.copy(rankUp = null)) }`. `PracticeService.kt:349` fills `xp` from `gamification.ofAttempt(latest.id)`, which reads the stored ledger award for that attempt. Its KDoc says that award is \"never a rank-up\". This is exactly what design.md decision 9 records (\"TaskView.lastFeedback keeps its XP … a reload shows what the POST showed; rankUp is null\"). The spec says a rank-up is offered once, and after that through `MissionSummary.rankUp` / `HqView.pendingRankUp`. Nulling it on reload is consistent with that: repeating it would replay the celebration.\n\nThe finding's claim that no test asserts this is false:\n- `GamificationIT.kt:234-236` reloads a solved task and checks `$.lastFeedback.xpAwarded == 10` and `$.lastFeedback.rankUp` is null.\n- `GamificationIT.kt:514`, in the test \"a mid-mission rank-up plays once with the attempt\" (`// @trace FR-36`), reloads the task right after a rank-crossing attempt and checks `$.lastFeedback.rankUp` is null.\n\nSo the integration test the suggestion asks for already exists. The only remaining point is that the delta spec has no explicit scenario for reloaded feedback. That is a documentation gap, and the behaviour is already pinned by design.md and the tests. It is not a wrong mechanism.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeMapping.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1600,
+      "durationMs": 30834,
+      "sessionId": "80604090-ea44-4fb2-82e9-258f82816759",
+      "costUsd": 0.212231,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "There is no reproducible defect here. The behaviour is intended, it is documented, and tests already pin it down.\n\n1. **Intended and documented.** PracticeMapping.kt:128 clears `rankUp` on the reloaded `lastFeedback`, and PracticeService.kt:349 fills the XP fields from `gamification.ofAttempt(latest.id)`. Both follow design.md decision 9 (lines 114-116): a reload shows what the POST showed, and `rankUp` is null. This matches FR-36's \"rank-up plays once\" rule. Showing the rank-up again on every reload would be the actual bug.\n\n2. **The \"no test\" claim is false.** GamificationIT.kt:234-236 reloads a task and asserts `$.lastFeedback.xpAwarded == 10` and `$.lastFeedback.rankUp` is null. GamificationIT.kt:514, in the test \"a mid-mission rank-up plays once with the attempt\" (@trace FR-36), reloads the task after an attempt that crossed a rank threshold and asserts `$.lastFeedback.rankUp` is null. That is exactly the IT the suggestion asks for.\n\n3. **No impact.** A user or attacker gets nothing from this. Reloaded feedback repeats stored, append-only ledger values. Nothing is recomputed or changed, nothing leaks, and the response still fits the schema (`lastFeedback` is an AttemptResult).\n\nThe only thing left is that the delta spec has no scenario for it. That is a gap in documentation, not a behaviour anyone can trigger, and the claim that coverage is missing is factually wrong.",
+        "severityAdjustment": "downgrade"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "12 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 2, contested: 4, rejected: 6"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/implement-gamification-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "slice 8 gamification backend (implement-gamification-api)",
+    "summary": "Review gate for slice 8 gamification backend (implement-gamification-api): 2 confirmed, 4 contested (treat as confirmed unless trivially wrong), 6 rejected.",
+    "confirmed": [
+      {
+        "title": "Briefing xpAvailable offers the mission bonus for a complete mission that has no bonus row",
+        "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+        "line": 442,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "`available()` returns `open * config.xp.firstAttempt + if (paid) 0 else config.xp.missionBonus` and never checks whether the mission is already complete. Design decision 8 says xpAvailable is '0 for a complete mission and during a replay'. A complete mission with no bonus row will therefore show 20 XP available that can never be earned (replays earn nothing). This happens when the task-side change above completes a mission, and for missions completed in the primary scope before V5. The child sees XP on offer that will never be awarded.",
+        "suggestion": "Add the bonus only when `open > 0`, or when `!complete(mission)`. Better still, also fix the missing-bonus paths so a complete, unpaid mission cannot exist.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is real, but only one of the two trigger paths the finding names can actually happen.\n\nWhat's confirmed: in `Gamification.available()` (`src/main/kotlin/cz/doucko/practice/application/Gamification.kt:122-127`; the file has 176 lines, so the cited line 442 doesn't exist), the code returns `open * firstAttempt + if (paid) 0 else missionBonus`. It never checks `complete(mission)`. Design decision 8 (`openspec/changes/implement-gamification-api/design.md:111-113`) says xpAvailable is \"0 for a complete mission\". So a complete mission with no MISSION_BONUS row shows 20 XP that can't be earned: `onAttempt` only pays the bonus when a task is resolved for the first time, and replays earn nothing.\n\nCan a complete, unpaid mission exist?\n- Task-side path: mostly blocked. The served task list (`ServedContentService.served`) filters to published TEXT tasks. However:\n  - `MissionRules.taskStatus` refuses to set a task back to DRAFT while it is in a published mission.\n  - `MissionRules.taskEdit` refuses changing a task to GRAPHIC in a published mission.\n  - Mission edits and publishes fire `PublishedMissionChanged`, and `onPublishedMissionChanged` then pays the bonus for a complete mission.\n\n  So nothing on the task side makes a mission complete without paying the bonus.\n- Data from before V5: reachable. `V5__gamification.sql` only creates the tables and has no backfill. Slice 7 practice is already merged to main, so primary-scope attempts from before V5 (live data, or a restored older dump migrated forward) can leave a mission fully resolved with no bonus row. Its briefing then shows `xpAvailable = 20` permanently, or until an admin republishes or edits the mission.\n\nSo the deviation from the spec is real and reachable, but only with legacy data. The impact is a display-only number in the briefing; no wrong XP is written and the ledger is not corrupted. Adding `if (open == 0) return 0` (or checking `complete()`) would fix it. Downgrading from major to minor.",
+          "The flaw is real, but it is a display bug, so I'd rate it minor rather than major.\n\n**The code does what the finding says.** The finding cites line 442, but the method is at `Gamification.kt:122-127`. `available()` returns `open * firstAttempt + (if (paid) 0 else missionBonus)`. It never checks `complete(mission)` or `open == 0`. So a mission whose tasks are all resolved in the primary scope, but which has no MISSION_BONUS row, shows `xpAvailable = 20`. Design decision 8 (`design.md:111-113`) says it should be 0 for a complete mission. Nothing in `PracticeService.briefing` (line 101) or the web mapping catches this, so the value goes straight to the API.\n\n**Can a complete mission be missing its bonus row?**\n- **Task-side admin paths: no.** I checked these and they do not create that state. `MissionRules.taskDelete` refuses to delete a task that is in a published mission. `taskStatus` refuses to move such a task back to draft. `taskEdit` refuses a TEXT→GRAPHIC change when the task is in a published mission. Publishing a mission, or editing a published mission's task list, fires `PublishedMissionChanged`. `onPublishedMissionChanged` then pays the bonus if the mission is already complete. `onAttempt` pays the bonus for every served mission that contains the resolved task. So the finding's first trigger does not hold.\n- **Data from before V5: yes.** `V5__gamification.sql` creates `xp_award` with no backfill. Any mission completed through primary-scope attempts before V5 has open = 0 and no bonus row, so the briefing shows 20 XP. Restoring an older (pre-V5) backup into the V5 app does the same, and the project has explicit restore-vs-newer-schema support (fix-restore-schema-drift). Those missions can never earn the bonus: `onAttempt` only runs on a new primary resolution, and every task is already resolved. Replays earn nothing.\n\n**Impact.** The child sees \"20 XP available\" on an already-finished mission, and it can never be earned. That is misleading UI. There is no XP corruption, the ledger is untouched, and there is no security effect. It also only happens with existing pre-V5 or restored data, not in fresh use. Adding `if (open == 0) return 0` (or checking `complete()`) fixes it."
+        ]
+      },
+      {
+        "title": "Unreadable config resource surfaces as a raw IOException rather than InvalidGamificationConfig",
+        "file": "src/main/kotlin/cz/doucko/practice/application/GamificationSettings.kt",
+        "line": 636,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "Only `!resource.exists()` is mapped to `InvalidGamificationConfig`. If `doucko.gamification.config` points at an existing but unreadable path (a directory, or a file with denied permissions), `resource.inputStream` throws an IOException. That stops startup with a stack trace that does not name the key, contrary to the KDoc ('An unreadable or invalid file stops the start with [InvalidGamificationConfig] naming the key').",
+        "suggestion": "Check `resource.isReadable` and wrap the read in try/catch(IOException), rethrowing `InvalidGamificationConfig(\"doucko.gamification.config\", \"names no readable file\")`.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is real, although the cited line is wrong: the file is only 27 lines long, and the code in question is at GamificationSettings.kt:23-24. Line 23 handles only `!resource.exists()`. Line 24 calls `resource.inputStream` without checking `isReadable` and without a try/catch. Nothing else guards this: the method is a plain @Bean factory, and the parser only sees the text after it has been read.\n\nTwo cases reach the gap. If `doucko.gamification.config=file:/some/dir` points at a directory, `FileSystemResource.exists()` returns true, but `getInputStream()` throws a `FileSystemException`/`IOException`. The same happens for a file that exists but whose permissions deny reading.\n\nSpring then wraps the IOException in a BeanCreationException, not in `InvalidGamificationConfig` naming `doucko.gamification.config`. That contradicts the KDoc on line 12: \"An unreadable or invalid file stops the start with [InvalidGamificationConfig] naming the key\".\n\nWhy the impact is small:\n- The app still fails closed: startup aborts, so no XP is ever computed from a bad config. The OQ-29 intent holds.\n- The IOException message usually includes the path.\n- Only the exception type and the property-key-naming diagnostic differ from what the KDoc promises.\n\nSo this is a real contract/diagnostic gap, not a correctness hazard. \"Minor\" is appropriate, and arguably generous.",
+          "The mechanism is real. The line number is wrong, though: the file is 27 lines long and the code is at GamificationSettings.kt:22-24, not line 636. Line 23 checks only `!resource.exists()`. Line 24 then calls `resource.inputStream` with no `isReadable` check and no try/catch. Spring returns a FileSystemResource or FileUrlResource for a `file:` location. For one of these that points at a directory, or at a file the process may not read, `exists()` returns true. `getInputStream()` then throws FileNotFoundException, which is an IOException (\"Is a directory\" / \"Access is denied\"). That exception is not an InvalidGamificationConfig. So the KDoc promise on line 12 (\"An unreadable or invalid file stops the start with [InvalidGamificationConfig] naming the key\") is broken for this case. Nothing else guards it: the bean method is the only loader, and Spring just wraps the IOException in a BeanCreationException.\n\nExploitability is close to zero. No user or attacker can reach this path. It only happens when an operator sets `doucko.gamification.config` to a directory or an unreadable file at deploy time. The failure is still fail-closed: startup aborts and no XP is ever computed from a bad config, so the safety goal (OQ-29) holds. Spring's BeanCreationException names the bean `gamificationConfig`, and the FileNotFoundException message includes the path, so an operator can still diagnose it. The only real harm is a contract mismatch with the KDoc and a less consistent error message. The finding is valid but should be downgraded to a nit."
+        ]
+      }
+    ],
+    "contested": [
+      {
+        "title": "No ledger backfill for primary-scope resolutions and completed missions from before V5",
+        "file": "src/main/resources/db/migration/V5__gamification.sql",
+        "line": 27,
+        "severity": "major",
+        "confidence": "low",
+        "evidence": "V5 creates an empty `xp_award` table. `Gamification.onAttempt` awards XP only on a new resolving attempt (`state.resolved` after the insert), and `complete()` is only evaluated for missions containing the task just resolved. Any task resolved, or mission completed, under slice 7 therefore never earns XP or its bonus. HQ shows `totalXp` 0 next to a non-zero `solvedTasks`. If a deployed database already has slice-7 attempts, this is effectively lost XP (FR-38).",
+        "suggestion": "Confirm whether any deployed data predates V5. If it does, add an append-only backfill: a new migration, or a startup task under the practice lock. It should insert TASK rows for each first primary resolution (using `hints_used`) and MISSION_BONUS rows for served missions that are already complete. If no such data exists, record that decision in design.md.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The mechanism is real. V5__gamification.sql (lines 6-39) only creates an empty `xp_award` table and its triggers. It has no INSERT…SELECT backfill. No startup task exists either: src/main has no ApplicationRunner, ApplicationReadyEvent or @PostConstruct. In Gamification.kt, XP is written in only two places. `onAttempt` (line 68) returns NONE unless the attempt just stored is PRIMARY and resolving, and it only checks bonuses for missions containing that task. `onPublishedMissionChanged` (lines 97-104) runs only when a mission is published or edited. So a task that was resolved before V5 never gets a TASK row. A later attempt on it would be in practice/retry scope or wouldn't count as a new resolution. A mission that was already complete only gets its bonus if it is republished or edited. `progress()` adds up the ledger, so on a database that already has slice-7 data, HQ would show totalXp=0 even though tasks are solved.\n\nThe impact, though, depends entirely on a deployed database that already holds slice-7 attempts, and I found no evidence of one. docs/current-state.md says G7 (release) \"fails until every…\" and lists the last completed gate as G3 (Phase 4). The product hasn't been released. The only pre-V5 data I found is the local compose/dev dump mentioned in docs/qa/evidence/slice7-compose-smoke.md, and that's test data, not a child's real progress. Neither design.md nor the spec says anything about backfill, so the decision isn't recorded either way.\n\nSo the finding is accurate as a gap, but before release it isn't a real loss of XP (FR-38). I'm downgrading it from major to minor. The right fix is to record in design.md that there is no pre-V5 production data. Alternatively, add an append-only backfill before the first release if real data might predate V5.",
+          "The code does what the finding says. V5 (`V5__gamification.sql:6-28`) creates an empty `xp_award` ledger with no backfill, so any resolution or mission completion stored before V5 would never earn XP. But that only matters if a real database holds slice-7 practice data, and the repo's evidence says none does.\n\n1. **The only real stack was emptied after the slice-7 smoke.** That stack holds the owner's data. The smoke run (`docs/qa/evidence/slice7-compose-smoke.md:70-75`) ended with the pre-smoke dump restored. That dump was taken at V3, before practice tables existed. The recorded final state is \"0 sources, tasks, missions, attempts and reports\". So the database has no attempts and not even any content a child could practise on.\n2. **The product is not released.** `docs/current-state.md` says G7 (release) fails until every MVP slice is archived. It lists the slice-7 XP and rank fields as placeholders (0 / [] / null) under \"Scope NOT delivered\". It also says the task-screen UI was never driven in the browser.\n3. **The window was short and empty.** Slice 7 merged on 2026-10-05, and slice 8 (`ae434be`) is the next feature commit. In between, the stack had no published missions, so no task could be resolved through the child API.\n\nNobody can trigger the problem today: no real user has pre-V5 resolutions, so no XP is lost. Severity \"major\" is not justified. The most it supports is a minor documentation note that no pre-V5 data exists, which the finding's own fallback suggests. The reviewer also rated their confidence low and made the issue depend on deployed data that the evidence shows does not exist."
+        ]
+      },
+      {
+        "title": "Every read and write reloads and sums the entire XP ledger several times per request",
+        "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+        "line": 462,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`ofAttempt` calls `ledger.awards()` and filters it in memory. It runs for each `outcome()`, so for every task screen and every submit. `onAttempt`, `available`, `progress`, `acknowledge` and `summary` each load the full table again, and `progress` also queries `celebrated()`. A single submit loads the full ledger at least twice. The design accepts in-memory sums, but `ofAttempt` could use the existing `xp_award_attempt_idx`.",
+        "suggestion": "Add targeted port methods: `awardsOf(attemptId)`, `total()` as SQL `sum(amount)`, `bonusPaid(missionId)` and `taskAwarded(taskId)`. Keep `awards()` for the summary only.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The observation is mostly accurate, but it isn't a correctness defect. In `Gamification.kt`, `ofAttempt` (line 145, not 462 as cited) does call `ledger.awards()` and filter in memory. `onAttempt` (line 69), `available` (125), `progress` (107), `acknowledge` (116), `summary` (141) and `onPublishedMissionChanged` (100) also each load the full ledger.\n\nEvery one of these paths still gives the right answer:\n- `onAttempt` runs under the caller's store lock and reads the ledger once. It uses that same snapshot for the once-per-task check, the \"before\" total and the set of missions already paid, so the result is consistent.\n- `acknowledge` and `onPublishedMissionChanged` call `store.lock()` before reading.\n- `ofAttempt` sums the rows for one attempt id correctly.\n\nNo wrong total, missed bonus, double award, rank error or answer-key leak follows from this. The cost is only the extra reads. This is a single-child app (NFR-3), so the XP ledger stays small (about one task award per task plus mission bonuses), and the finding admits the design accepts in-memory sums. The \"at least twice per submit\" claim is also overstated. In `PracticeService`, the submit path calls `onAttempt` (line 173) and maybe `celebrated` (176, which only reads the celebrated value). The `ofAttempt` call (line 349) builds `TaskView.lastFeedback` for the task screen, not the submit response.\n\nAt most this is a minor performance or design-quality suggestion; the mechanism is not wrong. Refuted on correctness.",
+          "The mechanism is real, but the line number is wrong and the impact is negligible.\n\nWhat the code does:\n- `JdbcXpLedger.awards()` (JdbcXpLedger.kt:22) runs `SELECT ... FROM xp_award ORDER BY seq` with no filter.\n- `ofAttempt` (Gamification.kt:145, not line 462; the file is only about 150 lines) calls `ledger.awards().filter { it.attemptId == attemptId }`. `PracticeService.kt:349` calls it when building the task outcome.\n- `onAttempt` (:69), `available` (:100 and :125), `progress` (:107), `acknowledge` (:116) and `summary` (:141) each load the full table again. `progress`, `onAttempt`, `acknowledge` and `summary` also call `celebrated()`.\n- `PracticeService` calls `progress` (:67), `available` (:101), `onAttempt` (:173) and `summary` (:265). Several full-ledger reads per request are therefore confirmed.\n\nWhy it doesn't matter in practice:\n- This is a single-child tutoring app. The ledger only grows through legitimate award events (task awards and mission bonuses), roughly one or two rows per solved task. Even after years of use it stays in the low thousands of narrow rows. Reading that a few times on localhost Postgres takes about a millisecond.\n- No user or attacker can grow the ledger faster than real practice does, so there is no denial-of-service or slowdown path.\n- No correctness is affected. The reads are consistent and nothing is returned wrong, so labelling this as \"correctness\" is inaccurate. It is a scalability and efficiency note.\n\nVerdict: the redundant full-table reads happen as described, but they have no observable effect for the real user. Downgrade to a nit or performance-hygiene suggestion."
+        ]
+      },
+      {
+        "title": "xpAvailable assumes firstAttempt is the maximum award, which is wrong when minimum > firstAttempt",
+        "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+        "line": 442,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "The parser accepts `firstAttempt` 0..1000 and `minimum` 1..1000 independently. `XpRules.taskAward` pays `maxOf(config.minimum, ...)`, so with e.g. `firstAttempt: 0, minimum: 5` each task earns 5, but `available()` computes `open * config.xp.firstAttempt` = 0. The same mismatch applies if `secondAttempt` or `revealed` is greater than `firstAttempt`.",
+        "suggestion": "Use `XpRules.taskAward(config.xp, CORRECT_FIRST_TRY, 0)`, or the maximum over states, as the per-task figure. Alternatively, add cross-field validation in the parser (minimum ≤ firstAttempt, secondAttempt ≤ firstAttempt) if the spec intends that ordering.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The mechanism holds, but only for unusual configs. The cited line number is off: the code is at Gamification.kt:122-127, not 442.\n\nWhat the code does:\n- `available()` returns `open * config.xp.firstAttempt + bonus`.\n- `XpRules.taskAward` (domain/Gamification.kt:39) pays `maxOf(config.minimum, config.firstAttempt - hints*hintCost)` for a first-try correct answer.\n- The parser (GamificationConfigParser.kt:47) checks each xp key separately: `minimum` must be 1..1000 and the other keys 0..1000. No rule says `minimum ≤ firstAttempt`, so a config with `firstAttempt=0, minimum=5` is accepted.\n- With that config, a first-try correct answer earns 5 XP, but the briefing shows 0 per open task. That is wrong under the spec's own wording: spec.md:122 says \"the unresolved tasks at the 1st-attempt award\", and the award actually paid for a first-try answer is `max(minimum, firstAttempt)`.\n\nWhere the finding goes too far: design.md decision 8 explicitly sets the per-task figure to `xp.firstAttempt` and never promises the maximum earnable XP. So \"secondAttempt or revealed > firstAttempt\" is not a bug by spec. The only real divergence is `minimum > firstAttempt`.\n\nImpact is small: it needs an odd admin-written config file, it only affects a display value in the briefing, and it never touches the ledger. Minor/low is the right rating. A one-line fix would be `taskAward(config.xp, CORRECT_FIRST_TRY, 0)`, or the parser could reject `minimum > firstAttempt`.",
+          "The arithmetic is real. `available()` (`practice/application/Gamification.kt:122-127`; the finding cites line 442, but the code is here) returns `open * config.xp.firstAttempt + bonus`. Meanwhile `XpRules.taskAward` (`practice/domain/Gamification.kt:39-41`) pays `maxOf(minimum, ...)`. The parser (`GamificationConfigParser.kt:47`) checks each field's range on its own, with no checks between fields. So a config like `firstAttempt: 0, minimum: 5` would give an `xpAvailable` lower than what a task actually pays.\n\nBut this is not a defect, for three reasons:\n1. **It is what the spec says.** The store spec delta (`openspec/changes/implement-gamification-api/specs/gamification/spec.md:122-123`) requires `xpAvailable` to count \"the unresolved tasks at the 1st-attempt award plus the bonus when it was never paid\". Design decision 8 (`design.md:111-113`) spells out the same formula, `× xp.firstAttempt`. The code follows both exactly. Changing the formula would mean changing the spec first, not fixing a bug.\n2. **No user or attacker can trigger it.** The values come from an operator-controlled JSON file read once at startup (`doucko.gamification.config`, default `classpath:gamification.json`; `GamificationSettings.kt:11-19`). The child UI and the API cannot change it. The shipped config (10/5/…/minimum 1) does not hit the case. Getting there takes a deliberately odd config (first-try award below the minimum, or second-try/reveal paying more than first-try) that contradicts the meaning of a first-attempt reward.\n3. **The impact is small.** If it did happen, a briefing would show a lower XP preview. The XP ledger, awards and ranks are not affected (FR-38 holds).\n\nAt most, adding checks between fields in the parser would be an optional hardening of operator input. As a correctness bug in `available()`, the finding does not hold."
+        ]
+      },
+      {
+        "title": "Undocumented rule: rank names are limited to 50 characters and duplicate JSON keys are refused",
+        "file": "src/main/kotlin/cz/doucko/practice/application/GamificationConfigParser.kt",
+        "line": 70,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "The delta spec (line 63-69) says startup is refused only when \"a rank name is missing or blank\". It sets no length limit and says nothing about duplicate keys. The code also refuses names longer than NAME_MAX = 50 code points (`name.codePointCount(0, name.length) > NAME_MAX` → \"must be a text of 1 to 50 characters\"). It also turns on `StreamReadFeature.STRICT_DUPLICATE_DETECTION`, so a duplicated key makes the backend refuse to start. Neither rule comes from any requirement, and no scenario covers the 50-character limit.",
+        "suggestion": "Amend the delta spec (and the store spec's \"Swappable skin\"/\"Rank ladder\") to state the 1..50 character limit for rank names and that duplicate keys are refused, and add a boundary test for 50 and 51 characters. Or drop the limit if the spec isn't changed.",
+        "dimension": "spec-compliance",
+        "verdict": "contested",
+        "verifierNotes": [
+          "Through a correctness lens, the code is not wrong. The finding's main claim, that the 50-character limit comes from nowhere, is false.\n\n1. **The limit is documented.** Decision 2 of the change's own design, `openspec/changes/implement-gamification-api/design.md:45`, says \"`name` 1..50 code points after trimming\". The code matches this exactly: it trims the name, counts code points, and uses `NAME_MAX = 50` (`GamificationConfigParser.kt:30,69-71`). The rule is a documented design decision, not an invented one. It also matches the 1..50 code-point rule the child-profile spec already uses for names.\n2. **A test exists.** \"No scenario covers the 50-character limit\" is only partly true. `GamificationConfigTest.kt:166` checks that a 51-character name is refused and that the error names `ranks[1] (rank 2).name`. Only the accept-at-50 case is missing.\n3. **Duplicate-key refusal is consistent with the design.** `STRICT_DUPLICATE_DETECTION` follows the design's stated principle: every key is required, unknown keys are refused, and \"a typo never silently falls back\" (design.md:46-47). Without it, Jackson would quietly keep the last of two duplicate keys. That is exactly the silent override the design forbids. The refusal happens at startup, the message names the file rather than its content, and it adds no reachable error path at runtime.\n\nWhat remains is a documentation gap: the delta spec's scenario text doesn't repeat the length limit or the duplicate-key rule from the design. That is a spec-wording nit, not a behaviour that is actually wrong. The mechanism the finding claims (rules with no source and no test) does not hold.",
+          "I confirmed the mechanism in the code, but the impact is smaller than the finding suggests.\n\n**What the code does:**\n- `GamificationConfigParser.kt:70-71` rejects a trimmed rank name longer than `NAME_MAX` (50) code points, with the message \"must be a text of 1 to 50 characters\".\n- Line 33 turns on `StreamReadFeature.STRICT_DUPLICATE_DETECTION`. When a key appears twice, Jackson throws, line 39 catches it, and line 42 raises `InvalidGamificationConfig(\"(file)\", \"must be one JSON object\")`. The backend then refuses to start.\n\n**What the spec says:** The delta spec (`specs/gamification/spec.md:61-69`) lists startup refusals only for a rank name that is \"missing or blank\". It sets no length limit and says nothing about duplicate keys. So a file the spec treats as valid (for example a 51-character rank name, or a repeated key) will stop startup. That gap is real.\n\n**Why it matters less:**\n1. **Part of it is documented.** `design.md:45` states \"`name` 1..50 code points after trimming\". The finding says the rule comes from nothing, but the 50-character limit is a recorded design decision; only the store/delta spec leaves it out. The duplicate-key rule is not documented anywhere I found, though it follows the design's own principle that \"a typo never silently falls back\".\n2. **Not exploitable.** Only the person who deploys the backend can reach this. They provide the classpath/`file:` resource named by `doucko.gamification.config`. No child or admin HTTP endpoint can change it, so no attacker can trigger it.\n3. **It fails safely.** The backend refuses at startup with a message that names the key and the rule. Nothing is silently corrupted, there is no raw 500, and no XP is computed wrongly. The duplicate-key error is vaguer (\"(file) must be one JSON object\") but still stops the start.\n\n**Verdict:** This is a real but cosmetic gap between the spec and the code, and part of it is already in `design.md`. It is not a defect a real user or attacker can hit, so I recommend downgrading it from minor to a nit or documentation item. The suggested fix still applies: add the 1..50 limit and the duplicate-key refusal to the spec, plus a test at 50 and 51 characters."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "Missions completed by a task-side admin change never get their completion bonus",
+        "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+        "line": 145,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "`PublishedMissionChanged` is only published from `MissionService.edit` and `MissionService.setStatus` (MissionService.kt:73, :89). A served mission's task list also shrinks when a task is deleted (`TaskService.delete` → `missions.removeTask(id)`, line 150), unpublished (`TaskService.setStatus`, line 156), or made unservable some other way, because `ServedContentService.served` drops non-PUBLISHED/non-TEXT tasks. If the removed task was the mission's last unresolved one, the mission is now complete but no event fires. `Gamification.onAttempt` only pays bonuses on a new primary resolution, and no task in that mission can be resolved any more, so the bonus is never paid unless an admin happens to re-save the mission. The design (decision 4, OQ-28) says that removing the last unresolved task completes the mission 'the same way'.",
+        "suggestion": "Publish `PublishedMissionChanged` (or a broader `ServedMissionsChanged`) for every published mission affected by a task delete, status change or modality change in TaskService. One option is to have `removeTask` return the affected mission ids, which it already collects. Add an IT that deletes or unpublishes the last unresolved task and checks that the bonus row is written.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "I could not reproduce the finding. Each task-side path it names is blocked by `MissionRules` (`content/domain/Missions.kt`) before any change is made, whenever the task belongs to a PUBLISHED mission. All of these checks run under `lock.exclusive()`.\n- **Delete:** `TaskService.delete` calls `MissionRules.taskDelete` before `missions.removeTask(id)`. That check returns `Refusal.TaskDeleteInPublished` if any containing mission is published (Missions.kt:249-251). So `removeTask` only runs for tasks that are in draft missions only, and those missions are never served and pay no bonus.\n- **Unpublish:** `TaskService.setStatus` calls `MissionRules.taskStatus`. Moving a task to DRAFT is refused with `TaskDraftInPublished` if any containing mission is published (Missions.kt:222-224). `PublishStatus` has only DRAFT and PUBLISHED, so there is no other way to unpublish.\n- **Modality change:** `TaskService.update` calls `MissionRules.taskEdit`. Changing a task to GRAPHIC is refused with `TaskGraphicInPublished` if any containing mission is published (Missions.kt:237-238). Topic and grade changes are refused for any containing mission.\n- **Other writers:** `bulkPublish` only publishes tasks. A search finds no other callers of `tasks.delete`, `tasks.setStatus` or `missions.removeTask`.\n\nSo a served (published) mission's task list cannot shrink through TaskService. Its task set changes only through `MissionService.edit` or `setStatus`, and those already publish `PublishedMissionChanged`. The case the finding describes, where a task-side admin change completes a published mission without firing the event, cannot happen.",
+          "The finding says a mission can lose its last unresolved task without any event firing. That can't happen: every path it names is blocked by `MissionRules` in `content/domain/Missions.kt` whenever the task belongs to a published mission.\n\n- **Deleting a task:** `TaskService.delete` (line 149) calls `MissionRules.taskDelete`. That returns `Refusal.TaskDeleteInPublished` if any mission containing the task is PUBLISHED, so the request fails before `missions.removeTask(id)` runs.\n- **Unpublishing a task:** `TaskService.setStatus` (line 162) calls `MissionRules.taskStatus`. That refuses `DRAFT` (`TaskDraftInPublished`) for a task in a published mission. `PublishStatus` has only DRAFT and PUBLISHED, so there is no other way to unpublish.\n- **Changing modality:** `TaskService.update` calls `MissionRules.taskEdit`. That refuses switching a task to GRAPHIC (`TaskGraphicInPublished`) while it is in a published mission, so it can't become non-servable that way either.\n- **Bulk publish:** `bulkPublish` only publishes tasks, never unpublishes them.\n\nThe only way to shrink a mission's task list is to set the mission to DRAFT first. Children aren't served draft missions. Re-publishing the mission goes through `MissionService.setStatus`, which publishes `PublishedMissionChanged` (MissionService.kt:89), and `Gamification.onPublishedMissionChanged` then pays the bonus. Editing a published mission likewise fires the event (line 73).\n\nSo the scenario of an admin removing the last unresolved task from a served mission without any event is not reachable, and no real user can trigger it."
+        ]
+      },
+      {
+        "title": "Admin publish/edit now fails if the synchronous gamification listener throws",
+        "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+        "line": 411,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`onPublishedMissionChanged` is a plain `@EventListener` running inside the admin's content transaction. It takes the practice advisory lock, reads every primary attempt for the mission and inserts a ledger row. Any exception it raises propagates out of `events.publishEvent(...)` in `MissionService.setStatus`/`edit`, so the admin's publish fails and rolls back, probably as a generic 500. Examples are a unique-index violation if an invariant is ever broken, or a row rejected by `CHECK amount`. The content module now depends at runtime on practice for its own writes to succeed.",
+        "suggestion": "This coupling may be what you want, since the bonus is atomic with the publish. If so, map any listener failure to an RFC 7807 response with a human-readable message, or use an idempotent insert (`ON CONFLICT DO NOTHING` on the partial unique index) so a race cannot block publishing.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "I refuted this finding: the failure it describes is either prevented or already turned into a proper error response.\n\n1. **Wrong line.** `Gamification.kt` has only 176 lines. The listener is at lines 95–104, not 411.\n\n2. **The duplicate-row case can't happen.** The listener first takes the advisory lock (`store.lock()`). It then checks whether a MISSION_BONUS row already exists for the mission, and only inserts if none does. Every path that awards XP takes the same lock, so two writers cannot race past the check. The partial unique index `xp_award_bonus_once_uq` is only a backstop.\n\n3. **The `CHECK amount` case can't happen either.** The column requires `amount BETWEEN 0 AND 1000`. The bonus is `config.xp.missionBonus`, and `GamificationConfigParser` refuses any value outside that range (`XP_MAX = 1000`) when the config is loaded. The shipped value is 20.\n\n4. **It would not be a raw 500 anyway.** Both of the finding's examples raise `DataIntegrityViolationException`. `ContentProblemAdvice` has `@Order(HIGHEST_PRECEDENCE)` and covers `MissionController`. Its handler at lines 60–61 maps that exception to a 409 `content-conflict` problem response with a message from the catalog. An admin publish or edit therefore gets an RFC 7807 response with a readable message, not a generic 500.\n\n5. **The coupling is intended.** OQ-28 wants the bonus written atomically with the publish, which a synchronous listener inside the content transaction provides. The finding itself concedes this may be wanted.\n\nWhat remains is \"some unexpected exception might happen\", which applies to any code in the transaction. That is not a correctness bug in this code.",
+          "The location is cited wrong: Gamification.kt is only 176 lines long, and the listener is at line 97, not 411. The coupling is real. `onPublishedMissionChanged` is a synchronous `@EventListener` with `@Transactional` (REQUIRED), so it joins the admin's transaction, and an exception thrown there would fail the publish. But neither failure the finding names can actually happen:\n\n1. **Unique-index violation from a race:** both writers to `xp_award` call `store.lock()` before their check-then-insert. That lock is `pg_advisory_xact_lock` in JdbcPracticeStore. `onAttempt` is called with the practice lock held (see the class doc), and `onPublishedMissionChanged` calls `store.lock()` itself on line 98. Both check whether the bonus was already paid under that same lock, so they run one after the other and cannot race. With no race, `ON CONFLICT DO NOTHING` has nothing to guard against.\n\n2. **`CHECK (amount BETWEEN 0 AND 1000)` rejecting a row:** the amount is always `config.xp.missionBonus`. GamificationConfigParser checks every XP value at startup to be within 0..`XP_MAX` (1000) and refuses unknown or missing keys. A bad config stops the app from starting, so no publish request ever reaches this insert with an out-of-range value.\n\nThe only failures left are general ones, such as the database being unreachable or a lock timeout. Those would break any write in the admin transaction, not something this listener introduces. Making the bonus atomic with the publish is also the intended design (OQ-28, design.md). No real user or attacker can trigger the claimed failure."
+        ]
+      },
+      {
+        "title": "Summary's completing attempt re-implements resolution logic instead of using TaskProgress",
+        "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+        "line": 454,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`.filter { it.correct || it.attemptNo == TaskProgress.MAX_ATTEMPTS }` restates the rule for when an attempt resolves a task, which `TaskProgress(...).state.resolved` already encodes. If resolution rules change (for example, more attempts or reveal-on-request), the summary's `completing` attempt, and with it `rankUp`, will silently drift from the state machine used everywhere else.",
+        "suggestion": "Derive the resolving attempt per task from `TaskProgress` (e.g. `groupBy taskId → TaskProgress(list).takeIf { state.resolved }?.latest`), then take the latest by `createdAt`.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The cited line is wrong. Gamification.kt has only 176 lines, so line 454 doesn't exist. The code the finding describes is at line 138, inside `summary()`.\n\nThe code gives the right answer today. `TaskProgress.state` (domain/Rules.kt:19-26) marks a task resolved exactly when attempt 1 is correct, attempt 2 is correct, or there are 2 attempts. The filter `correct || attemptNo == MAX_ATTEMPTS` picks out exactly the attempts that cause that change. No attempt can be stored after a task is resolved, because PracticeService.kt:140 rejects it with `PracticeConflict(\"resolved\")`. So every attempt that passes the filter is the one that resolved its task. `summary()` only runs for a completed run, so the newest of those attempts is the one that completed the mission. The filter and `TaskProgress(...).state.resolved` always pick the same attempts. It also uses the shared `TaskProgress.MAX_ATTEMPTS` constant instead of a hard-coded 2, so changing the attempt limit carries over automatically.\n\nThe finding admits it is only about future drift (\"If resolution rules change…\"). That is a maintainability/duplication point, not a bug in the current code. Through the correctness lens, the mechanism is not wrong in this code. At most it is a refactoring nit.",
+          "The cited line is wrong: Gamification.kt has only 176 lines, so line 454 doesn't exist. The filter is actually at line 138 (in the run-summary method). That filter, `it.correct || it.attemptNo == TaskProgress.MAX_ATTEMPTS`, gives the same result as `TaskProgress.state.resolved` under today's rules. In Rules.kt:19-26, a task is resolved if attempt 1 is correct, attempt 2 is correct, or there are two attempts (REVEALED). Attempts per task are capped at MAX_ATTEMPTS = 2, and the filter reads the shared constant. So an attempt resolves a task exactly when it is correct or is attempt #2.\n\nOne edge case: the filter would also match a correct attempt #2 that followed a correct attempt #1. That can't happen, because a resolved task has attemptsLeft = 0, so no second attempt is stored. No user or attacker can make the summary's `completing` value or the rankUp differ from the state machine today. The finding only warns about drift if the rules change in the future, which is a duplication/maintainability concern, not a correctness bug that can be reproduced. Under the exploitability/reproducibility lens there is no real-world trigger, and the location in the finding is wrong."
+        ]
+      },
+      {
+        "title": "COVERAGE SUMMARY: 16 delta scenarios: 16 implemented, 0 partial, 0 missing, 0 contradicted",
+        "file": "openspec/changes/implement-gamification-api/specs/gamification/spec.md",
+        "line": 1,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "I traced each of the 16 delta scenarios to code and to a matching test. Award table, Neutral submissions and Hints/replays: Gamification.kt:63-83 and XpRules (domain/Gamification.kt:32-42), tested at GamificationIT.kt:210/242/266/377. Shared task, two missions and published-already-complete: Gamification.kt:74-80 and 95-104, plus the MissionService events, tested at GamificationIT.kt:401/424/459/486. Config keys, ladder and alternate file: GamificationConfigParser.kt, tested in GamificationConfigTest and GamificationConfigIT.kt:136/149. Mid-mission rank-up, pending rank-up with ack, and older ack: PracticeService submit, Gamification.acknowledge and progress(), tested at GamificationIT.kt:501/530/573. Summary/replay and available XP: RunXp.summarize and Gamification.available, tested at GamificationIT.kt:634/377/678. Append-only ledger and XP never goes down: V5 trigger, tested at GamificationIT.kt:695/707. Every FR assigned to this repo for slice 8 (FR-32..FR-39) appears in the delta spec and has @trace tests. No NFR travels with this slice. The OpenAPI fields used (AttemptResult xpAwarded/bonusXp/completedMissionIds/rankUp, HqView.pendingRankUp, Rank{index,name,minXp}, MissionBriefing.xpAvailable, MissionSummary xpEarned/rankUp/rankReachedDuringRun, ackRankUp 204/400) match contract/api/openapi.yaml. No new endpoints or status codes were added. Ticked tasks 1.1–4.2 all have their artifacts (V5__gamification.sql, the test classes, docs/qa/evidence/slice8-red-run.md, the domain types, PlaceholderLadder removed, PublishedMissionChanged, missionsContaining, JdbcXpLedger, gamification.json). Tasks 5.1–5.6 are honestly left unticked.",
+        "suggestion": "Nothing to fix here; this row is the coverage summary. Finish tasks 5.1–5.6 (qa:verify, openspec validate --strict, review-gate with review-findings.json, compose smoke, current-state, archive) before calling the slice done.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "This is a coverage summary, not a defect report. It points to no wrong behaviour, so a correctness check has nothing to confirm. I checked its factual claims and they hold: the delta spec has exactly 16 `#### Scenario` headers. The Gamification.kt files (application and domain), GamificationConfigParser.kt and V5__gamification.sql all exist. V5 has an append-only trigger (`xp_award_append_only_trg`, RAISE EXCEPTION 'xp_award is append-only (FR-38)'). There are 57 `@trace FR-32..39` annotations across GamificationIT, GamificationRulesTest, GamificationConfigTest and GamificationConfigIT. In tasks.md, 4.2 is ticked and 5.1–5.6 are not, as the summary says. Because the summary is accurate and reports no defect, it should be treated as informational and not as a 'minor' bug. Its one actionable point, finishing tasks 5.1–5.6 before calling the slice done, is already tracked by the unticked tasks.",
+          "I'm marking this refuted because it isn't a defect. The \"finding\" is a coverage summary: all 16 delta scenarios are reported as implemented, with 0 partial, 0 missing and 0 contradicted. It names no faulty mechanism, no reachable bad path and no way for a user or attacker to trigger a problem. Its own suggestion says \"Nothing to fix here\". The cited file, openspec/changes/implement-gamification-api/specs/gamification/spec.md, exists. Line 1 is just a header anchor, not a code location with a bug. The only open work it mentions (tasks 5.1–5.6 left unticked) is process follow-up the finding itself says was honestly left open, not something that can go wrong in the product. Under an exploitability/reproducibility lens there is nothing to confirm, so this should not stay in the list as a severity-bearing issue. Keep it as an informational note."
+        ]
+      },
+      {
+        "title": "Mid-mission rank-up is marked as played by the server on the POST response, but the store spec says a celebration counts as played only once the client acknowledges it",
+        "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+        "line": 175,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "The store spec contract/openspec/specs/gamification/spec.md:261 says: \"A celebration counts as played once the client acknowledges it.\" The delta spec (line 92-93) says the opposite for AttemptResult.rankUp: \"that celebration counts as played\". OpenAPI AttemptResult.rankUp agrees with the delta (\"one-shot: the POST response is its only carrier\"). The code follows the delta and contract: `val rankUp = xp.crossing?.takeIf { !result.missionComplete }; rankUp?.let { gamification.celebrated(it, record.createdAt) }`. It writes rank_celebration with no client ack. So if the POST response is lost (tab closed or network drop), the mid-mission celebration never plays again. Under the store spec it would still be pending on HQ.",
+        "suggestion": "Amend the store spec (a docs-store change) so it says a mid-mission AttemptResult.rankUp is one-shot and counts as played when the response is sent, and that only mission-complete and out-of-session crossings need ackRankUp. The other option is to make mid-mission crossings pending until acknowledged as well, but that would also need a contract change.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The code does what the finding describes. `PracticeService.kt:175-176` records `rank_celebration` for a mid-mission crossing right away, without waiting for the client to acknowledge it. But that is not a code defect. It is the behaviour the authoritative API contract requires:\n\n- **OpenAPI `AttemptResult.rankUp` (`contract/api/openapi.yaml:1416`):** \"animated now (one-shot: the POST response is its only carrier)\".\n- **OpenAPI `HqView.pendingRankUp` (`openapi.yaml:1236`):** lists only out-of-session crossings and a mission-complete crossing whose summary was never acknowledged. Mid-mission crossings are deliberately left out.\n- **`ackRankUp` and `MissionSummary.rankUp` (`openapi.yaml:999` and `:1469`):** the ack flow is defined only for mission-complete and HQ celebrations.\n- **Archived contract proposal (`add-api-contract-v0`, line 110):** describes the same one-shot design.\n- **Backend delta spec (lines 92-95):** says the same.\n\nIf the server left mid-mission crossings pending, the contract would have no field to deliver them through. `pendingRankUp` does not cover them, so the server would break the OpenAPI semantics.\n\nThe sentence the finding quotes, \"A celebration counts as played once the client acknowledges it\" (`contract/openspec/specs/gamification/spec.md:261`), sits in the paragraph about HQ and mission-complete celebrations. It is followed directly by the rule for an unshown mission-complete celebration. The same requirement also says a mid-mission celebration plays \"on the task's feedback\". So at worst the store spec's wording is ambiguous or inconsistent with the contract.\n\nThe finding admits all of this: it says the code \"follows the delta and contract\", and its main fix is to change the docs-store wording. The concern about a lost response is real, but it is a trade-off the contract chose on purpose, not a wrong mechanism in this code. This is a docs-store wording issue, not a correctness bug in `PracticeService`.",
+          "The finding describes the code accurately. `PracticeService.kt:175-176` records a mid-mission crossing as celebrated as soon as the POST response is built, with no client acknowledgement. It is still not a real defect, for four reasons:\n\n1. **The code follows the store's own contract.** `contract/api/openapi.yaml:1416` is part of the docs store and is the API contract (NFR-12). It says `AttemptResult.rankUp` is \"animated now (one-shot: the POST response is its only carrier)\". The archived store change `add-api-contract-v0/proposal.md:110` also says the rank-up celebration is \"one-shot end to end\". The backend delta spec (lines 91-93) says the same. The code matches all three.\n\n2. **The cited store-spec sentence covers a different case.** `gamification/spec.md:261`, \"A celebration counts as played once the client acknowledges it\", sits between the sentences about rank-ups caused outside a child session (HQ, publish-time bonus, admin re-evaluation) and mission-complete rank-ups whose screen was never shown. Those are the HQ and summary cases, and `ackRankUp` exists for them. For a mid-mission crossing, the same requirement says it plays \"on the task's feedback\", and only the POST response carries that. The store spec also says the mission-complete screen after a mid-mission rank-up \"does not play the animation again\", which means the mid-mission celebration is never re-offered. Reading line 261 as a rule that mid-mission crossings stay pending on HQ contradicts the rest of that paragraph.\n\n3. **The scenario does happen, but it is intended, not exploitable.** If the POST response is lost (tab closed or network drop), the celebration never plays. That is what the contract asks for. A child gains nothing and loses no XP (XP stays an append-only ledger, FR-38). The only effect is a missed animation.\n\n4. **No code change is called for.** The finding itself suggests a docs-store wording fix. At most that is a small editorial clarification of the store spec. It is not a backend spec-compliance defect at `PracticeService.kt:175`."
+        ]
+      },
+      {
+        "title": "Reloaded TaskView.lastFeedback now shows the stored XP of the last attempt and drops its rank-up; no requirement covers this",
+        "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeMapping.kt",
+        "line": 128,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The delta spec only covers XP in the POST AttemptResult, the summary, the briefing and HQ. The code also fills `lastFeedback` on GET task screens from the ledger (`xp = gamification.ofAttempt(latest.id)` in PracticeService.outcome) and forces `rankUp = null` (`lastFeedback = screen.lastResult?.let { attempt(it.copy(rankUp = null)) }`). The comment points to \"design decision 9\" in design.md, not to a spec requirement. It fits the schema (lastFeedback is an AttemptResult), but no scenario says reloaded feedback must repeat xpAwarded/bonusXp/completedMissionIds or never carry rankUp. No test asserting it was visible in the gamification test names.",
+        "suggestion": "Add a scenario to the delta spec (e.g. \"Reloaded task feedback shows the stored award and no rank-up\") and an IT that reloads the task after a crossing attempt and checks the XP fields and rankUp null.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "Seen through correctness, nothing here is broken. `PracticeMapping.kt:128` sets `lastFeedback = screen.lastResult?.let { attempt(it.copy(rankUp = null)) }`. `PracticeService.kt:349` fills `xp` from `gamification.ofAttempt(latest.id)`, which reads the stored ledger award for that attempt. Its KDoc says that award is \"never a rank-up\". This is exactly what design.md decision 9 records (\"TaskView.lastFeedback keeps its XP … a reload shows what the POST showed; rankUp is null\"). The spec says a rank-up is offered once, and after that through `MissionSummary.rankUp` / `HqView.pendingRankUp`. Nulling it on reload is consistent with that: repeating it would replay the celebration.\n\nThe finding's claim that no test asserts this is false:\n- `GamificationIT.kt:234-236` reloads a solved task and checks `$.lastFeedback.xpAwarded == 10` and `$.lastFeedback.rankUp` is null.\n- `GamificationIT.kt:514`, in the test \"a mid-mission rank-up plays once with the attempt\" (`// @trace FR-36`), reloads the task right after a rank-crossing attempt and checks `$.lastFeedback.rankUp` is null.\n\nSo the integration test the suggestion asks for already exists. The only remaining point is that the delta spec has no explicit scenario for reloaded feedback. That is a documentation gap, and the behaviour is already pinned by design.md and the tests. It is not a wrong mechanism.",
+          "There is no reproducible defect here. The behaviour is intended, it is documented, and tests already pin it down.\n\n1. **Intended and documented.** PracticeMapping.kt:128 clears `rankUp` on the reloaded `lastFeedback`, and PracticeService.kt:349 fills the XP fields from `gamification.ofAttempt(latest.id)`. Both follow design.md decision 9 (lines 114-116): a reload shows what the POST showed, and `rankUp` is null. This matches FR-36's \"rank-up plays once\" rule. Showing the rank-up again on every reload would be the actual bug.\n\n2. **The \"no test\" claim is false.** GamificationIT.kt:234-236 reloads a task and asserts `$.lastFeedback.xpAwarded == 10` and `$.lastFeedback.rankUp` is null. GamificationIT.kt:514, in the test \"a mid-mission rank-up plays once with the attempt\" (@trace FR-36), reloads the task after an attempt that crossed a rank threshold and asserts `$.lastFeedback.rankUp` is null. That is exactly the IT the suggestion asks for.\n\n3. **No impact.** A user or attacker gets nothing from this. Reloaded feedback repeats stored, append-only ledger values. Nothing is recomputed or changed, nothing leaks, and the response still fits the schema (`lastFeedback` is an AttemptResult).\n\nThe only thing left is that the delta spec has no scenario for it. That is a gap in documentation, not a behaviour anyone can trigger, and the claim that coverage is missing is factually wrong."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/implement-gamification-api/review-findings.json"
+  }
+}

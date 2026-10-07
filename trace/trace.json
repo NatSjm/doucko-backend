@@ -707,8 +707,7 @@
       ],
       "planned": true,
       "tests": [
-        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
-        "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt"
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt"
       ],
       "recordings": []
     },
@@ -866,10 +865,20 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md",
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -880,10 +889,14 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/practice-flow/spec.md"
+        "contract/openspec/specs/practice-flow/spec.md",
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -893,10 +906,33 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md",
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -906,10 +942,34 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md",
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -920,10 +980,32 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md",
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -934,10 +1016,16 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md",
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -948,10 +1036,18 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md",
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -962,10 +1058,18 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/gamification/spec.md"
+        "contract/openspec/specs/gamification/spec.md",
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -1462,38 +1566,6 @@
   ],
   "failures": [],
   "warnings": [
-    {
-      "check": "test-trace",
-      "msg": "FR-32 (owned by backend) has no test annotated \"@trace FR-32\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-33 (owned by backend) has no test annotated \"@trace FR-33\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-34 (owned by backend) has no test annotated \"@trace FR-34\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-35 (owned by backend) has no test annotated \"@trace FR-35\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-36 (owned by backend) has no test annotated \"@trace FR-36\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-37 (owned by backend) has no test annotated \"@trace FR-37\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-38 (owned by backend) has no test annotated \"@trace FR-38\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-39 (owned by backend) has no test annotated \"@trace FR-39\""
-    },
     {
       "check": "test-trace",
       "msg": "FR-40 (owned by backend) has no test annotated \"@trace FR-40\""

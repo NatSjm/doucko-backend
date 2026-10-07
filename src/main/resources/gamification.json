@@ -1,0 +1,17 @@
+{
+  "xp": {
+    "firstAttempt": 10,
+    "secondAttempt": 5,
+    "revealed": 1,
+    "hintCost": 2,
+    "minimum": 1,
+    "missionBonus": 20
+  },
+  "ranks": [
+    { "name": "Nováček", "minXp": 0 },
+    { "name": "Kadet", "minXp": 150 },
+    { "name": "Strážce", "minXp": 400 },
+    { "name": "Hrdina", "minXp": 800 },
+    { "name": "Legenda", "minXp": 1500 }
+  ]
+}
