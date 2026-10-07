@@ -78,6 +78,33 @@ class Gamification(
         return XpOutcome(amount, bonus, completed, ladder.crossing(before, before + amount + bonus))
     }
 
+    /**
+     * Awards for a re-evaluation that improved [attempt]'s task to [state] (caller holds the lock; progress-stats
+     * design decision 9): the difference between the award of [state] with the attempt's hints and the task XP
+     * already paid, never negative, then the bonus of every served mission containing the task that is now
+     * complete and was never paid. Rows carry [reportId], never an attempt. No celebration is stored, so a
+     * crossing waits for `HqView.pendingRankUp`.
+     */
+    @Transactional
+    fun onReevaluation(
+        attempt: AttemptRecord,
+        state: TaskState,
+        reportId: UUID,
+        at: Instant,
+    ): XpOutcome {
+        val amount = maxOf(0, XpRules.taskAward(config.xp, state, attempt.hintsUsed) - ledger.taskXp(attempt.taskId))
+        if (amount > 0) {
+            ledger.insert(award(AwardKind.REEVALUATION, attempt.taskId, attempt.missionId, null, amount, at).copy(reportId = reportId))
+        }
+        val containing = served.missionsContaining(attempt.taskId).filter { attempt.taskId in it.taskIds }
+        val paid = ledger.bonusesPaid(containing.map { it.missionId })
+        val completed = containing.filter { it.missionId !in paid && complete(it) }.map { it.missionId }
+        completed.forEach {
+            ledger.insert(award(AwardKind.MISSION_BONUS, null, it, null, config.xp.missionBonus, at).copy(reportId = reportId))
+        }
+        return XpOutcome(amount, completed.size * config.xp.missionBonus, completed, null)
+    }
+
     /** Stores that the celebration of [rank] played now (a mid-mission `AttemptResult.rankUp`). */
     @Transactional
     fun celebrated(
@@ -172,7 +199,7 @@ class Gamification(
         val runAttempts = attempts.filter { it.missionId == mission.missionId }.map { it.id }.toSet()
         val completing =
             attempts
-                .filter { it.correct || it.attemptNo == TaskProgress.MAX_ATTEMPTS }
+                .filter { it.effectiveCorrect || it.attemptNo == TaskProgress.MAX_ATTEMPTS }
                 .maxByOrNull { it.createdAt }
                 ?.id
         return RunXp.summarize(ledger.awards(), runAttempts, completing, ladder, ledger.celebrated())

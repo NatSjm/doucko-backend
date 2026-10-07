@@ -11,6 +11,7 @@ import cz.doucko.content.uploadSource
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
+import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -28,8 +29,9 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 
 /**
- * NFR-3 (plan §2.1, extended by slice 7): a full attempt, an unreadable submission, a hint, a problem report
- * and an HQ read, against Postgres with the web, JDBC, transaction, Hibernate, driver and application loggers
+ * NFR-3 (plan §2.1, extended by slices 7 and 9): a full attempt, an unreadable submission, a hint, a problem
+ * report, an HQ read, and the admin statistics, flag queue, re-evaluation and dismiss (which return the note and
+ * the raw answer), against Postgres with the web, JDBC, transaction, Hibernate, driver and application loggers
  * at TRACE. Neither the submitted answers, the report note nor the display name may appear in any log line.
  * The capture itself is proven by an application TRACE line that does appear.
  */
@@ -71,6 +73,7 @@ class PracticeLogCaptureIT {
     }
 
     // @trace NFR-3
+    // @trace FR-41
     @Test
     fun `answers, report notes and the display name never reach the logs, even at TRACE`(output: CapturedOutput) {
         val admin = mvc.signedIn()
@@ -123,6 +126,22 @@ class PracticeLogCaptureIT {
         mvc.get("/api/child/hq").andExpect { jsonPath("$.displayName") { value(DISPLAY_NAME) } }
         mvc.get(base).andExpect { status { isOk() } }
         jdbc.queryForObject("SELECT count(*) FROM attempt WHERE parts::text LIKE ?", Int::class.java, "%$ANSWER%") shouldBe 1
+        // Slice 9: the admin statistics and the flag queue return the note and the raw answer, never logging them.
+        val reportId = jdbc.queryForObject("SELECT id::text FROM problem_report WHERE note IS NOT NULL", String::class.java)
+
+        fun adminPost(path: String) =
+            mvc.post(path) {
+                session = admin.session
+                cookie(Cookie("XSRF-TOKEN", admin.xsrf))
+                header("X-XSRF-TOKEN", admin.xsrf)
+            }
+        mvc.get("/api/admin/stats") { session = admin.session }.andExpect { status { isOk() } }
+        mvc.get("/api/admin/reports") { session = admin.session }.andExpect {
+            jsonPath("$[0].note") { value(NOTE) }
+            jsonPath("$[0].attempt.rawInput.a") { value(ANSWER) }
+        }
+        adminPost("/api/admin/reports/$reportId/reevaluate").andExpect { jsonPath("$.report.note") { value(NOTE) } }
+        adminPost("/api/admin/reports/$reportId/dismiss").andExpect { jsonPath("$.status") { value("DISMISSED") } }
         LoggerFactory.getLogger("cz.doucko.probe").trace("capture probe {}", "visible-5b1e")
 
         output.all shouldContain "visible-5b1e"

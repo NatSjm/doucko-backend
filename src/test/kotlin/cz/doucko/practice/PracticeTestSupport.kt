@@ -1,15 +1,19 @@
 package cz.doucko.practice
 
 import cz.doucko.practice.adapter.out.tutor.DeterministicTutor
+import cz.doucko.practice.application.FlagQueue
 import cz.doucko.practice.application.Gamification
 import cz.doucko.practice.application.GamificationSettings
 import cz.doucko.practice.application.PracticeService
 import cz.doucko.practice.application.PracticeStore
+import cz.doucko.practice.application.ProgressStats
 import cz.doucko.practice.application.XpLedger
 import cz.doucko.practice.domain.AttemptRecord
 import cz.doucko.practice.domain.AwardKind
 import cz.doucko.practice.domain.HintRecord
+import cz.doucko.practice.domain.Reevaluation
 import cz.doucko.practice.domain.ReportRecord
+import cz.doucko.practice.domain.ReportStatus
 import cz.doucko.practice.domain.RunRecord
 import cz.doucko.practice.domain.XpAward
 import org.springframework.boot.logging.LogLevel
@@ -71,6 +75,36 @@ class InMemoryPracticeStore : PracticeStore {
 
     override fun usedTasks(taskIds: Collection<UUID>) =
         (attempts.map { it.taskId } + hints.map { it.taskId } + reports.map { it.taskId }).filter { it in taskIds }.toSet()
+
+    override fun allAttempts() = attempts.sortedWith(compareBy({ it.createdAt }, { it.id }))
+
+    override fun allHints() = hints.sortedBy { it.openedAt }
+
+    override fun attempt(id: UUID) = attempts.firstOrNull { it.id == id }
+
+    override fun reports(status: ReportStatus?) =
+        reports
+            .filter { status == null || it.status == status }
+            .sortedWith(compareBy({ it.status != ReportStatus.OPEN }, { it.createdAt }, { it.id }))
+
+    override fun report(id: UUID) = reports.firstOrNull { it.id == id }
+
+    override fun insertReevaluation(
+        attemptId: UUID,
+        reportId: UUID,
+        reevaluation: Reevaluation,
+    ) {
+        attempts.replaceAll { if (it.id == attemptId) it.copy(reevaluation = reevaluation) else it }
+    }
+
+    override fun closeReport(
+        reportId: UUID,
+        status: ReportStatus,
+    ): Boolean {
+        val open = reports.firstOrNull { it.id == reportId && it.status == ReportStatus.OPEN } ?: return false
+        reports.replaceAll { if (it === open) it.copy(status = status) else it }
+        return true
+    }
 }
 
 /** [XpLedger] in memory, for `@WebMvcTest` slices. */
@@ -84,7 +118,9 @@ class InMemoryXpLedger : XpLedger {
 
     override fun total() = awards.sumOf { it.amount }
 
-    override fun taskAwarded(taskId: UUID) = awards.any { it.kind == AwardKind.TASK && it.taskId == taskId }
+    override fun taskAwarded(taskId: UUID) = awards.any { it.kind != AwardKind.MISSION_BONUS && it.taskId == taskId }
+
+    override fun taskXp(taskId: UUID) = awards.filter { it.kind != AwardKind.MISSION_BONUS && it.taskId == taskId }.sumOf { it.amount }
 
     override fun bonusesPaid(missionIds: Collection<UUID>) =
         awards.filter { it.kind == AwardKind.MISSION_BONUS && it.missionId in missionIds }.map { it.missionId }.toSet()
@@ -105,7 +141,14 @@ class InMemoryXpLedger : XpLedger {
 
 /** The practice use case over an in-memory store, for `@WebMvcTest` slices (every child controller needs it). */
 @TestConfiguration(proxyBeanMethods = false)
-@Import(PracticeService::class, DeterministicTutor::class, Gamification::class, GamificationSettings::class)
+@Import(
+    PracticeService::class,
+    DeterministicTutor::class,
+    Gamification::class,
+    GamificationSettings::class,
+    ProgressStats::class,
+    FlagQueue::class,
+)
 class PracticeWebTestBeans {
     @Bean
     fun practiceStore() = InMemoryPracticeStore()
@@ -115,11 +158,11 @@ class PracticeWebTestBeans {
 }
 
 /**
- * Empties the practice and gamification tables before content is deleted. The XP ledger refuses DELETE
- * (FR-38), so it is truncated; the other tables keep the slice-7 DELETE order.
+ * Empties the practice and gamification tables before content is deleted. The XP ledger and the
+ * re-evaluations refuse DELETE (FR-38, FR-42), so they are truncated; the other tables keep the slice-7 DELETE order.
  */
 fun JdbcTemplate.cleanPractice() {
-    execute("TRUNCATE xp_award, rank_celebration")
+    execute("TRUNCATE xp_award, rank_celebration, attempt_reevaluation")
     for (table in listOf("problem_report", "opened_hint", "attempt", "practice_run")) update("DELETE FROM $table")
 }
 

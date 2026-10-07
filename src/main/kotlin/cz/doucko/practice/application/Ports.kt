@@ -4,7 +4,9 @@ import cz.doucko.content.ServedPart
 import cz.doucko.practice.domain.AttemptRecord
 import cz.doucko.practice.domain.HintRecord
 import cz.doucko.practice.domain.RawAnswer
+import cz.doucko.practice.domain.Reevaluation
 import cz.doucko.practice.domain.ReportRecord
+import cz.doucko.practice.domain.ReportStatus
 import cz.doucko.practice.domain.RunRecord
 import cz.doucko.practice.domain.TaskState
 import java.util.UUID
@@ -54,6 +56,34 @@ interface PracticeStore {
 
     /** The tasks among [taskIds] that any attempt, report or opened hint references (FR-56, CA-D22). */
     fun usedTasks(taskIds: Collection<UUID>): Set<UUID>
+
+    /** Every logged attempt of every scope with its re-evaluation, oldest first (the statistics, FR-40). */
+    fun allAttempts(): List<AttemptRecord>
+
+    /** Every opened hint of every scope (the statistics, FR-40). */
+    fun allHints(): List<HintRecord>
+
+    /** One logged attempt with its re-evaluation, or null. */
+    fun attempt(id: UUID): AttemptRecord?
+
+    /** The flag queue (FR-41): reports with [status] (null: all), `OPEN` first, each group oldest first. */
+    fun reports(status: ReportStatus?): List<ReportRecord>
+
+    /** One report, or null. */
+    fun report(id: UUID): ReportRecord?
+
+    /** Records a re-evaluation next to the attempt (insert-only; the attempt itself is never changed, OQ-20). */
+    fun insertReevaluation(
+        attemptId: UUID,
+        reportId: UUID,
+        reevaluation: Reevaluation,
+    )
+
+    /** Moves an `OPEN` report to [status]; false when it is no longer `OPEN`. */
+    fun closeReport(
+        reportId: UUID,
+        status: ReportStatus,
+    ): Boolean
 }
 
 /** What the tutor sees of a task after an attempt: its parts, its hints and the scope's state. */
@@ -102,8 +132,11 @@ interface XpLedger {
     /** The ledger total. */
     fun total(): Int
 
-    /** True when [taskId] already has its task award. */
+    /** True when [taskId] already has task XP: its task award, or a re-evaluation award. */
     fun taskAwarded(taskId: UUID): Boolean
+
+    /** The task XP paid for [taskId] so far: its task award plus every re-evaluation award (FR-41). */
+    fun taskXp(taskId: UUID): Int
 
     /** The missions among [missionIds] whose completion bonus is already paid. */
     fun bonusesPaid(missionIds: Collection<UUID>): Set<UUID>

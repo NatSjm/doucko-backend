@@ -6,7 +6,10 @@ import cz.doucko.practice.domain.AttemptRecord
 import cz.doucko.practice.domain.HintRecord
 import cz.doucko.practice.domain.PartRecord
 import cz.doucko.practice.domain.RawAnswer
+import cz.doucko.practice.domain.Reevaluation
+import cz.doucko.practice.domain.ReportReason
 import cz.doucko.practice.domain.ReportRecord
+import cz.doucko.practice.domain.ReportStatus
 import cz.doucko.practice.domain.RunRecord
 import org.springframework.jdbc.core.SqlParameterValue
 import org.springframework.jdbc.core.simple.JdbcClient
@@ -20,7 +23,8 @@ import java.sql.Types
 import java.util.UUID
 
 /**
- * [PracticeStore] on Postgres (`V4__practice.sql`). Insert-only (FR-42), except that a replay run is marked finished once. Attempt parts are one JSONB
+ * [PracticeStore] on Postgres (`V4__practice.sql`, `V6__progress_stats.sql`). Insert-only (FR-42), except that a replay run is
+ * marked finished once and an `OPEN` report is closed once (FR-41). Attempts are read with their re-evaluation. Attempt parts are one JSONB
  * array: `key`, `raw` (string, array of option keys, or null for a locked part), `normalized`, `verdict`,
  * `locked`. Values are always bound parameters; nothing here logs (NFR-3).
  */
@@ -44,10 +48,7 @@ class JdbcPracticeStore(
         if (taskIds.isEmpty()) return emptyList()
         return jdbc
             .sql(
-                """
-                SELECT id, task_id, mission_id, scope, replay, attempt_no, hints_used, correct, parts::text AS parts, created_at
-                FROM attempt WHERE scope = :scope AND task_id IN (:ids) ORDER BY created_at, attempt_no
-                """.trimIndent(),
+                "$ATTEMPTS WHERE a.scope = :scope AND a.task_id IN (:ids) ORDER BY a.created_at, a.attempt_no",
             ).param("scope", scope)
             .param("ids", taskIds.distinct())
             .query { rs, _ -> attempt(rs) }
@@ -57,10 +58,7 @@ class JdbcPracticeStore(
     override fun attemptsIn(scope: UUID): List<AttemptRecord> =
         jdbc
             .sql(
-                """
-                SELECT id, task_id, mission_id, scope, replay, attempt_no, hints_used, correct, parts::text AS parts, created_at
-                FROM attempt WHERE scope = :scope ORDER BY created_at, attempt_no
-                """.trimIndent(),
+                "$ATTEMPTS WHERE a.scope = :scope ORDER BY a.created_at, a.attempt_no",
             ).param("scope", scope)
             .query { rs, _ -> attempt(rs) }
             .list()
@@ -180,6 +178,88 @@ class JdbcPracticeStore(
             .filterNotNull()
             .toSet()
 
+    override fun allAttempts(): List<AttemptRecord> =
+        jdbc
+            .sql("$ATTEMPTS ORDER BY a.created_at, a.id")
+            .query { rs, _ -> attempt(rs) }
+            .list()
+
+    override fun allHints(): List<HintRecord> =
+        jdbc
+            .sql("SELECT task_id, scope, hint_index, mission_id, opened_at FROM opened_hint ORDER BY opened_at")
+            .query { rs, _ -> hint(rs) }
+            .list()
+
+    override fun attempt(id: UUID): AttemptRecord? =
+        jdbc
+            .sql("$ATTEMPTS WHERE a.id = ?")
+            .param(id)
+            .query { rs, _ -> attempt(rs) }
+            .optional()
+            .orElse(null)
+
+    override fun reports(status: ReportStatus?): List<ReportRecord> =
+        jdbc
+            .sql(
+                """
+                $REPORTS WHERE (CAST(:status AS text) IS NULL OR status = CAST(:status AS text))
+                ORDER BY (status <> 'OPEN'), created_at, id
+                """.trimIndent(),
+            ).param("status", SqlParameterValue(Types.VARCHAR, status?.name))
+            .query { rs, _ -> report(rs) }
+            .list()
+
+    override fun report(id: UUID): ReportRecord? =
+        jdbc
+            .sql("$REPORTS WHERE id = ?")
+            .param(id)
+            .query { rs, _ -> report(rs) }
+            .optional()
+            .orElse(null)
+
+    override fun insertReevaluation(
+        attemptId: UUID,
+        reportId: UUID,
+        reevaluation: Reevaluation,
+    ) {
+        val verdicts = JsonNodeFactory.instance.objectNode().apply { reevaluation.verdicts.forEach { (key, v) -> put(key, v.name) } }
+        jdbc
+            .sql(
+                "INSERT INTO attempt_reevaluation (attempt_id, report_id, verdicts, correct, reevaluated_at) VALUES (?, ?, ?::jsonb, ?, ?)",
+            ).params(attemptId, reportId, json.writeValueAsString(verdicts), reevaluation.correct, Timestamp.from(reevaluation.at))
+            .update()
+    }
+
+    override fun closeReport(
+        reportId: UUID,
+        status: ReportStatus,
+    ): Boolean =
+        jdbc
+            .sql("UPDATE problem_report SET status = ? WHERE id = ? AND status = 'OPEN'")
+            .params(status.name, reportId)
+            .update() == 1
+
+    private fun hint(rs: ResultSet) =
+        HintRecord(
+            rs.getObject("task_id", UUID::class.java),
+            rs.getObject("scope", UUID::class.java),
+            rs.getInt("hint_index"),
+            rs.getObject("mission_id", UUID::class.java),
+            rs.getTimestamp("opened_at").toInstant(),
+        )
+
+    private fun report(rs: ResultSet) =
+        ReportRecord(
+            id = rs.getObject("id", UUID::class.java),
+            taskId = rs.getObject("task_id", UUID::class.java),
+            missionId = rs.getObject("mission_id", UUID::class.java),
+            reason = ReportReason.valueOf(rs.getString("reason")),
+            note = rs.getString("note"),
+            attemptId = rs.getObject("attempt_id", UUID::class.java),
+            createdAt = rs.getTimestamp("created_at").toInstant(),
+            status = ReportStatus.valueOf(rs.getString("status")),
+        )
+
     private fun attempt(rs: ResultSet) =
         AttemptRecord(
             id = rs.getObject("id", UUID::class.java),
@@ -192,6 +272,14 @@ class JdbcPracticeStore(
             correct = rs.getBoolean("correct"),
             parts = json.readTree(rs.getString("parts")).values().map(::part),
             createdAt = rs.getTimestamp("created_at").toInstant(),
+            reevaluation =
+                rs.getString("re_verdicts")?.let { verdicts ->
+                    Reevaluation(
+                        json.readTree(verdicts).properties().associate { (key, value) -> key to Verdict.valueOf(value.asString()) },
+                        rs.getBoolean("re_correct"),
+                        rs.getTimestamp("re_at").toInstant(),
+                    )
+                },
         )
 
     private fun parts(parts: List<PartRecord>): JsonNode {
@@ -234,5 +322,13 @@ class JdbcPracticeStore(
     private companion object {
         /** Arbitrary constant identifying the practice lock ("doucko-p" in ASCII; design decision 3). */
         const val KEY = 0x646F75636B6F2D70L
+
+        /** An attempt with its re-evaluation, if any (`V6__progress_stats.sql`). */
+        const val ATTEMPTS =
+            "SELECT a.id, a.task_id, a.mission_id, a.scope, a.replay, a.attempt_no, a.hints_used, a.correct, " +
+                "a.parts::text AS parts, a.created_at, r.verdicts::text AS re_verdicts, r.correct AS re_correct, " +
+                "r.reevaluated_at AS re_at FROM attempt a LEFT JOIN attempt_reevaluation r ON r.attempt_id = a.id"
+
+        const val REPORTS = "SELECT id, task_id, mission_id, reason, note, attempt_id, created_at, status FROM problem_report"
     }
 }

@@ -261,7 +261,7 @@ class PracticeService(
                 ?: throw PracticeConflict("summary-not-complete")
         val attempts = store.attempts(scope, mission.taskIds)
         val firstTry =
-            attempts.count { it.attemptNo == 1 && it.correct && it.missionId == mission.missionId }
+            attempts.count { it.attemptNo == 1 && it.effectiveCorrect && it.missionId == mission.missionId }
         val xp = gamification.summary(mission, scope)
         return SummaryData(
             mission.missionId,

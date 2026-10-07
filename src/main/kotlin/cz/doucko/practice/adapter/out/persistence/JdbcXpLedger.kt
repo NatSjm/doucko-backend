@@ -13,7 +13,7 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * [XpLedger] on Postgres (`V5__gamification.sql`): insert-only. The database assigns `seq` (an inserted
+ * [XpLedger] on Postgres (`V5__gamification.sql`, `V6__progress_stats.sql`): insert-only. The database assigns `seq` (an inserted
  * award's own `seq` is ignored) and refuses any update or delete of an award (FR-38).
  */
 @Repository
@@ -41,10 +41,17 @@ class JdbcXpLedger(
 
     override fun taskAwarded(taskId: UUID): Boolean =
         jdbc
-            .sql("SELECT count(*) FROM xp_award WHERE kind = 'TASK' AND task_id = ?")
+            .sql("SELECT count(*) FROM xp_award WHERE kind IN ('TASK', 'REEVALUATION') AND task_id = ?")
             .param(taskId)
             .query(Int::class.java)
             .single() > 0
+
+    override fun taskXp(taskId: UUID): Int =
+        jdbc
+            .sql("SELECT coalesce(sum(amount), 0) FROM xp_award WHERE kind IN ('TASK', 'REEVALUATION') AND task_id = ?")
+            .param(taskId)
+            .query(Int::class.java)
+            .single()
 
     override fun bonusesPaid(missionIds: Collection<UUID>): Set<UUID> =
         if (missionIds.isEmpty()) {
@@ -61,14 +68,16 @@ class JdbcXpLedger(
 
     override fun insert(award: XpAward) {
         jdbc
-            .sql("INSERT INTO xp_award (id, kind, task_id, mission_id, attempt_id, amount, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-            .param(award.id)
+            .sql(
+                "INSERT INTO xp_award (id, kind, task_id, mission_id, attempt_id, amount, created_at, report_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ).param(award.id)
             .param(award.kind.name)
             .param(SqlParameterValue(Types.OTHER, award.taskId))
             .param(award.missionId)
             .param(SqlParameterValue(Types.OTHER, award.attemptId))
             .param(award.amount)
             .param(Timestamp.from(award.createdAt))
+            .param(SqlParameterValue(Types.OTHER, award.reportId))
             .update()
     }
 
@@ -98,9 +107,10 @@ class JdbcXpLedger(
             attemptId = rs.getObject("attempt_id", UUID::class.java),
             amount = rs.getInt("amount"),
             createdAt = rs.getTimestamp("created_at").toInstant(),
+            reportId = rs.getObject("report_id", UUID::class.java),
         )
 
     private companion object {
-        const val SELECT = "SELECT seq, id, kind, task_id, mission_id, attempt_id, amount, created_at FROM xp_award"
+        const val SELECT = "SELECT seq, id, kind, task_id, mission_id, attempt_id, amount, created_at, report_id FROM xp_award"
     }
 }

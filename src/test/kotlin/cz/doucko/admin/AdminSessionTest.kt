@@ -203,8 +203,8 @@ class AdminSessionTest {
         AdminProbe.calls.set(0)
         mvc.get(PROBE) { session = admin.session }.andExpect { status { isOk() } }
         AdminProbe.calls.get() shouldBe 1
-        // No stats handler yet: past security it is an ordinary undeclared path.
-        mvc.get("/api/admin/stats") { session = admin.session }.isProblem(404)
+        // A real admin read (slice 9) needs no token either.
+        mvc.get("/api/admin/stats") { session = admin.session }.andExpect { status { isOk() } }
     }
 
     // @trace NFR-15

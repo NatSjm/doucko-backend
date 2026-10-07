@@ -52,7 +52,20 @@ data class PartRecord(
     val locked: Boolean,
 )
 
-/** A graded attempt in the append-only log (FR-31, FR-42). [correct] means every part is correct. */
+/**
+ * A re-evaluation recorded next to an attempt (progress-stats, FR-41, OQ-20): the verdict of every part under
+ * the answer spec of that moment, never in place of the attempt's own verdicts.
+ */
+data class Reevaluation(
+    val verdicts: Map<String, Verdict>,
+    val correct: Boolean,
+    val at: Instant,
+)
+
+/**
+ * A graded attempt in the append-only log (FR-31, FR-42). [correct] means every part was correct when it was
+ * graded; [reevaluation] is the verdict an admin re-evaluation recorded later, if any.
+ */
 data class AttemptRecord(
     val id: UUID,
     val taskId: UUID,
@@ -64,7 +77,15 @@ data class AttemptRecord(
     val correct: Boolean,
     val parts: List<PartRecord>,
     val createdAt: Instant,
-)
+    val reevaluation: Reevaluation? = null,
+) {
+    /**
+     * Whether the attempt counts as correct for practice state: the re-evaluated verdict of a first
+     * play-through attempt, else the verdict it was graded with. A replay attempt keeps its own verdict for its
+     * run whatever a re-evaluation recorded (OQ-17; progress-stats design decision 8).
+     */
+    val effectiveCorrect: Boolean get() = reevaluation?.takeIf { !replay }?.correct ?: correct
+}
 
 /** An opened hint (FR-28): 1-based [index], opened once per task and scope. */
 data class HintRecord(
@@ -75,7 +96,10 @@ data class HintRecord(
     val openedAt: Instant,
 )
 
-/** A problem report (FR-30) with the latest attempt of the current run attached, if any. */
+/** The contract's `ReportStatus` (FR-41). */
+enum class ReportStatus { OPEN, FIXED, DISMISSED }
+
+/** A problem report (FR-30) with the latest attempt of the current run attached, if any, and its status (FR-41). */
 data class ReportRecord(
     val id: UUID,
     val taskId: UUID,
@@ -84,6 +108,7 @@ data class ReportRecord(
     val note: String?,
     val attemptId: UUID?,
     val createdAt: Instant,
+    val status: ReportStatus = ReportStatus.OPEN,
 )
 
 /** A replay run of a mission (OQ-17); its id is the run's scope. */

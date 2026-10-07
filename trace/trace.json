@@ -1093,10 +1093,51 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/progress-stats/spec.md"
+        "contract/openspec/specs/progress-stats/spec.md",
+        "openspec/changes/implement-progress-stats-api/specs/progress-stats/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ProgressStatsIT.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -1107,10 +1148,46 @@
       ],
       "ownedHere": true,
       "specs": [
-        "contract/openspec/specs/progress-stats/spec.md"
+        "contract/openspec/specs/progress-stats/spec.md",
+        "openspec/changes/implement-progress-stats-api/specs/progress-stats/spec.md"
       ],
       "planned": true,
-      "tests": [],
+      "tests": [
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeLogCaptureIT.kt",
+        "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt"
+      ],
       "recordings": []
     },
     {
@@ -1121,7 +1198,8 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/progress-stats/spec.md",
-        "openspec/specs/practice-flow/spec.md"
+        "openspec/specs/practice-flow/spec.md",
+        "openspec/changes/implement-progress-stats-api/specs/progress-stats/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -1567,12 +1645,8 @@
   "failures": [],
   "warnings": [
     {
-      "check": "test-trace",
-      "msg": "FR-40 (owned by backend) has no test annotated \"@trace FR-40\""
-    },
-    {
-      "check": "test-trace",
-      "msg": "FR-41 (owned by backend) has no test annotated \"@trace FR-41\""
+      "check": "active-changes",
+      "msg": "active change \"implement-progress-stats-api\" is not archived"
     }
   ]
 }
