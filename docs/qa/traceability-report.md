@@ -52,8 +52,8 @@ Result: PASS, 1 warning(s)
 | FR-38 | yes | yes | backend, frontend | 6 | - |
 | FR-39 | yes | yes | backend, frontend | 6 | - |
 | FR-58 | yes | yes | frontend | n/a | n/a |
-| FR-40 | yes | yes | backend, frontend | 39 | - |
-| FR-41 | yes | yes | backend, frontend | 36 | - |
+| FR-40 | yes | yes | backend, frontend | 42 | - |
+| FR-41 | yes | yes | backend, frontend | 41 | - |
 | FR-42 | yes | yes | backend | 1 | - |
 | FR-43 | yes | yes | backend | 52 | - |
 | FR-44 | yes | yes | backend | 10 | - |

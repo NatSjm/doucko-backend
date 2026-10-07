@@ -62,12 +62,10 @@ class AdminStatsController(
         ResponseEntity.ok(StatsMapping.reevaluation(queue.reevaluate(reportId)))
 
     override fun dismissReport(reportId: UUID): ResponseEntity<Report> = ResponseEntity.ok(StatsMapping.report(queue.dismiss(reportId)))
-
-    private companion object {
-        /** The contract's `weeks` pattern: ASCII 1–52, no sign, no leading zero. */
-        val WEEKS = Regex("^([1-9]|[1-4][0-9]|5[0-2])$")
-    }
 }
+
+/** The contract's `weeks` pattern: ASCII 1–52, no sign, no leading zero. */
+private val WEEKS = Regex("^([1-9]|[1-4][0-9]|5[0-2])$")
 
 /** Statistics and flag-queue views → generated contract models (NFR-12). Times are written in UTC. */
 internal object StatsMapping {

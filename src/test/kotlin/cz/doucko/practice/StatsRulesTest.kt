@@ -152,6 +152,14 @@ class StatsRulesTest {
 
     // @trace FR-40
     @Test
+    fun `attempts at the same instant belong to one session`() {
+        val at = prague("2026-10-06T16:00:00")
+        StatsRules.sessions(List(3) { attempt(at) }).map { it.answeredTasks } shouldContainExactly listOf(3)
+        StatsRules.SESSION_GAP shouldBe Duration.ofMinutes(30)
+    }
+
+    // @trace FR-40
+    @Test
     fun `replay attempts count towards sessions and answered tasks`() {
         val start = prague("2026-10-06T16:00:00")
         val attempts = run(start, 5) + List(5) { attempt(start.plus(Duration.ofMinutes(20L + it)), replay = true) }

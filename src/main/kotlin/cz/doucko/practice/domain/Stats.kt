@@ -54,6 +54,7 @@ data class FirstTryCount(
 /** The practice statistics over the attempt log and the opened hints (FR-40; design decisions 2–5). Pure. */
 object StatsRules {
     /** A gap of exactly this length keeps the session going; a longer one starts a new session (OQ-14). */
+    @JvmField
     val SESSION_GAP: Duration = Duration.ofMinutes(30)
 
     /** A session with at least this many answered tasks qualifies (product brief §5). */

@@ -96,8 +96,7 @@ class AdminStatsProblemAdvice(
         val problem = problems.problem(status, request.requestURI, request.locale, key).apply(customize)
         return ResponseEntity.status(status).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(problem)
     }
-
-    private companion object {
-        val PARAMETERS = setOf("weeks", "status")
-    }
 }
+
+/** The query parameters of the admin statistics operations, each with its own message. */
+private val PARAMETERS = setOf("weeks", "status")
