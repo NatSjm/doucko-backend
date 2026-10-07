@@ -866,7 +866,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/practice-flow/spec.md",
-        "openspec/changes/implement-gamification-api/specs/gamification/spec.md"
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -890,7 +890,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/practice-flow/spec.md",
-        "openspec/changes/implement-gamification-api/specs/gamification/spec.md"
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -907,7 +907,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/gamification/spec.md",
-        "openspec/changes/implement-gamification-api/specs/gamification/spec.md"
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -943,7 +943,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/gamification/spec.md",
-        "openspec/changes/implement-gamification-api/specs/gamification/spec.md"
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -981,7 +981,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/gamification/spec.md",
-        "openspec/changes/implement-gamification-api/specs/gamification/spec.md"
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -1017,7 +1017,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/gamification/spec.md",
-        "openspec/changes/implement-gamification-api/specs/gamification/spec.md"
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -1037,7 +1037,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/gamification/spec.md",
-        "openspec/changes/implement-gamification-api/specs/gamification/spec.md"
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -1059,7 +1059,7 @@
       "ownedHere": true,
       "specs": [
         "contract/openspec/specs/gamification/spec.md",
-        "openspec/changes/implement-gamification-api/specs/gamification/spec.md"
+        "openspec/specs/gamification/spec.md"
       ],
       "planned": true,
       "tests": [
@@ -1573,10 +1573,6 @@
     {
       "check": "test-trace",
       "msg": "FR-41 (owned by backend) has no test annotated \"@trace FR-41\""
-    },
-    {
-      "check": "active-changes",
-      "msg": "active change \"implement-gamification-api\" is not archived"
     }
   ]
 }

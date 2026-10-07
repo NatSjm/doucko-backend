@@ -1,0 +1,105 @@
+{
+  "generatedBy": "review-gate",
+  "scope": "slice 8 gamification backend (implement-gamification-api)",
+  "change": "implement-gamification-api",
+  "baseRef": "da5f9a9",
+  "headRef": "HEAD",
+  "dimensions": {
+    "correctness": {
+      "confirmed": 2,
+      "contested": 3,
+      "rejected": 3
+    },
+    "security": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    },
+    "spec-compliance": {
+      "confirmed": 0,
+      "contested": 1,
+      "rejected": 3
+    },
+    "visual": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "major",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Briefing xpAvailable offers the mission bonus for a complete mission that has no bonus row",
+      "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "line": 442,
+      "status": "fixed",
+      "fixCommit": "33f5bf2",
+      "resolution": "Gamification.available returns 0 when no task is left to resolve (design decision 8); together with the F03 reconciliation a complete, unpaid mission cannot persist. GamificationIT \"practice from before the ledger is credited once at startup\" (xpAvailable 0 for the complete mission before reconciliation)."
+    },
+    {
+      "id": "F02",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Unreadable config resource surfaces as a raw IOException rather than InvalidGamificationConfig",
+      "file": "src/main/kotlin/cz/doucko/practice/application/GamificationSettings.kt",
+      "line": 636,
+      "status": "fixed",
+      "fixCommit": "33f5bf2",
+      "resolution": "GamificationSettings refuses a resource that does not exist or is not readable and maps an IOException on read to InvalidGamificationConfig(\"doucko.gamification.config\"). GamificationConfigTest \"an invalid file stops the start and names the key\" (directory case)."
+    },
+    {
+      "id": "F03",
+      "severity": "major",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "No ledger backfill for primary-scope resolutions and completed missions from before V5",
+      "file": "src/main/resources/db/migration/V5__gamification.sql",
+      "line": 27,
+      "status": "fixed",
+      "fixCommit": "33f5bf2",
+      "resolution": "Fixed rather than argued: slice 7 is on main, so a database may hold practice from before V5. Gamification.reconcile runs on ApplicationReadyEvent under the practice lock, append-only and idempotent: a TASK award for each primary-scope resolution without one (resolving attempt hints, linked to it) and the bonus of each complete, unpaid served mission; a crossed rank becomes pendingRankUp. Design decision 10. GamificationIT \"practice from before the ledger is credited once at startup\", GamificationServiceTest \"the reconciliation skips unresolved and already credited tasks\"."
+    },
+    {
+      "id": "F04",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "Every read and write reloads and sums the entire XP ledger several times per request",
+      "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "line": 462,
+      "status": "fixed",
+      "fixCommit": "33f5bf2",
+      "resolution": "XpLedger gained awardsOf(attemptId) (uses xp_award_attempt_idx), total() (SQL sum), taskAwarded(taskId) and bonusesPaid(missionIds); only the summary loads the whole ledger. Covered by GamificationIT and GamificationServiceTest."
+    },
+    {
+      "id": "F05",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "xpAvailable assumes firstAttempt is the maximum award, which is wrong when minimum > firstAttempt",
+      "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "line": 442,
+      "status": "fixed",
+      "fixCommit": "33f5bf2",
+      "resolution": "XpRules.bestAward = the highest of the three awards after the minimum, without hints; available() uses it. GamificationRulesTest \"the available XP per task is the best award a task can still earn\"."
+    },
+    {
+      "id": "F06",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "contested",
+      "title": "Undocumented rule: rank names are limited to 50 characters and duplicate JSON keys are refused",
+      "file": "src/main/kotlin/cz/doucko/practice/application/GamificationConfigParser.kt",
+      "line": 70,
+      "status": "fixed",
+      "fixCommit": "33f5bf2",
+      "resolution": "Documented instead of dropped: the delta spec and design decision 2 state rank names 1 to 50 code points (HQ badge) and that duplicate keys are refused; GamificationConfigTest covers 50 accepted / 51 refused and the duplicate key. The store spec is unchanged (the limit is an implementation bound of this repo)."
+    }
+  ],
+  "clean": true,
+  "generatedAt": "2026-10-07T10:21:10Z"
+}
