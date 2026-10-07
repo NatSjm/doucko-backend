@@ -65,8 +65,9 @@ configuration file when it starts and SHALL refuse to start, with an error
 naming the offending key, when a key is missing or unknown, when a value is
 not a JSON integer in its range (task awards, hint cost and mission bonus
 0..1000, minimum 1..1000, thresholds 0..1 000 000), when the ladder is empty,
-does not start at 0 or is not strictly increasing, or when a rank name is
-missing or blank (FR-34, FR-35, FR-36, FR-39, OQ-29).
+does not start at 0 or is not strictly increasing, when a rank name is
+missing, blank or longer than 50 characters, or when a key appears twice
+(FR-34, FR-35, FR-36, FR-39, OQ-29).
 
 #### Scenario: Invalid values name their key
 
@@ -79,6 +80,12 @@ missing or blank (FR-34, FR-35, FR-36, FR-39, OQ-29).
 - **GIVEN** a ladder with thresholds 0, 400, 150, or 0, 150, 150, or a 2nd threshold of `150.5`, `"150"`, `-150`, `1000001`, null or absent
 - **WHEN** the backend starts
 - **THEN** it refuses to start and the error names `ranks[1]`
+
+#### Scenario: Rank name limit and duplicate keys
+
+- **GIVEN** the default file with the 2nd rank named by 50 characters, then by 51 characters, then with `hintCost` written twice
+- **WHEN** the backend starts
+- **THEN** it starts with the 50-character name, and refuses the 51-character name naming `ranks[1]` and the duplicate key
 
 #### Scenario: Another file changes values and names, not behaviour
 
@@ -129,6 +136,12 @@ tasks (FR-32, FR-33, FR-37).
 - **GIVEN** a 10-task mission resolved with 7 correct on attempt 1, 2 on attempt 2 and 1 revealed, no hints
 - **WHEN** the summary is read, the mission is replayed with every task correct, and the summary is read again
 - **THEN** the first summary has `xpEarned` 101, `firstTryCount` 7 and `replay` false; the second has `xpEarned` 0, `firstTryCount` 10 and `replay` true, and the total is unchanged by the replay
+
+#### Scenario: Practice stored before the ledger existed
+
+- **GIVEN** tasks resolved and a mission completed in the primary scope with no ledger rows
+- **WHEN** the backend starts
+- **THEN** each resolved task gets its award from its resolving attempt and the complete mission its bonus, once; a second start adds nothing
 
 #### Scenario: Available XP
 

@@ -7,6 +7,7 @@ import cz.doucko.practice.application.PracticeService
 import cz.doucko.practice.application.PracticeStore
 import cz.doucko.practice.application.XpLedger
 import cz.doucko.practice.domain.AttemptRecord
+import cz.doucko.practice.domain.AwardKind
 import cz.doucko.practice.domain.HintRecord
 import cz.doucko.practice.domain.ReportRecord
 import cz.doucko.practice.domain.RunRecord
@@ -33,6 +34,8 @@ class InMemoryPracticeStore : PracticeStore {
         scope: UUID,
         taskIds: Collection<UUID>,
     ) = attempts.filter { it.scope == scope && it.taskId in taskIds }
+
+    override fun attemptsIn(scope: UUID) = attempts.filter { it.scope == scope }
 
     override fun hints(
         scope: UUID,
@@ -76,6 +79,15 @@ class InMemoryXpLedger : XpLedger {
     val celebrations = CopyOnWriteArrayList<Int>()
 
     override fun awards() = awards.toList()
+
+    override fun awardsOf(attemptId: UUID) = awards.filter { it.attemptId == attemptId }
+
+    override fun total() = awards.sumOf { it.amount }
+
+    override fun taskAwarded(taskId: UUID) = awards.any { it.kind == AwardKind.TASK && it.taskId == taskId }
+
+    override fun bonusesPaid(missionIds: Collection<UUID>) =
+        awards.filter { it.kind == AwardKind.MISSION_BONUS && it.missionId in missionIds }.map { it.missionId }.toSet()
 
     override fun insert(award: XpAward) {
         awards += award.copy(seq = awards.size + 1L)

@@ -52,6 +52,9 @@ class GamificationIT {
     @Autowired
     lateinit var jdbc: JdbcTemplate
 
+    @Autowired
+    lateinit var gamification: cz.doucko.practice.application.Gamification
+
     lateinit var admin: Admin
     lateinit var sourceId: String
     private var position = 0
@@ -686,6 +689,35 @@ class GamificationIT {
         briefing(m).read<Int>("$.xpAvailable") shouldBe 0
         replay(m)
         briefing(m).read<Int>("$.xpAvailable") shouldBe 0
+    }
+
+    // @trace FR-34, FR-35, FR-36
+    @Test
+    fun `practice from before the ledger is credited once at startup`() {
+        // Review F03 / F01: slice-7 data has resolutions and a complete mission but no ledger rows.
+        val (t1, t2) = tasks(2)
+        val done = mission(listOf(t1, t2))
+        val (h, open) = List(2) { task(hints(2)) }
+        val partial = mission(listOf(h, open))
+        solve(done, t1)
+        reveal(done, t2)
+        openHints(partial, h, 1)
+        wrong(partial, h)
+        solve(partial, h)
+        jdbc.execute("TRUNCATE xp_award, rank_celebration")
+        total() shouldBe 0
+        briefing(done).read<Int>("$.xpAvailable") shouldBe 0
+        gamification.reconcile() shouldBe 4
+        hq().let {
+            it.read<Int>("$.totalXp") shouldBe 10 + 1 + 20 + 3
+            it.read<Any?>("$.pendingRankUp").shouldBeNull()
+        }
+        bonusRows(done) shouldBe 1
+        bonusRows(partial) shouldBe 0
+        briefing(partial).read<Int>("$.xpAvailable") shouldBe 30
+        gamification.reconcile() shouldBe 0
+        total() shouldBe 34
+        summary(done).read<Int>("$.xpEarned") shouldBe 11
     }
 
     // ---------------------------------------------------------------- no negative mechanics (FR-38)

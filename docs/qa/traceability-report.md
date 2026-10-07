@@ -43,14 +43,14 @@ Result: PASS, 3 warning(s)
 | FR-29 | yes | yes | backend, frontend | 2 | - |
 | FR-30 | yes | yes | backend, frontend | 4 | - |
 | FR-31 | yes | yes | backend, frontend | 3 | - |
-| FR-32 | yes | yes | backend, frontend | 7 | - |
+| FR-32 | yes | yes | backend, frontend | 8 | - |
 | FR-33 | yes | yes | backend, frontend | 2 | - |
-| FR-34 | yes | yes | backend | 17 | - |
-| FR-35 | yes | yes | backend | 18 | - |
-| FR-36 | yes | yes | backend, frontend | 17 | - |
+| FR-34 | yes | yes | backend | 21 | - |
+| FR-35 | yes | yes | backend | 22 | - |
+| FR-36 | yes | yes | backend, frontend | 20 | - |
 | FR-37 | yes | yes | backend, frontend | 4 | - |
 | FR-38 | yes | yes | backend, frontend | 6 | - |
-| FR-39 | yes | yes | backend, frontend | 5 | - |
+| FR-39 | yes | yes | backend, frontend | 6 | - |
 | FR-58 | yes | yes | frontend | n/a | n/a |
 | FR-40 | yes | yes | backend, frontend | - | - |
 | FR-41 | yes | yes | backend, frontend | - | - |

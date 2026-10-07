@@ -23,6 +23,9 @@ interface PracticeStore {
         taskIds: Collection<UUID>,
     ): List<AttemptRecord>
 
+    /** Every attempt in [scope], all tasks (the startup reconciliation of the XP ledger). */
+    fun attemptsIn(scope: UUID): List<AttemptRecord>
+
     /** The opened hints of [taskIds] in [scope]. */
     fun hints(
         scope: UUID,
@@ -92,6 +95,18 @@ fun interface TutorPort {
 interface XpLedger {
     /** Every award, in ledger order. */
     fun awards(): List<cz.doucko.practice.domain.XpAward>
+
+    /** The awards caused by one attempt, in ledger order. */
+    fun awardsOf(attemptId: UUID): List<cz.doucko.practice.domain.XpAward>
+
+    /** The ledger total. */
+    fun total(): Int
+
+    /** True when [taskId] already has its task award. */
+    fun taskAwarded(taskId: UUID): Boolean
+
+    /** The missions among [missionIds] whose completion bonus is already paid. */
+    fun bonusesPaid(missionIds: Collection<UUID>): Set<UUID>
 
     fun insert(award: cz.doucko.practice.domain.XpAward)
 

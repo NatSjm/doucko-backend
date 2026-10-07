@@ -69,6 +69,16 @@ class GamificationRulesTest {
         XpRules.taskAward(defaults.copy(revealed = 7), TaskState.REVEALED, 3) shouldBe 7
     }
 
+    // @trace FR-35
+    @Test
+    fun `the available XP per task is the best award a task can still earn`() {
+        XpRules.bestAward(defaults) shouldBe 10
+        // Review F05: a minimum above the 1st-attempt award, or a higher 2nd-try or reveal award, is what a task earns.
+        XpRules.bestAward(defaults.copy(firstAttempt = 0, minimum = 5)) shouldBe 5
+        XpRules.bestAward(defaults.copy(firstAttempt = 3, secondAttempt = 8)) shouldBe 8
+        XpRules.bestAward(defaults.copy(firstAttempt = 2, revealed = 9)) shouldBe 9
+    }
+
     // ---------------------------------------------------------------- rank ladder (FR-36, FR-37)
 
     // @trace FR-36

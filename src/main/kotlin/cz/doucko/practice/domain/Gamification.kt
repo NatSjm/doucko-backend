@@ -40,6 +40,10 @@ object XpRules {
             TaskState.CORRECT_SECOND_TRY -> maxOf(config.minimum, config.secondAttempt - hints * config.hintCost)
             TaskState.REVEALED -> maxOf(config.minimum, config.revealed)
         }
+
+    /** The highest award a task can still earn without hints (contract `MissionBriefing.xpAvailable`). */
+    fun bestAward(config: XpConfig): Int =
+        listOf(TaskState.CORRECT_FIRST_TRY, TaskState.CORRECT_SECOND_TRY, TaskState.REVEALED).maxOf { taskAward(config, it, 0) }
 }
 
 /** A rank of the ladder (contract `Rank`): 0-based [index], name and threshold. */

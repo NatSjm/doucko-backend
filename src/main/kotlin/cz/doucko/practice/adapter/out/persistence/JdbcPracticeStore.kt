@@ -54,6 +54,17 @@ class JdbcPracticeStore(
             .list()
     }
 
+    override fun attemptsIn(scope: UUID): List<AttemptRecord> =
+        jdbc
+            .sql(
+                """
+                SELECT id, task_id, mission_id, scope, replay, attempt_no, hints_used, correct, parts::text AS parts, created_at
+                FROM attempt WHERE scope = :scope ORDER BY created_at, attempt_no
+                """.trimIndent(),
+            ).param("scope", scope)
+            .query { rs, _ -> attempt(rs) }
+            .list()
+
     override fun hints(
         scope: UUID,
         taskIds: Collection<UUID>,

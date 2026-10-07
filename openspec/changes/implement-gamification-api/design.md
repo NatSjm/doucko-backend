@@ -44,7 +44,8 @@ smoke (run by the coordinator after the merge).
    `xp.missionBonus` (each 0..1000), `xp.minimum` (1..1000), `ranks` (non-empty
    array of `{name, minXp}`; `name` 1..50 code points after trimming; `minXp`
    0..1 000 000, first 0, strictly increasing). Every key is required, unknown
-   keys are refused (a typo never silently falls back). The file is read and
+   keys and duplicate keys are refused (a typo never silently falls back); a
+   rank name longer than 50 code points is refused (it must fit the HQ badge). The file is read and
    validated when the context starts; an invalid file stops the start with an
    `IllegalStateException` whose message names the key (`xp.missionBonus`,
    `ranks[1] (rank 2).minXp`) and the rule, never the file content. Trade-off:
@@ -109,12 +110,22 @@ smoke (run by the coordinator after the merge).
    completing attempt's awards, if the run crossed one earlier.
    `firstTryCount` unchanged from slice 7.
 8. **Briefing `xpAvailable`** = (served tasks of the mission not resolved in
-   the primary scope) × `xp.firstAttempt` + `xp.missionBonus` when the mission
-   has no bonus row yet. 0 for a complete mission and during a replay.
+   the primary scope) × the best award a task can earn without hints (the
+   1st-attempt award with the default values; the highest of the three awards
+   after the minimum, review F05) + `xp.missionBonus` when the mission has no
+   bonus row yet. 0 when no task is left to resolve: a complete mission and
+   every replay (review F01).
 9. **`TaskView.lastFeedback` keeps its XP.** `xpAwarded`, `bonusXp` and
    `completedMissionIds` of the latest attempt are re-read from the ledger rows
    of that attempt, so a reload shows what the POST showed; `rankUp` is null.
-10. **HQ write methods.** `PUT`/`POST`/`PATCH /api/child/hq` stay 405 (slice 7's
+10. **Startup reconciliation (review F03).** When the application is ready,
+    `Gamification.reconcile` (under the practice lock, append-only, idempotent)
+    inserts a task award for every task resolved in the primary scope without
+    one (practice stored by slice 7 before V5 existed; the award uses the
+    resolving attempt's hints and links to it) and the bonus of every served
+    mission that is complete and unpaid (no attempt link). Like any credit
+    outside a session, a rank it crosses becomes `pendingRankUp`.
+11. **HQ write methods.** `PUT`/`POST`/`PATCH /api/child/hq` stay 405 (slice 7's
     undeclared-method rule); attempt bodies bind only `answers` (slice 7). Both
     re-tested with XP present.
 
@@ -123,8 +134,10 @@ smoke (run by the coordinator after the merge).
 - `practice/domain`: `XpConfig`, `XpRules`, `RankLadder`, `Rank` (moved from the
   placeholder), `XpAward`, `AwardKind`, `RunXp` (summary arithmetic).
   `PlaceholderLadder` is removed.
-- `practice/application`: port `XpLedger`; `Gamification` (award on
-  resolution, publish-time bonus, HQ progress, ack, summary, available XP);
+- `practice/application`: port `XpLedger` (all awards, awards of one attempt,
+  total, task awarded, bonuses paid, celebrations); `Gamification` (award on
+  resolution, publish-time bonus, startup reconciliation, HQ progress, ack,
+  summary, available XP); `PracticeStore.attemptsIn(scope)`;
   `GamificationSettings` (loads and validates the file; the parser is
   `GamificationConfigParser`, Jackson tree, no Spring); `Gamification` also listens to `PublishedMissionChanged`.
   `PracticeService` calls `Gamification`.
@@ -160,6 +173,7 @@ the transaction rolls back (no partial award).
 
 - An `AttemptResult.rankUp` whose response is lost is never replayed (the
   contract makes the POST its only carrier). Accepted by the contract.
-- Ledger growth: one row per task and per mission; totals are summed in memory
-  per request (one child, hundreds of rows).
+- Ledger growth: one row per task and per mission. Totals, task and bonus
+  checks and an attempt's rows are SQL queries (review F04); only the summary
+  loads the whole ledger (one child, hundreds of rows).
 - The trigger also blocks test cleanup by `DELETE`; tests use `TRUNCATE`.

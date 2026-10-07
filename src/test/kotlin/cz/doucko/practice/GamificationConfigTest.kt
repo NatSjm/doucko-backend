@@ -164,6 +164,11 @@ class GamificationConfigTest {
         refused(shipped().replace("\"name\": \"Kadet\", ", "")).message.shouldNotBeNull() shouldContain "ranks[1] (rank 2).name"
         refused(shipped().replace("\"Kadet\"", "\"   \"")).message.shouldNotBeNull() shouldContain "ranks[1] (rank 2).name"
         refused(shipped().replace("\"Kadet\"", "\"${"x".repeat(51)}\"")).message.shouldNotBeNull() shouldContain "ranks[1] (rank 2).name"
+        // Review F06: the documented limit is 1 to 50 characters, counted in code points.
+        GamificationConfigParser
+            .parse(shipped().replace("\"Kadet\"", "\"${"ž".repeat(50)}\""))
+            .ladder.ranks[1]
+            .name shouldBe "ž".repeat(50)
         refused(shipped().replace(Regex(",\\s*\"xp\": \\{[^}]*}|\"xp\": \\{[^}]*},"), "")).message.shouldNotBeNull() shouldContain "xp"
     }
 
@@ -187,6 +192,10 @@ class GamificationConfigTest {
             context.startupFailure.shouldNotBeNull().allText() shouldContain "xp.missionBonus"
         }
         start(dir.resolve("absent.json").toUri().toString()).run { context ->
+            context.startupFailure.shouldNotBeNull().allText() shouldContain "doucko.gamification.config"
+        }
+        // Review F02: a path that exists but cannot be read (a directory) names the key too.
+        start(dir.toUri().toString()).run { context ->
             context.startupFailure.shouldNotBeNull().allText() shouldContain "doucko.gamification.config"
         }
     }

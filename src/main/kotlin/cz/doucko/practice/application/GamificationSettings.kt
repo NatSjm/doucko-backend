@@ -20,8 +20,14 @@ class GamificationSettings {
         resources: ResourceLoader,
     ): GamificationConfig {
         val resource = resources.getResource(location)
-        if (!resource.exists()) throw InvalidGamificationConfig("doucko.gamification.config", "names no readable file")
-        val text = resource.inputStream.use { String(it.readAllBytes(), Charsets.UTF_8) }
+        val unreadable = InvalidGamificationConfig("doucko.gamification.config", "names no readable file")
+        if (!resource.exists() || !resource.isReadable) throw unreadable
+        val text =
+            try {
+                resource.inputStream.use { String(it.readAllBytes(), Charsets.UTF_8) }
+            } catch (_: java.io.IOException) {
+                throw unreadable
+            }
         return GamificationConfigParser.parse(text)
     }
 }

@@ -876,7 +876,8 @@
         "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
-        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt"
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt"
       ],
       "recordings": []
     },
@@ -924,9 +925,13 @@
         "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
-        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt"
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt"
       ],
       "recordings": []
     },
@@ -959,7 +964,11 @@
         "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
-        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt"
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt"
       ],
       "recordings": []
     },
@@ -986,13 +995,16 @@
         "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationIT.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
-        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt"
+        "src/test/kotlin/cz/doucko/practice/GamificationRulesTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt"
       ],
       "recordings": []
     },
@@ -1055,7 +1067,8 @@
         "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
         "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
-        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt"
+        "src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt",
+        "src/test/kotlin/cz/doucko/practice/GamificationServiceTest.kt"
       ],
       "recordings": []
     },

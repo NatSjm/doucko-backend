@@ -14,6 +14,7 @@ import cz.doucko.practice.domain.TaskProgress
 import cz.doucko.practice.domain.TaskState
 import cz.doucko.practice.domain.XpAward
 import cz.doucko.practice.domain.XpRules
+import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -65,18 +66,13 @@ class Gamification(
         attempt: AttemptRecord,
         state: TaskState,
     ): XpOutcome {
-        if (attempt.scope != Scope.PRIMARY || !state.resolved) return XpOutcome.NONE
-        val awards = ledger.awards()
-        if (awards.any { it.kind == AwardKind.TASK && it.taskId == attempt.taskId }) return XpOutcome.NONE
-        val before = awards.sumOf { it.amount }
+        if (attempt.scope != Scope.PRIMARY || !state.resolved || ledger.taskAwarded(attempt.taskId)) return XpOutcome.NONE
+        val before = ledger.total()
         val amount = XpRules.taskAward(config.xp, state, attempt.hintsUsed)
         ledger.insert(award(AwardKind.TASK, attempt.taskId, attempt.missionId, attempt.id, amount, attempt.createdAt))
-        val paid = awards.filter { it.kind == AwardKind.MISSION_BONUS }.map { it.missionId }.toSet()
-        val completed =
-            served
-                .missionsContaining(attempt.taskId)
-                .filter { attempt.taskId in it.taskIds && it.missionId !in paid && complete(it) }
-                .map { it.missionId }
+        val containing = served.missionsContaining(attempt.taskId).filter { attempt.taskId in it.taskIds }
+        val paid = ledger.bonusesPaid(containing.map { it.missionId })
+        val completed = containing.filter { it.missionId !in paid && complete(it) }.map { it.missionId }
         completed.forEach { ledger.insert(award(AwardKind.MISSION_BONUS, null, it, attempt.id, config.xp.missionBonus, attempt.createdAt)) }
         val bonus = completed.size * config.xp.missionBonus
         return XpOutcome(amount, bonus, completed, ladder.crossing(before, before + amount + bonus))
@@ -97,14 +93,50 @@ class Gamification(
     fun onPublishedMissionChanged(event: PublishedMissionChanged) {
         store.lock()
         val mission = served.mission(event.missionId) ?: return
-        val paid = ledger.awards().any { it.kind == AwardKind.MISSION_BONUS && it.missionId == mission.missionId }
+        val paid = mission.missionId in ledger.bonusesPaid(listOf(mission.missionId))
         if (!paid && complete(mission)) {
             ledger.insert(award(AwardKind.MISSION_BONUS, null, mission.missionId, null, config.xp.missionBonus, Instant.now()))
         }
     }
 
+    /**
+     * Startup reconciliation (review F03): credits, append-only and idempotently, what the ledger misses: a
+     * task award for every task resolved in the primary scope without one (practice from before V5, with the
+     * hints of its resolving attempt), and the bonus of every served mission that is complete and unpaid. XP
+     * credited here is outside a child session, so a rank it crosses is offered by `HqView.pendingRankUp`.
+     * Returns the number of rows inserted.
+     */
+    @EventListener(ApplicationReadyEvent::class)
+    @Transactional
+    fun reconcile(): Int {
+        store.lock()
+        var inserted = 0
+        store
+            .attemptsIn(Scope.PRIMARY)
+            .groupBy { it.taskId }
+            .values
+            .mapNotNull { list ->
+                val progress = TaskProgress(list)
+                progress.latest?.takeIf { progress.state.resolved }?.let { it to progress.state }
+            }.sortedBy { (resolving, _) -> resolving.createdAt }
+            .forEach { (resolving, state) ->
+                if (!ledger.taskAwarded(resolving.taskId)) {
+                    val amount = XpRules.taskAward(config.xp, state, resolving.hintsUsed)
+                    ledger.insert(award(AwardKind.TASK, resolving.taskId, resolving.missionId, resolving.id, amount, resolving.createdAt))
+                    inserted++
+                }
+            }
+        val missions = served.missions()
+        val paid = ledger.bonusesPaid(missions.map { it.missionId })
+        missions.filter { it.missionId !in paid && complete(it) }.forEach {
+            ledger.insert(award(AwardKind.MISSION_BONUS, null, it.missionId, null, config.xp.missionBonus, Instant.now()))
+            inserted++
+        }
+        return inserted
+    }
+
     fun progress(): XpProgress {
-        val total = ledger.awards().sumOf { it.amount }
+        val total = ledger.total()
         val rank = ladder.rankFor(total)
         return XpProgress(total, rank, ladder.nextAfter(rank), rank.takeIf { it.index > ledger.celebrated() })
     }
@@ -113,17 +145,22 @@ class Gamification(
     @Transactional
     fun acknowledge(rankIndex: Int) {
         store.lock()
-        val current = ladder.rankFor(ledger.awards().sumOf { it.amount })
+        val current = ladder.rankFor(ledger.total())
         val index = minOf(rankIndex, current.index)
         if (index > ledger.celebrated()) ledger.celebrate(index, Instant.now())
     }
 
-    /** XP still earnable in [mission] (contract `MissionBriefing.xpAvailable`, design decision 8). */
+    /**
+     * XP still earnable in [mission] (contract `MissionBriefing.xpAvailable`, design decision 8): each unresolved
+     * task at the best award without hints, plus the bonus when unpaid; 0 once nothing is left to resolve.
+     */
     fun available(mission: ServedMission): Int {
         val states = primaryStates(mission.taskIds)
         val open = mission.taskIds.count { states[it]?.resolved != true }
-        val paid = ledger.awards().any { it.kind == AwardKind.MISSION_BONUS && it.missionId == mission.missionId }
-        return open * config.xp.firstAttempt + if (paid) 0 else config.xp.missionBonus
+        if (open == 0) return 0
+        val best = XpRules.bestAward(config.xp)
+        val paid = mission.missionId in ledger.bonusesPaid(listOf(mission.missionId))
+        return open * best + if (paid) 0 else config.xp.missionBonus
     }
 
     /** The XP and ranks of a completed run of [mission] in [scope] (design decision 7). */
@@ -143,7 +180,7 @@ class Gamification(
 
     /** The stored XP of one attempt, for `TaskView.lastFeedback` (design decision 9); never a rank-up. */
     fun ofAttempt(attemptId: UUID): XpOutcome {
-        val rows = ledger.awards().filter { it.attemptId == attemptId }
+        val rows = ledger.awardsOf(attemptId)
         val bonuses = rows.filter { it.kind == AwardKind.MISSION_BONUS }
         return XpOutcome(
             rows
