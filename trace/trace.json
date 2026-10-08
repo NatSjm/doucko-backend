@@ -1666,10 +1666,5 @@
     }
   ],
   "failures": [],
-  "warnings": [
-    {
-      "check": "active-changes",
-      "msg": "active change \"harden-phase5-api\" is not archived"
-    }
-  ]
+  "warnings": []
 }

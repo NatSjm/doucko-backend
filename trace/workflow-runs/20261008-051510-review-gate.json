@@ -1,0 +1,1387 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-08T05:15:10.893Z",
+  "finishedAt": "2026-10-08T05:21:03.163Z",
+  "args": {
+    "scope": "Phase 5 hardening backend (harden-phase5-api): isolated e2e stack tooling and coverage tests",
+    "baseRef": "f822521",
+    "headRef": "HEAD",
+    "change": "harden-phase5-api",
+    "focus": "Check against openspec/changes/harden-phase5-api (spec delta specs/platform-foundation/spec.md and design.md). Pay attention to: any way tools/e2e-stack.mjs or compose.e2e.yaml could address the owner's Compose project 'doucko' or its volumes (doucko_doucko-pgdata, doucko_doucko-storage) — project name from env, COMPOSE_* variables, relative -f paths, down -v scope; values from .env or the process environment leaking into the e2e stack; ports published on anything but 127.0.0.1 or services other than the frontend (NFR-2); the seed not being idempotent (duplicates on re-run, races, matching by excerpt), sending workbook content or PII (NFR-3, NFR-4); the generated PDF being invalid; secrets or real values committed in tools/e2e-stack.env; the new tests asserting real behaviour rather than padding coverage; Windows path handling."
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": null,
+    "budgetPerAgentUsd": 2,
+    "maxTotalUsd": 10,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "failed",
+  "stoppedBecause": "--max-total-usd 10 reached ($10.11)",
+  "error": null,
+  "totalCostUsd": 10.9664,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 1315,
+      "durationMs": 119318,
+      "sessionId": "5edc9143-68db-467a-b2c8-03e367ad507e",
+      "costUsd": 0.8346296000000001,
+      "numTurns": 26,
+      "result": {
+        "findings": [
+          {
+            "title": "Seed adopts any mission at topic+position 1 without checking or fixing its taskIds, so re-runs can fail or report tasks the mission doesn't contain",
+            "file": "tools/lib/e2e-seed.mjs",
+            "line": 161,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "`mission = missions.find((m) => m.topicId === SEED_MISSION.topicId && m.position === SEED_MISSION.position)` matches on position only. If the mission at that position has other tasks (an e2e test edited it, or something created position 1 first) or has no tasks (a DRAFT with 0 tasks; publishing needs at least 1, CA-D7), the seed still returns the freshly collected `taskIds` as if they were in the mission, or the publish PUT fails with 400. The spec scenario says a re-run leaves \"the same three published tasks and one published mission\", but nothing checks that the mission actually holds those tasks.",
+            "suggestion": "After finding the mission, compare `mission.taskIds` with the seed `taskIds`. If they differ, PUT /api/admin/missions/{id} with the seed list (or fail loudly) before publishing, and return `mission.taskIds`."
+          },
+          {
+            "title": "Design names a scratch/qa-lock mutex for up..down that does not exist",
+            "file": "openspec/changes/harden-phase5-api/design.md",
+            "line": 31,
+            "severity": "major",
+            "confidence": "high",
+            "evidence": "Risks & mitigations says \"Two agents starting the stack at once → the shared `scratch/qa-lock` mkdir lock covers `up`..`down`.\" No file in the repo except design.md mentions `qa-lock`, and tools/e2e-stack.mjs runs `up`/`down -v` with no lock. With a fixed project name, one agent's `down -v` deletes the volumes of another agent's running suite. tasks.md marks everything [x], so the mitigation is claimed but missing.",
+            "suggestion": "Add a lock (mkdir of scratch/qa-lock, held from up through down) to tools/e2e-stack.mjs, or remove the claim from design.md and record the risk as accepted."
+          },
+          {
+            "title": "Pre-up NFR-2 check accepts RFC 1918 addresses, but the spec requires the e2e frontend on 127.0.0.1 only",
+            "file": "tools/e2e-stack.mjs",
+            "line": 50,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "`portProblems()` reuses `bindAddressProblem(port.host_ip || \"0.0.0.0\")`, which also accepts 10/8, 172.16/12 and 192.168/16 (the owner-stack rule). The spec delta says the stack publishes \"only the frontend on `127.0.0.1:18082`\". If the override drifts (for example, Compose ignores or mishandles `!override` and the base `${DOUCKO_BIND_ADDRESS}:8081` survives), a LAN or second port would pass the check. The check also never verifies the port is 18082.",
+            "suggestion": "For the e2e tool, require exactly one published port: service `frontend`, `host_ip === \"127.0.0.1\"`, `published == 18082`. Refuse anything else."
+          },
+          {
+            "title": "Seed tooling (blankPdf, idempotent matching, AdminClient) has no automated test",
+            "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+            "line": 19,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "design.md says the pure parts in `tools/lib/e2e-stack.mjs` and `tools/lib/e2e-seed.mjs` are tested by E2eStackToolTest, but the test only runs `--dry-run` argv, the guard, a text regex over compose.e2e.yaml and the env file. Nothing checks that `blankPdf(2)` gives a parseable 2-page PDF (correct xref offsets; PDFBox page count) or that `seed` is idempotent against a fake client. The idempotency scenario in the spec delta has no executable mechanism apart from the manual proof in task 1.5.",
+            "suggestion": "Add a test that loads blankPdf(n) with PDFBox (already used by the backend for page counts) and asserts n pages. Add a node-level test that runs `seed` twice against an in-memory fake AdminClient and asserts no second create and identical results."
+          },
+          {
+            "title": "composeEnv stripping is untested; the dry-run test only proves the -p argument",
+            "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+            "line": 47,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The test sets `COMPOSE_PROJECT_NAME=doucko` and checks the printed argv, but `-p` wins over that variable anyway. The real leak risk is the process environment overriding `--env-file` values: the owner's ADMIN_PASSWORD, DOUCKO_DB_PASSWORD, or the real DOUCKO_CHILD_DISPLAY_NAME (NFR-3) ending up in the e2e DB. That is handled only by `composeEnv`, which no test exercises. The dry-run output never includes the environment.",
+            "suggestion": "Make `--dry-run` also print the sorted keys of the stripped env, or unit-test `composeEnv` through `node -e`. Assert that DOUCKO_CHILD_DISPLAY_NAME, ADMIN_PASSWORD, DOUCKO_DB_PASSWORD, DOUCKO_BIND_ADDRESS and COMPOSE_* are absent."
+          },
+          {
+            "title": "Env stripping is case-sensitive on a copied object; Windows env names are case-insensitive",
+            "file": "tools/lib/e2e-stack.mjs",
+            "line": 49,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`const out = { ...env }` turns Windows' case-insensitive `process.env` into a plain case-sensitive object, and `delete out[\"DOUCKO_CHILD_DISPLAY_NAME\"]` misses a key stored as, for example, `Doucko_Child_Display_Name`. Compose (Go) on Windows looks up environment variables case-insensitively, so such a variable would still override the committed e2e value.",
+            "suggestion": "Delete keys by case-insensitive comparison: `for (const k of Object.keys(out)) if (STRIP.includes(k.toUpperCase())) delete out[k]`."
+          },
+          {
+            "title": "Task matching scans every seed task without stopping and ignores duplicates",
+            "file": "tools/lib/e2e-seed.mjs",
+            "line": 129,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "For each of the 3 definitions, the loop fetches every task whose `promptExcerpt.startsWith(\"E2E Seed\")` and keeps the last match: `if (full.prompt === def.prompt) task = full;`. There is no `break`, so it makes N GETs per definition. If an earlier interrupted or concurrent run created duplicates, the seed quietly picks one and the spec's 'exactly one' state is never restored or reported.",
+            "suggestion": "Fetch the seed-prefixed tasks once into a map from prompt to tasks. If a prompt has more than one task, fail loudly (or warn) instead of choosing one."
+          },
+          {
+            "title": "New TaskRules test repeats an existing page-range assertion",
+            "file": "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+            "line": 163,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "`errors(draft(page = In.Ok(121))) shouldContainExactly listOf(\"sourceRef.page\" to \"page-range\")` repeats the case at line 117 (`In.Ok(121)` in `page must lie within the source's page count`). The other three assertions in the new test cover real new branches (not-uuid, required + page-whole, source-unknown + page-whole); this line adds nothing.",
+            "suggestion": "Drop the last assertion, or replace it with a branch that is not covered yet."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 1343,
+      "durationMs": 82334,
+      "sessionId": "df8fbef8-c195-4dbf-a5e8-2750f9d228ce",
+      "costUsd": 0.5290506,
+      "numTurns": 7,
+      "result": {
+        "findings": [
+          {
+            "title": "Design promises a qa-lock around up..seed..down that is not implemented; concurrent seeds create duplicates",
+            "file": "tools/e2e-stack.mjs",
+            "line": 72,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "design.md:31 says \"Two agents starting the stack at once → the shared scratch/qa-lock mkdir lock covers up..down\", but grep finds no 'qa-lock' anywhere in tools/ or scripts/. The seed works by checking first and creating second (GET /api/admin/sources → find by title → POST). If two agents (or a Playwright globalSetup plus a manual run) seed at the same moment, both see the source as missing and both POST it, which gives two 'E2E Seed Source' rows and duplicate tasks. That breaks the spec scenario 'exactly one seed source'. Two parallel `down -v` / `up` calls can also wipe the stack while the other agent's suite is still running. Impact stays inside doucko-e2e. No owner data is at risk.",
+            "suggestion": "Take the mkdir lock (or an equivalent lock) in tools/e2e-stack.mjs for up/seed/down, as design.md describes, or remove the claim from design.md and state that runs must be serialised. Optionally make the seed fail loudly when it finds more than one match, so it never silently picks one."
+          },
+          {
+            "title": "Seed treats any mission at topic+position 1 as the seed mission and never checks its task list",
+            "file": "tools/lib/e2e-seed.mjs",
+            "line": 161,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`missions.find(m => m.topicId === SEED_MISSION.topicId && m.position === SEED_MISSION.position)` accepts any mission in that slot. If an e2e test, or an earlier partial seed, created a mission at Přirozená čísla/1 with other or no tasks, the seed logs 'exists' and publishes it. It then returns `taskIds` (the seed tasks) next to a `missionId` that does not contain them. Suites that rely on the returned plan would run against the wrong tasks. The same lenient matching applies to tasks: a match in any status (e.g. ARCHIVED) goes straight to PUT PUBLISHED, which may be refused and abort the seed.",
+            "suggestion": "Compare the found mission's task ids with the seed tasks. Refuse with a clear message if they differ, or update the mission. Handle non-DRAFT/non-PUBLISHED task states explicitly."
+          },
+          {
+            "title": "Env-stripping guard (composeEnv) is not covered by any test; the 'environment names doucko' test only checks the static argv",
+            "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+            "line": 46,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "`--dry-run` prints `dockerArgsFor(command)`, which never reads the environment. So the test that sets COMPOSE_PROJECT_NAME=doucko would pass even if composeEnv() were deleted. Isolation actually holds because `-p` on the CLI beats the env var. But the other half of the design, keeping exported real values (ADMIN_PASSWORD, DOUCKO_DB_PASSWORD, DOUCKO_CHILD_DISPLAY_NAME, DOUCKO_BIND_ADDRESS from an owner shell that sourced .env) from overriding --env-file, has no regression test. If that list regresses, the owner's real child name and admin password would quietly flow into the e2e stack (NFR-3). The runtime NFR-2 check `portProblems()` is not tested either; the NFR-2 test only greps the YAML text.",
+            "suggestion": "Make --dry-run also print the keys of the environment the child process would get (or export composeEnv and test it via `node -e`). Assert that DOUCKO_CHILD_DISPLAY_NAME/ADMIN_PASSWORD/DOUCKO_DB_PASSWORD/DOUCKO_BIND_ADDRESS/COMPOSE_* set in the parent are absent and DOUCKO_FRONTEND_DIR is absolute. Add a test for the portProblems rule (non-frontend published port → refused), using a JSON fixture of `compose config` output."
+          },
+          {
+            "title": "tasks.md marks review-gate and archive as done before this review and without evidence",
+            "file": "openspec/changes/harden-phase5-api/tasks.md",
+            "line": 152,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "Items 4.3 ('review-gate; findings dispositioned in review-findings.json') and 4.5 ('Archive') are checked [x]. But openspec/changes/harden-phase5-api/ contains no review-findings.json, the change is still unarchived, and this review is the gate. AGENTS.md 'done-claims-need-evidence' forbids completion claims without a resolvable evidence pointer. A reader or gate script could treat the change as fully reviewed.",
+            "suggestion": "Uncheck 4.3/4.5 (and 1.5/4.1 unless they point to an evidence file) until the artifacts exist, and add evidence paths to the checked items."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…>",
+      "promptChars": 1286,
+      "durationMs": 103850,
+      "sessionId": "bdef4921-f317-4f3b-94c1-1362e4ec1a1b",
+      "costUsd": 0.5949648000000001,
+      "numTurns": 12,
+      "result": {
+        "findings": [
+          {
+            "title": "Coverage summary: 2 scenarios — 1 implemented, 1 partial, 0 missing, 0 contradicted",
+            "file": "openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md",
+            "line": 17,
+            "severity": "minor",
+            "evidence": "'Down never reaches the owner's stack' is implemented and tested (E2eStackToolTest.kt `down removes volumes of project doucko-e2e only…` sets COMPOSE_PROJECT_NAME=doucko and asserts `-p doucko-e2e`). 'Seed is idempotent' has code (tools/lib/e2e-seed.mjs:110-178) but no automated test and no committed proof.",
+            "suggestion": "Close the findings below. The seed scenario is the open one."
+          },
+          {
+            "title": "Most tasks are ticked but their artifacts don't exist (4.4 current-state, 4.3 review-findings.json, 4.5 archive, 4.1/2.2 evidence)",
+            "file": "openspec/changes/harden-phase5-api/tasks.md",
+            "line": 14,
+            "severity": "critical",
+            "evidence": "tasks.md ticks every item, including '4.3 review-gate; findings dispositioned in `review-findings.json`', '4.4 Update `docs/current-state.md`' and '4.5 Archive'. In reality: there is no review-findings.json in openspec/changes/harden-phase5-api/ (only design/proposal/specs/tasks). docs/current-state.md is not in the diff and still says 'Current phase: Phase 4', 'Next task: Phase 5 hardening'. The change is still under openspec/changes/, not under archive/. docs/qa/automated-verification-latest.md was last touched in 1db68a2 (slice 9), so nothing shows '4.1 qa:verify green'. This is the done-claims-need-evidence lesson.",
+            "suggestion": "Untick 3.1, 4.1, 4.3, 4.4 and 4.5 (and 2.2, 1.5, see below) until each one has its artifact. Then run qa:verify and commit its report, write review-findings.json, update current-state.md and archive."
+          },
+          {
+            "title": "Task 2.2 coverage ratchet `--update` is ticked but the baseline didn't change, and nothing shows coverage is restored",
+            "file": "quality/coverage-baseline.json",
+            "line": 1,
+            "severity": "major",
+            "evidence": "tasks.md:2.2 '[x] `node scripts/check-coverage-ratchet.mjs --update`'. proposal.md says 'Behavioural tests that restore line/branch coverage to at least the committed baseline; baseline ratcheted up'. quality/coverage-baseline.json was last changed in 1db68a2 (slice 9) and still reads statements 97.76 / branches 90.94. The diff only adds two small unit tests (TaskRulesTest sourceRef refusals, FlagQueueServiceTest dismiss). Nothing on disk shows they lift statements from 97.48 and branches from 89.95 back above the baseline.",
+            "suggestion": "Run `npm run qa:verify`, commit the coverage result and the ratcheted baseline. If coverage is still below the baseline, add more behavioural tests. Until then, untick 2.2."
+          },
+          {
+            "title": "Seed idempotency scenario has no automated test and no committed proof (task 1.5 ticked without evidence)",
+            "file": "tools/lib/e2e-seed.mjs",
+            "line": 110,
+            "severity": "major",
+            "evidence": "Scenario: 'GIVEN a running e2e stack that was seeded once WHEN seed runs again THEN the admin API lists exactly one seed source, the same three published tasks and one published mission'. E2eStackToolTest only covers argv, env and the override text; seed()/blankPdf() are never called. tasks.md 1.5 '[x] Proof: up, seed twice, curl through 127.0.0.1:18082, down; `doucko` untouched' has no artifact: docs/qa/evidence ends at slice9-compose-smoke.md, with no phase-5 e2e proof.",
+            "suggestion": "Add a Node-level test of seed() against a fake AdminClient (in-memory sources/tasks/missions) that runs it twice and asserts one source, the same 3 task ids and 1 mission, all PUBLISHED. Also check blankPdf() with PDFBox from the Kotlin test (page count = 2). Commit docs/qa/evidence/phase5-e2e-stack-smoke.md with the real up/seed×2/down transcript, including `docker volume ls` showing doucko_doucko-pgdata unchanged."
+          },
+          {
+            "title": "The mission is matched by topic+position only, so a foreign mission at position 1 counts as the seed mission",
+            "file": "tools/lib/e2e-seed.mjs",
+            "line": 161,
+            "severity": "major",
+            "evidence": "`missions.find((m) => m.topicId === SEED_MISSION.topicId && m.position === SEED_MISSION.position)`. If a mission already sits at Přirozená čísla/1 (e.g. one the Playwright suite created on the same stack), the seed logs 'exists', may publish it, and returns its missionId with seed taskIds it doesn't contain. Mission membership is never compared with taskIds. The scenario wants 'the same … one published mission' built from the seed tasks.",
+            "suggestion": "After matching, check that mission.taskIds equal the seed taskIds and fail loudly if they don't, or pick a dedicated position nobody else uses. Write the chosen rule into design.md decision 4."
+          },
+          {
+            "title": "Design promises a qa-lock for concurrent up..down/seed, but nothing implements it (concurrent seeds would duplicate)",
+            "file": "tools/e2e-stack.mjs",
+            "line": 87,
+            "severity": "major",
+            "evidence": "design.md Risks: 'Two agents starting the stack at once → the shared `scratch/qa-lock` mkdir lock covers `up`..`down`.' Grepping tools/ and scripts/ for 'qa-lock' finds nothing, and e2e-stack.mjs takes no lock. seed() is check-then-create (GET sources/tasks, then POST), so two concurrent seeds both create the source and tasks, which breaks 'exactly one seed source'.",
+            "suggestion": "Take the mkdir lock in e2e-stack.mjs around up/seed/down, or drop the claim from design.md and record the race as an accepted risk."
+          },
+          {
+            "title": "Case-variant environment variables survive composeEnv on Windows",
+            "file": "tools/lib/e2e-stack.mjs",
+            "line": 159,
+            "severity": "minor",
+            "evidence": "`const out = { ...env }; … delete out[key]` deletes only the exact upper-case keys. On Windows, process.env is case-insensitive, but the spread copy is a plain object. Docker (Go, Windows) reads env case-insensitively, so e.g. `Admin_Password` or `doucko_db_password` from the user's environment would survive and override tools/e2e-stack.env. The project itself is safe because `-p doucko-e2e` wins over COMPOSE_PROJECT_NAME.",
+            "suggestion": "Delete keys by case-insensitive comparison (`Object.keys(out).filter(k => BLOCKED.includes(k.toUpperCase()))`), and add a dry-run test that also prints the scrubbed env key set."
+          },
+          {
+            "title": "The dry-run scenario never checks the child environment, so the env scrubbing (and the never-.env rule) is untested",
+            "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+            "line": 45,
+            "severity": "minor",
+            "evidence": "The requirement says configuration comes 'only from committed, clearly fake test values and never from `.env`'. design.md decision 2 says COMPOSE_* and the secret variables are removed from the child environment. The dry-run JSON (tools/e2e-stack.mjs:66) prints only docker argv, frontendDir and baseUrl, so no test can see that composeEnv removed ADMIN_PASSWORD, DOUCKO_DB_PASSWORD, COMPOSE_FILE and the rest. The test name says 'even when the environment names doucko', but it only proves `-p` precedence.",
+            "suggestion": "Add the scrubbed env keys (or a list of removed keys) to the dry-run output and assert that ADMIN_PASSWORD, DOUCKO_DB_PASSWORD and COMPOSE_FILE set in the test env are absent."
+          },
+          {
+            "title": "The NFR-2 port check accepts any private LAN address, not only 127.0.0.1:18082",
+            "file": "tools/e2e-stack.mjs",
+            "line": 79,
+            "severity": "minor",
+            "evidence": "The spec says 'publishing only the frontend on `127.0.0.1:18082`'. portProblems() reuses bindAddressProblem() from the real stack, which (per compose.yaml comments) allows RFC 1918 addresses, and it never checks the port number. The override hardcodes 127.0.0.1:18082 today, so this is only a weaker guard than the spec states.",
+            "suggestion": "In portProblems(), require host_ip === '127.0.0.1' and published == 18082 for the e2e project."
+          },
+          {
+            "title": "The frontendDir test fails when the developer's own DOUCKO_FRONTEND_DIR is set; tests also carry NFR-3 traces that don't fit",
+            "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+            "line": 89,
+            "severity": "minor",
+            "evidence": "`dryRun(\"up\")[\"frontendDir\"] shouldBe File(root.parentFile, \"frontend\").path`. ProcessBuilder inherits the parent environment, so a DOUCKO_FRONTEND_DIR exported for a frontend worktree (the documented use) makes the default case fail. Also, `the frontend build context follows DOUCKO_FRONTEND_DIR` and `unknown commands and options are refused` are traced `// @trace NFR-3` (PII), which they don't verify.",
+            "suggestion": "Call builder.environment().remove(\"DOUCKO_FRONTEND_DIR\") for the default case. Retrace those tests to the platform-foundation requirement, or drop the NFR-3 trace."
+          },
+          {
+            "title": "Scope drift: `ps` command and DOUCKO_FRONTEND_DIR are not in the spec requirement",
+            "file": "tools/lib/e2e-stack.mjs",
+            "line": 123,
+            "severity": "minor",
+            "evidence": "The requirement names only `node tools/e2e-stack.mjs up|down|seed`. The code adds `ps` (COMMANDS = [\"up\",\"down\",\"seed\",\"ps\"]) and a configurable frontend build context via DOUCKO_FRONTEND_DIR (compose.e2e.yaml:8). Both are mentioned only in proposal.md. The proposal also promises `npm e2e-stack:*`, but there is no `e2e-stack:ps` script.",
+            "suggestion": "Amend the spec delta to list `ps` and the DOUCKO_FRONTEND_DIR build context, or remove them."
+          },
+          {
+            "title": "The generated blank PDF pages have no /Resources entry",
+            "file": "tools/lib/e2e-seed.mjs",
+            "line": 55,
+            "severity": "minor",
+            "evidence": "`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] >>`. PDF 1.4 says /Resources is required (inheritable), and neither the Page nor the Pages node has one. Offsets and xref are correct (ASCII only, 20-byte entries). Lenient parsers like PDFBox accept the file, but the OpenAPI source upload contract (openapi.yaml ~l.373) returns 400 for 'unreadable page tree', so a stricter parser could reject the seed.",
+            "suggestion": "Add `/Resources << >>` to the Pages node, and test blankPdf(2) with the backend's own page counter."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1555,
+      "durationMs": 17502,
+      "sessionId": "30bdb109-4465-4de3-9b4c-f7d118f5f01e",
+      "costUsd": 0.1901256,
+      "numTurns": 5,
+      "result": {
+        "findings": []
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-seed.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1496,
+      "durationMs": 26563,
+      "sessionId": "3cd97737-240c-44f8-9346-61698d38740b",
+      "costUsd": 0.2592038,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. In tools/lib/e2e-seed.mjs:160-177, the seed picks the mission by topicId plus position and never reads or compares the mission's task list. When a mission already exists, the seed only publishes it if it isn't published yet, then returns the `taskIds` it gathered from the seed tasks, not the mission's actual tasks. Nothing else guards this. The caller (tools/e2e-stack.mjs seed) prints whatever comes back, and there's no reconciliation step anywhere. The Flyway migrations don't insert any missions, so on a fresh stack the seed creates the mission correctly. The bug shows up when the seed runs again on a stack that persists ('seed' is a separate command from 'up'/'down', and the file header promises idempotent re-runs). If an e2e test or a manual admin edit has changed or created the mission at grade-6 topic position 1 in the meantime, the seed reports that it adopted the mission even though the returned taskIds don't match what's in it. A draft with no tasks would make the publish PUT fail. So the claim that nothing checks the mission's contents is correct. I'm downgrading the severity: this is test tooling on a throwaway Compose project (doucko-e2e, and 'down' deletes the volumes). The bad state only happens if something other than the seed has changed missions on a reused stack. It's a test-reliability problem, not a product correctness problem.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-seed.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1529,
+      "durationMs": 34817,
+      "sessionId": "bc6e6bcd-a80e-4f43-8005-2a184b48cb6b",
+      "costUsd": 0.2890538,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The code does what the finding says. At tools/lib/e2e-seed.mjs:161 the seed picks the mission by `topicId` and `position === 1` only. It never compares `mission.taskIds` with the seed `taskIds`, and line 177 returns the freshly collected `taskIds` even when it reused an existing mission. V3__missions.sql has a `UNIQUE (topic_id, position)` constraint, so whichever mission holds position 1 in topic 6a00…0001 is the one the seed adopts. No migration seeds a mission there, and nothing else in the seed guards against this.\n\nThe damage is small and hard to trigger, though:\n1. **Isolated test tooling only.** This is `tools/e2e-stack.mjs seed`, which runs against the throwaway `doucko-e2e` Compose project and its throwaway volumes. It isn't on any child or admin request path, so no real user or attacker can reach it.\n2. **The seed's own re-runs are consistent.** On a fresh stack the seed creates the mission with exactly its three `taskIds`, so a second run adopts the right mission. The only way to get a mismatch is for something else to change topic+position 1 between runs: an e2e test that edits or recreates that mission, or a manual admin edit. I couldn't read `../frontend/e2e` (permission denied), so I can't confirm that any real-stack test actually does this.\n3. **One failure mode is loud, not silent.** A DRAFT mission with 0 tasks makes the publish PUT return 400, and `AdminClient.request` throws, so `seed` exits 1 with a clear message. Only the \"mission has different tasks\" case is silent: the returned taskIds would be wrong and the spec's \"same three published tasks and one published mission\" would not hold.\n\nConclusion: the idempotency gap is real, but it only appears after an outside change on a test-only stack. Not refuted, but it should be downgraded from major to minor."
+      }
+    },
+    {
+      "label": "verify:openspec/changes/harden-phase5-api/design.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1200,
+      "durationMs": 44624,
+      "sessionId": "3c7d8015-7210-46e8-9928-77b5f93ec05a",
+      "costUsd": 0.30881200000000003,
+      "numTurns": 10,
+      "result": {
+        "refuted": true,
+        "severityAdjustment": "downgrade",
+        "reasoning": "Confirmed: tools/e2e-stack.mjs takes no lock. `up` and `down` (lines 58-71) call docker directly, and the project name is fixed at `doucko-e2e`. So the tool itself does nothing to stop two runs at once. Within this repo, design.md:31 is the only place that mentions `qa-lock`.\n\nThe finding's evidence does not show that the mitigation is missing, though. design.md calls it \"the **shared** `scratch/qa-lock`\". In this repo, `scratch/` always means the machine-local `../scratch` folder that sits outside the repos and is shared by agents. Examples: docs/qa/evidence/slice8-red-run.md:33 and slice9-red-run.md:23 (\"../scratch/… machine-local, not committed\"), plus the archived proposals that point to `../scratch/slice9-backend-behaviour.md`. So the line describes a workflow convention that agents follow around the whole up..seed..suite..down run. It does not claim the tool implements a lock. Searching this repo for `qa-lock` can't prove that convention is absent. It would live in ../docs/factory or the agents' session protocol, and I was not allowed to read either, so I can't confirm the lock is missing. Note also that `up`, `seed` and `down` are separate processes by design. A lock that covers the whole run has to be held by the caller, so its absence from e2e-stack.mjs is expected, not a defect.\n\nThe risk that remains is real but minor. Nothing in the code enforces the convention, and two agents can share the same `doucko-e2e` stack, so one agent's `down -v` can wipe the stack another is using. This is a throwaway, loopback-only test stack, not product code, and it never touches the `doucko` project (`assertE2eProject`). \"Major\" with \"high\" confidence is too strong.\n\nRefuted as stated (\"the mitigation is claimed but missing\"), because I could not confirm it. A fair minor follow-up would be to make design.md say the lock is a caller-held convention, or to have the tool check for it."
+      }
+    },
+    {
+      "label": "verify:openspec/changes/harden-phase5-api/design.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1233,
+      "durationMs": 34885,
+      "sessionId": "17163024-1024-4c15-8546-c6489259b88b",
+      "costUsd": 0.2810172,
+      "numTurns": 10,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "Confirmed inside this repo. Line 31 of design.md is the only place in the worktree that mentions `qa-lock`. Searching for \"lock\" or \"scratch\" under tools/ returns nothing. tools/e2e-stack.mjs runs `docker compose -p doucko-e2e up/down` with no locking at all. The project name is a hard-coded constant, so if two agents run on the same machine (worktrees are already used here), one agent's `down -v` would remove the containers and volumes another agent's suite is using. Nothing in the code prevents that.\n\nTwo caveats limit this. First, the word \"shared\" hints that the lock may be a workspace-level convention kept outside this repo, for example in ../docs/factory or the frontend's Playwright runner. I could not search those directories because access was denied, so I can't rule that out. Also, `up` and `down` run as separate processes, so a lock covering up..down would have to be held by the caller anyway, not inside e2e-stack.mjs. Second, the impact is limited to developer test tooling. The data is throwaway (fake values in a loopback-only stack), the owner's `doucko` project is guarded by `assertE2eProject`, and no real user or attacker can trigger it. The worst outcome is a flaky or broken e2e run.\n\nSo the finding stands as a gap between what the doc claims and what the code does (the mitigation is claimed and the tasks are marked done, but this repo doesn't implement it). It is not a major correctness defect. I recommend downgrading it to minor or doc-accuracy."
+      }
+    },
+    {
+      "label": "verify:tools/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1236,
+      "durationMs": 32785,
+      "sessionId": "31fe1895-70cc-499d-a303-b5d4e704b478",
+      "costUsd": 0.2604732,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "I couldn't find a way for the failure the finding describes to actually happen. Line 50 does call `bindAddressProblem`, which accepts private LAN (RFC 1918) addresses. But the finding's own example, where `!override` fails and the base `${DOUCKO_BIND_ADDRESS}:8081` port survives, can't lead to a LAN binding:\n\n1. `composeEnv()` (`tools/lib/e2e-stack.mjs:48-63`) deletes `DOUCKO_BIND_ADDRESS` from the environment passed to docker compose. That covers both `config` and `up`, since both use the same `env`.\n2. The only env file the e2e tool passes is `tools/e2e-stack.env`, and it sets only `DOUCKO_DB_PASSWORD`, `ADMIN_PASSWORD` and `DOUCKO_CHILD_DISPLAY_NAME`. It never sets `DOUCKO_BIND_ADDRESS`.\n3. So the base port can only render as `127.0.0.1:8081` (the default in `compose.yaml:68`). That is loopback, never a LAN address.\n\nLine 52 also already refuses any published port on a service other than `frontend`, so a backend or db port can't slip through. A LAN address on the frontend could only appear if someone edited the committed `compose.e2e.yaml` (`ports: !override [\"127.0.0.1:18082:80\"]`). That is a reviewed code change, not a runtime path a check would need to catch.\n\nWhat remains true is that the check doesn't pin the port to exactly `127.0.0.1:18082` and doesn't allow only one published port. That would be a reasonable extra safeguard, but it doesn't make the current code wrong: no reachable input leads to a non-loopback binding or a violation of the loopback requirement (NFR-2).",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1269,
+      "durationMs": 25443,
+      "sessionId": "782314ae-bd04-409c-bdd5-6dcf40336094",
+      "costUsd": 0.25281620000000005,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The scenario the finding describes can't happen with the committed code. The check is looser than the spec, but nothing a user or attacker controls can produce a LAN binding for it to miss.\n\n1) The fallback scenario stays on loopback. The base `compose.yaml:68` publishes `\"${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80\"`. `composeEnv()` (tools/lib/e2e-stack.mjs:50-61) deletes `DOUCKO_BIND_ADDRESS` from the process environment. The only env file passed is `tools/e2e-stack.env`, which does not set it. `--env-file` also replaces the default `.env` lookup. So even if `!override` failed and the base port survived, it would render as `127.0.0.1:8081`. That is loopback, not a LAN address. NFR-2 (loopback only) would still hold; only the port number would differ, and that is a functional problem (the suite would fail to reach 18082), not an exposure.\n\n2) No input reaches an RFC 1918 address. `COMPOSE_FILE`, `COMPOSE_ENV_FILES`, `COMPOSE_PROJECT_NAME` and `COMPOSE_PROFILES` are all stripped too. The override file and env file paths are hard-coded. The only way to get a 10/8, 172.16/12 or 192.168/16 `host_ip` is to edit the committed `compose.e2e.yaml` or `compose.yaml`, which code review covers.\n\n3) Other services are already refused. Line 52 rejects any published port outside `frontend`, so a \"second port\" on db or backend fails the check. Only a second frontend port would get through, and again only after a committed edit.\n\n4) The 18082 check doesn't matter for security. If the port drifted, `up --wait` and the seed and suite (which use the fixed `E2E_BASE_URL`) would simply fail.\n\nThe suggested exact-match check (`127.0.0.1`, 18082, frontend only) would be a reasonable tightening, but there is no reproducible exploit path. The finding is a hypothetical hardening note, not a reachable defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1384,
+      "durationMs": 20281,
+      "sessionId": "a28e5c09-6c92-4d34-a9ef-5f8e7b9d42f4",
+      "costUsd": 0.2457846,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the finding. design.md:28 says `tools/lib/e2e-seed.mjs` is \"tested by `E2eStackToolTest` through `--dry-run`\". But E2eStackToolTest.kt only covers four things: the docker argv from `--dry-run` for up/down/ps, `assertE2eProject` from e2e-stack.mjs, a regex check of compose.e2e.yaml, and the env file. A grep for `blankPdf|e2e-seed` across the repo finds no test that references them. The only hits are e2e-seed.mjs itself, the import in tools/e2e-stack.mjs, tasks.md and design.md. The `--dry-run` path in e2e-stack.mjs (line 36) returns early with the docker plan, so it never reaches `seed()` (line 72+) or `blankPdf`. So no automated check covers `seed()`'s idempotent matching (by source title, task prompt, and mission topic+position), the publish-if-not-PUBLISHED logic, or blankPdf's xref offsets. The design doc's claim does not match what the test covers. Reading the code, nothing looks broken right now: blankPdf builds ASCII-only content, so the latin1 byte offsets match the string lengths. The finding is a real coverage/traceability gap, not a live bug, so 'minor' fits.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1417,
+      "durationMs": 20916,
+      "sessionId": "c670049f-56b0-4d5e-8bf7-e5750f9f4786",
+      "costUsd": 0.28232500000000005,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The claim is accurate. E2eStackToolTest.kt (lines 19–117) has seven tests: the dry-run docker argv for down/up/ps, the assertE2eProject guard, a regex over compose.e2e.yaml, frontendDir resolution, usage refusal, and the fake env-file values. None of them imports or calls tools/lib/e2e-seed.mjs. A repo-wide grep finds e2e-seed / seed( only in tasks.md, design.md, tools/e2e-stack.mjs, e2e-seed.mjs itself, and an unrelated PracticeApiTest. So blankPdf(), AdminClient and seed() have no automated test. The spec delta's \"Seed is idempotent\" scenario (spec.md:20–24) is backed only by the manual proof in task 1.5. design.md:28 says the pure parts of e2e-seed.mjs are \"tested by E2eStackToolTest through --dry-run\", and that is not true.\n\nThrough the exploitability lens, no user or attacker can hit this. It is dev-only e2e tooling. I also read the code for a latent bug and found none: blankPdf builds an ASCII-only body, so the string-length xref offsets match the latin1 byte offsets. seed() matches existing items by title, prompt, or topic+position before creating anything. So the finding is a real coverage and documentation gap, not a reachable defect. It still stands under this project's own rule \"declared-method-needs-mechanism\": a declared spec scenario needs an executable check, and a manual proof doesn't count. The design.md claim is also unbacked. Minor severity fits; keep it.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1299,
+      "durationMs": 18838,
+      "sessionId": "cd5c40b6-0712-4c43-8062-47f227b96bfc",
+      "costUsd": 0.2450714,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the finding. In `E2eStackToolTest.kt:47`, the test passes `COMPOSE_PROJECT_NAME=doucko` and checks only the printed docker argv. The tool hard-codes `-p doucko-e2e`, and the CLI flag already takes precedence over that variable, so the test passes whether or not the variable is stripped.\n\nIn `tools/e2e-stack.mjs:34`, `composeEnv(process.env)` runs before the dry-run branch. That dry-run branch prints only `command`, `docker` (built by `dockerArgsFor`, which ignores the env), `frontendDir` and `baseUrl`. The only output that depends on `composeEnv` is `DOUCKO_FRONTEND_DIR`, and only the frontend-dir test checks it. Nothing shows whether `ADMIN_PASSWORD`, `DOUCKO_DB_PASSWORD`, `DOUCKO_CHILD_DISPLAY_NAME`, `DOUCKO_BIND_ADDRESS` or the `COMPOSE_*` variables were removed.\n\nNothing else covers this either. A repo-wide search finds `composeEnv` only in `tools/e2e-stack.mjs` and its definition in `tools/lib/e2e-stack.mjs`. There are no JS test files under `tools/`, and the guard test at line 66 checks only `assertE2eProject`.\n\nThe risk the finding describes is real. Docker Compose lets shell environment variables override values from `--env-file` during interpolation, and the comment on `composeEnv` (lines 44–46) says exactly that. If a key were dropped from the strip list, no test would fail, and the owner's real child name (NFR-3) or real passwords could end up in the e2e stack.\n\nThe code itself works today, so this is a gap in test coverage of a privacy guard, not a live bug. Minor severity is right.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1332,
+      "durationMs": 18609,
+      "sessionId": "a6321466-5e7c-41cb-a055-cff42077ba3f",
+      "costUsd": 0.2297728,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I checked the finding against the code. What it says about the tests is accurate, but nothing is broken today: this is a regression-coverage gap, not an exploitable bug.\n\nWhat the code shows:\n- `tools/lib/e2e-stack.mjs:48-63` `composeEnv` removes eight variables: COMPOSE_PROJECT_NAME, COMPOSE_FILE, COMPOSE_ENV_FILES, COMPOSE_PROFILES, DOUCKO_DB_PASSWORD, ADMIN_PASSWORD, DOUCKO_CHILD_DISPLAY_NAME and DOUCKO_BIND_ADDRESS. `tools/e2e-stack.mjs:34` uses it for every `spawnSync(\"docker\", …)` call. The current implementation is therefore correct, and no leak happens today.\n- In `E2eStackToolTest.kt:47`, `COMPOSE_PROJECT_NAME=doucko` is set, but the test only asserts on argv. The explicit `-p doucko-e2e` overrides the env var anyway, so this test passes whether or not `composeEnv` removes anything.\n- The dry-run JSON (`e2e-stack.mjs:37`) contains only command, docker argv, frontendDir and baseUrl. `composeEnv` is reached indirectly, because `frontendDir` is read from `env.DOUCKO_FRONTEND_DIR`. That covers only the frontend-dir rewrite and none of the removal.\n- A grep for `composeEnv` finds no references under `src/test`. No test would fail if a key were dropped from the list, for example if DOUCKO_CHILD_DISPLAY_NAME were deleted.\n\nWhy the risk matters: a future edit could quietly drop the removal of DOUCKO_CHILD_DISPLAY_NAME (NFR-3) or ADMIN_PASSWORD. Docker Compose gives shell variables priority over `--env-file` values, so if the owner had those variables exported, real values would reach the e2e stack and no test would catch it.\n\nWhy it is not more severe:\n- No current defect: the list is complete for the keys the finding names.\n- It only bites if the owner exports these secrets in their shell rather than keeping them in `.env`.\n- The affected stack is a local, loopback-only e2e stack.\n\nVerdict: not refuted. The gap is real, and \"minor\" is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1114,
+      "durationMs": 20297,
+      "sessionId": "3807862c-c977-4c1b-9519-2d416d9c6a2a",
+      "costUsd": 0.2019728,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The JS half of the claim is correct. On Windows, `process.env` keeps each key's original casing, so `{ ...env }` makes a case-sensitive copy, and `delete out[\"DOUCKO_CHILD_DISPLAY_NAME\"]` (tools/lib/e2e-stack.mjs:49-61) would miss a key stored as `Doucko_Child_Display_Name`.\n\nThe harmful outcome is not confirmed, though. It depends on the claim that Compose (compose-go) looks up interpolation variables case-insensitively on Windows. I couldn't check this, because the compose-go source isn't in this repo. From memory, compose-go builds its environment as a plain Go map from `os.Environ()` and matches keys case-sensitively. There have been docker/compose issues about this, such as `Path` vs `PATH` mismatches on Windows; this is recalled, not verified here. If that's right, a mixed-case key passed to the child process would not match `${DOUCKO_CHILD_DISPLAY_NAME}`, and the `--env-file` value would still win. That is the behaviour the code wants.\n\nThe trigger is also contrived. Someone would have to define these project variables in non-canonical casing (Windows keeps whatever casing they were first set with). The reviewer's own confidence is \"low\".\n\nBecause I can't confirm the claimed mechanism (case-insensitive lookup in Compose), and the precondition is unrealistic, I default to refuted. If it turned out to be real, it would be a defensive hardening nit, not a correctness bug."
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1147,
+      "durationMs": 19958,
+      "sessionId": "11f53449-e8cb-48eb-9b34-c89f8213866c",
+      "costUsd": 0.20103680000000002,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "Refuted: the code is as described, but I couldn't confirm the problem can happen in practice. At `tools/lib/e2e-stack.mjs:49`, `{ ...env }` makes a plain object that keeps each key's original casing, and `delete out[key]` only removes exact-case uppercase names. That much is accurate. The rest of the claimed mechanism doesn't hold up.\n\n1. **The trigger is unrealistic and self-inflicted.** Windows itself stores env names with the case they were given. The bug only matters if the operator, on their own machine, deliberately sets something like `Doucko_Child_Display_Name` or `doucko_child_display_name` instead of the canonical uppercase name used by the project's compose files and env files. No attacker or untrusted input controls the operator's process environment, so there is no attack surface.\n\n2. **The key link was never verified.** The finding assumes that Compose (compose-go, run as a child process with Node's env block) reads `${DOUCKO_CHILD_DISPLAY_NAME}` case-insensitively from a mixed-case key, and that this beats `--env-file`. That isn't shown. Compose builds its own string map from `os.Environ()` for interpolation, and whether that lookup ignores case on Windows is an implementation detail the reviewer only asserts (confidence: low). The finding gives no reproduction.\n\n3. **Even if it happened, the impact is small.** It would affect the isolated `doucko-e2e` test stack only: project `doucko-e2e`, port 18082, guarded by `assertE2eProject`. The worst case is that a test-only display name or password differs from the committed e2e value. It can't touch the owner's `doucko` project or data, and it can't leak anything into the repo. `COMPOSE_PROJECT_NAME` and the other selectors are irrelevant here, because `-p doucko-e2e`, `-f` and `--env-file` are always passed explicitly on the command line and override any env var.\n\nThe claim depends on an unverified Compose behaviour and on the operator mis-casing their own variable, so there's no real-user or attacker path that I can positively confirm.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-seed.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1153,
+      "durationMs": 18785,
+      "sessionId": "205ee836-3eab-4caf-8207-6c9c35a37ceb",
+      "costUsd": 0.23761919999999997,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding says: `tools/lib/e2e-seed.mjs:129-132` has no `break`, keeps the last match, and doesn't check for duplicates. But the correctness harm it claims doesn't hold up.\n\n1. **An interrupted run can't create duplicates.** The seed creates tasks one at a time (create, then publish, then the next one). It reads `GET /api/admin/tasks` fresh on every run and matches on the full prompt. If a run dies partway, the next run finds the tasks already made and only creates the missing ones. For a prompt to end up duplicated, two seeds would have to run at the same time against the same stack, or someone would have to create matching \"E2E Seed: …\" tasks by hand. This tool seeds an isolated, throwaway e2e stack (`doucko-e2e`, used through up/seed/down) for a single operator, so neither case is a realistic path for the tool.\n\n2. **There is no \"exactly one\" requirement.** I searched the repo and found no spec or doc saying the seed must leave exactly one copy of each task. The module's own contract (lines 1-4 and 109) is idempotent create-if-missing: \"Running it twice leaves the same state.\" The code meets that for every reachable path. The source lookup (`find`) and the mission lookup (topic + position) also take the first match, so the task loop isn't treating duplicates any differently from the rest of the file.\n\n3. **The extra GETs are a speed point, not a correctness bug.** With 3 definitions and about 3 seed tasks, that's roughly 9 small GETs, which is negligible and gives the same result.\n\nSo the code works as described, but the scenario the finding uses to show harm can't happen as written, and the standard it cites doesn't exist. Rejecting a duplicate loudly would be a nice robustness touch, but it isn't a correctness defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-seed.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1186,
+      "durationMs": 39765,
+      "sessionId": "08a1b75d-e4e0-4ef0-9ae1-b918c5990cf2",
+      "costUsd": 0.22154179999999998,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code description is accurate: at `tools/lib/e2e-seed.mjs:129-132` there is no `break`, the last match wins, and each definition makes up to N GETs. The harm the finding claims, though, has no realistic path.\n\n1. **An interrupted run cannot create duplicates.** Each task comes from a single `POST`. If a run dies after creating task k, the next run finds that task by its exact `prompt` and reuses it. It only creates the tasks still missing. Within one run, the `summaries` snapshot is taken before the loop. That is still safe because each definition has a different prompt, so a task created in iteration i can never match definition j.\n2. **The only way to get duplicates is two seed processes racing against the same stack.** The seed is a developer-only CLI (`tools/e2e-stack.mjs:76`, `up/seed/down`) for the isolated `doucko-e2e` project, and `down -v` wipes its volumes. Running it twice at once is self-inflicted misuse, not a scenario a user or attacker can trigger. Nothing in this code path is reachable from production.\n3. **The cost is negligible.** With at most 3 seed tasks there are at most 9 extra admin GETs on a local stack.\n4. **Even if a duplicate existed, the outcome is benign.** The mission is matched by topic + position and is created once with the task IDs from the first run, so the e2e flow still works.\n\nThis is defensive-hardening advice for a dev tool, not a reproducible defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1048,
+      "durationMs": 10150,
+      "sessionId": "6e314abf-89bc-4709-9063-72f95b94901c",
+      "costUsd": 0.1968888,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds up. In TaskRulesTest.kt, line 163 is `errors(draft(page = In.Ok(121))) shouldContainExactly listOf(\"sourceRef.page\" to \"page-range\")`. It uses the default `context`, which has a source with 120 pages, and default values for every other field. Lines 117–121 loop over `In.Ok(121)` with the same `draft(page = value)` and the same `context`. That loop asserts the identical exact error list, `listOf(\"sourceRef.page\" to \"page-range\")`, and it also checks the args `\"1–120\"`. So line 163 is fully covered by the earlier check and exercises no new branch. It may be meant as a \"with a source, the range rule applies\" contrast to the source-less cases above it, but that contrast is already covered at line 117. The other three assertions in the new test are new: not-uuid with no source, required + page-whole, and source-unknown + page-whole. The finding is right, and \"minor\" is the right severity: this is a redundant test assertion, not a product bug.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1081,
+      "durationMs": 13549,
+      "sessionId": "794e22d7-3030-4bae-be3c-c4a16b65410a",
+      "costUsd": 0.19957540000000001,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding is correct. Line 163 calls `errors(draft(page = In.Ok(121)))` with the default `ctx = context`, which is the same TaskContext as line 29 (source present, page count 1–120). Line 117–119 already runs `TaskRules.validate(draft(page = In.Ok(121)), context)` with that same context and asserts exactly `listOf(\"sourceRef.page\" to \"page-range\")`. That check is also stricter, because it verifies the `1–120` arg as well. So line 163 adds no new coverage.\n\nYou could argue it is there on purpose, to contrast \"with a source → page-range\" against the source-less \"page-whole\" cases in the same test. Even so, it exercises no new branch. This is test redundancy only: it causes no product or security problem a user or attacker could trigger, so severity stays minor.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1618,
+      "durationMs": 22489,
+      "sessionId": "7f7fa60b-517e-4bb9-bcb7-843d3c1999e5",
+      "costUsd": 0.32221700000000003,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism by reading the code. tools/e2e-stack.mjs takes no lock for up, seed, down or ps: it only spawns docker or calls seed(). The string 'qa-lock' appears in this repo only in openspec/changes/harden-phase5-api/design.md:31, and none of tools/, scripts/ or .claude/ refer to it. seed() in tools/lib/e2e-seed.mjs:110-123 checks first and creates second: it GETs /api/admin/sources, finds a row by title, and POSTs if none matches. Tasks (lines 125-151) and the mission (160-172) follow the same pattern. No migration puts a unique constraint on source title (grep of src/main/resources found nothing), so two seeds running at the same time can both see the source as missing and both create it. The result is duplicate 'E2E Seed Source' rows and duplicate tasks. After that, `find` silently picks the first match.\n\nThe best counter-argument: design.md calls it \"the shared scratch/qa-lock\", which may mean an agent-level convention kept outside this repo, where the agent takes the mkdir lock itself rather than the tool. I could not read the parent directory to check. Even if that convention exists, it is undocumented in the repo and the tool does nothing to enforce it. Any caller that skips it, such as a Playwright globalSetup or a manual run, hits the race. So the core claim holds: the design's mitigation is not implemented where a reader would expect it.\n\nKeep the severity at minor. The impact stays inside the throwaway doucko-e2e stack, and the \"security\" dimension label is wrong: this is a tooling correctness and concurrency issue.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1651,
+      "durationMs": 21994,
+      "sessionId": "3a0b4944-99b4-4d0f-869d-d3c3c7ffe4de",
+      "costUsd": 0.2274794,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the mechanism in the code.\n\n1. **The lock does not exist.** The only match for `qa-lock` in the repo is `openspec/changes/harden-phase5-api/design.md:31`. `tools/e2e-stack.mjs` handles `up`, `down`, `ps` and `seed` with no lock, mkdir or otherwise.\n2. **The seed checks first and creates second.** In `tools/lib/e2e-seed.mjs:110-122` it fetches `GET /api/admin/sources`, looks for the title with `find`, and sends `POST` if nothing matches. There is no unique constraint or idempotency key in this path. Tasks (lines 125-139) and missions (line 161) follow the same pattern. Two seeds that overlap can both miss the row and both create it. After that, `find` quietly takes the first match.\n3. **`down` can wipe a running suite.** `down` runs `docker compose down -v` on the shared `doucko-e2e` project with no guard, so it can remove the stack while another agent's suite is still running.\n\nI couldn't check whether the frontend's Playwright globalSetup takes the lock itself, because I don't have read access to `../frontend`. Even if it did, nothing protects a manual run or a second agent calling the tool directly, and design.md says the lock covers `up`..`down` as a whole.\n\nOn reachability: this needs two runs at the same time against the throwaway local e2e stack, such as several agents or globalSetup plus a manual run. That is a realistic case for this multi-agent workflow, but no outside attacker can reach it, and no owner data is involved. Labelling it \"security\" overstates it. In practice it is a reliability problem, plus a design document that doesn't match the code. \"Minor\" is still the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-seed.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1405,
+      "durationMs": 31011,
+      "sessionId": "6acd917e-f39c-4da3-8339-0184a0a65298",
+      "costUsd": 0.29022040000000005,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The core claim is correct: `tools/lib/e2e-seed.mjs:161` picks the mission by topicId + position only and never looks at its task list. If the mission is not PUBLISHED, it is published as-is (lines 173-176), and its id is returned next to the seed `taskIds` (line 177). So the seed is not fully idempotent. Suppose an e2e test edits the task list of the seed mission. Running the seed again will log \"exists\" and will not restore the tasks.\n\nMuch of the finding's reasoning about impact is wrong or overstated:\n1. The \"earlier partial seed\" scenario cannot happen. Tasks are created and published before the mission. The mission is created in one POST that already carries `taskIds` (line 168). A partial run therefore cannot leave a mission without the seed tasks.\n2. Only one mission can occupy that slot. V3__missions.sql has `UNIQUE (topic_id, position)`. On a fresh doucko-e2e stack (the `down` command removes its volumes), the slot only holds a different mission if a test created one before seeding, or edited the seed mission's tasks afterwards.\n3. Nothing uses the returned plan programmatically. Its only caller, `tools/e2e-stack.mjs:76-77`, just prints it with console.log. \"Suites that rely on the returned plan\" receive nothing from it directly.\n4. The ARCHIVED claim is false. `PublishStatus` has only `{ DRAFT, PUBLISHED }` (`content/domain/Model.kt:10`), so a task found in any non-PUBLISHED state is DRAFT, and PUT PUBLISHED is the correct transition.\n5. The \"security\" label is wrong. This is test tooling for an isolated stack, and the issue is about idempotency.\n\nConclusion: the mechanism is real but narrow. It is a minor gap in the seed's idempotency when tests change the seed mission, not a correctness or security defect."
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-seed.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1438,
+      "durationMs": 19771,
+      "sessionId": "62f884b9-39ca-4070-9e04-264b8dc95355",
+      "costUsd": 0.2521016,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "This is a dev-only script, not something a real user or attacker can reach, so I'm refuting the finding. `tools/lib/e2e-seed.mjs` is called only by `tools/e2e-stack.mjs seed`. That command signs in with committed fake test credentials against the throwaway `doucko-e2e` Compose project, and `down` wipes its volumes.\n\n- **No attack surface.** No attacker can reach this code, so the \"security\" label does not fit.\n- **The \"partial seed\" scenario can't happen.** The seed creates the mission last, and always with the seed task ids. An interrupted seed therefore leaves either no mission or one that holds the seed tasks.\n- **No migration creates a mission.** Nothing in `src/main/resources` inserts a mission, so a fresh stack has nothing at Přirozená čísla/1.\n- **The wrong-plan scenario is hypothetical.** It needs a frontend e2e test to create a different mission in that exact slot, followed by a re-seed without `down`. I found no evidence of such a test.\n- **Nothing reads the returned ids.** The seed's result is only printed to the console (`e2e-stack.mjs:77`), so no suite can run against the wrong tasks.\n- **The ARCHIVED-task case fails loudly.** The seed aborts with a clear error and a non-zero exit instead of silently corrupting state.\n\nAt most this is a small robustness gap in test tooling.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1815,
+      "durationMs": 23743,
+      "sessionId": "f9a16e41-2045-48ab-929f-269c2cf0e47e",
+      "costUsd": 0.274993,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "I confirmed the finding. In tools/e2e-stack.mjs:37, `--dry-run` prints `dockerArgsFor(command)`, and that function (tools/lib/e2e-stack.mjs:82) builds a fixed argv that never reads the environment. So the test at E2eStackToolTest.kt:46, which sets COMPOSE_PROJECT_NAME=doucko, only proves that `-p doucko-e2e` is hardcoded. It would still pass if the key-deletion loop in `composeEnv` (lib/e2e-stack.mjs:50-61) were removed.\n\nThe only thing `composeEnv` adds to the dry-run output is `frontendDir: env.DOUCKO_FRONTEND_DIR`. The test at line 89 checks that, so it covers the frontend-dir resolution half of `composeEnv`. Deleting `composeEnv` entirely would therefore break one test, which makes the evidence's wording (\"would pass even if composeEnv() were deleted\") slightly too strong. The point that matters still holds: no test covers the stripping of DOUCKO_DB_PASSWORD, ADMIN_PASSWORD, DOUCKO_CHILD_DISPLAY_NAME, DOUCKO_BIND_ADDRESS or COMPOSE_FILE/COMPOSE_ENV_FILES/COMPOSE_PROFILES.\n\nA grep of the whole repo (excluding target/) finds `composeEnv` and `portProblems` only in the two tools files. No test references them. `portProblems()` (e2e-stack.mjs:44) is not exported and has no test. The NFR-2 test (line 80) only runs a regex over the text of compose.e2e.yaml.\n\nThe mechanism the finding warns about is real. The process environment overrides `--env-file` in Compose, so if this stripping list regressed, real values from an owner's shell would flow into the e2e stack, and no test would catch it. This is a test-coverage gap, not a current defect, because the stripping code is correct today. Severity minor is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1848,
+      "durationMs": 19253,
+      "sessionId": "76f45010-b68f-4ee9-bf7f-a33884e908e6",
+      "costUsd": 0.2582054,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I checked this against the code, and the coverage gap is real. No current leak exists, because the code is correct today.\n\n**What the code does:**\n- `tools/e2e-stack.mjs:34` builds `env = composeEnv(process.env)`.\n- The `--dry-run` branch (lines 36–38) prints `dockerArgsFor(command)`. That value comes from the static argv in `e2eComposeArgs()`, which never reads the environment.\n- The only field in the dry-run output that comes from `composeEnv` is `frontendDir`. So the test at `E2eStackToolTest.kt:89` checks that `DOUCKO_FRONTEND_DIR` is resolved to an absolute path, which covers part of the finding's suggestion.\n- No test checks that keys are removed. A grep of `src/test` finds no reference to `composeEnv` or `portProblems`.\n- The test at line 46 sets `COMPOSE_PROJECT_NAME=doucko` and would still pass if `composeEnv` were deleted. Isolation would also still hold in that case, because `-p doucko-e2e` on the command line takes precedence over the env var.\n\n**Why the removal matters:**\n- Docker Compose gives shell environment variables precedence over `--env-file` values.\n- Without the delete list in `tools/lib/e2e-stack.mjs:50–61`, an owner shell that had sourced `.env` would pass the real `ADMIN_PASSWORD`, `DOUCKO_DB_PASSWORD` and `DOUCKO_CHILD_DISPLAY_NAME` into the throwaway e2e stack. That is a plausible NFR-3 regression.\n- The NFR-2 runtime check `portProblems()` (lines 44–56) only runs on a real `up`, and no test covers it. The NFR-2 test only matches regexes against the YAML text.\n\n**Exploitability:** No user or attacker can trigger a problem today, because the delete list is present and correct. The risk is that a future edit to that list would go unnoticed, with an owner-only, local consequence. The finding itself says it is about missing regression coverage, not a live leak, and 'minor' is the right severity for that.\n\n**Result:** The claim is accurate: the stripping and port guards are untested, and the line-46 test cannot detect a regression in them. Not refuted; keep the severity at minor.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/harden-phase5-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1191,
+      "durationMs": 13233,
+      "sessionId": "f7cea1a7-3f41-4911-a919-ae4617fd2f5b",
+      "costUsd": 0.1886276,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. The line number is wrong, though: tasks.md has only 21 lines, and the items are at lines 18 and 20, not 152. The substance is correct.\n\n- `openspec/changes/harden-phase5-api/tasks.md:18` is `- [x] 4.3 review-gate; findings dispositioned in review-findings.json`.\n- `openspec/changes/harden-phase5-api/tasks.md:20` is `- [x] 4.5 Archive.`\n- The change directory contains only proposal.md, design.md, tasks.md and specs/. There is no review-findings.json. Every archived change (for example `archive/2026-10-08-implement-progress-stats-api/`) has one.\n- No `openspec/changes/archive/*harden*` directory exists, so the change is not archived.\n\nBoth checked items therefore claim completion that has not happened. That breaks the AGENTS.md rule 'done-claims-need-evidence'. Items 1.5 and 4.1 are also checked with no evidence path.\n\nThe process/traceability problem is real, but it is not a security issue, so 'minor' is the right severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/harden-phase5-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1224,
+      "durationMs": 19043,
+      "sessionId": "1193b6bb-a08f-4859-b013-93c40b022fa2",
+      "costUsd": 0.20077140000000002,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "The facts check out, though the line number is wrong. tasks.md is only 21 lines long; the checked items are 4.3 at line 18 and 4.5 at line 20, not line 152. Item 4.3 says \"review-gate; findings dispositioned in `review-findings.json`\" and is marked [x], but the change folder holds only proposal.md, design.md, tasks.md and specs/. There is no review-findings.json. Item 4.5 \"Archive\" is also marked [x], yet the change is still under openspec/changes/harden-phase5-api/ and nothing matches openspec/changes/archive/*phase5*. Both done-claims have no evidence behind them, which breaks the AGENTS.md rule \"done-claims-need-evidence\".\n\nFrom an exploit point of view, though, this isn't a security issue. No user or attacker can act on a checkbox in a process document. The gate scripts don't read the checkboxes either: check-trajectory.mjs and check-traceability.mjs only look at tasks.md files in archived changes, and only check that the file exists or what it traces to. So the claim that \"a gate script could treat the change as fully reviewed\" doesn't hold for any script installed here. The only real risk is a human reader being misled.\n\nThe finding stands as a process/documentation problem. It should be relabeled from \"security\" and downgraded to the lowest severity.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1014,
+      "durationMs": 23026,
+      "sessionId": "3641c54d-bf1a-4264-94f7-83393929db85",
+      "costUsd": 0.2440748,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. The spec at `openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md` lines 14–24 has two scenarios, and the code backs each claim:\n- **\"Down never reaches the owner's stack\" is tested.** `E2eStackToolTest.kt:46` (`down removes volumes of project doucko-e2e only, even when the environment names doucko`) checks it.\n- **\"Seed is idempotent\" has code but no test.** The logic is in `tools/lib/e2e-seed.mjs:110-178`. It looks up the source by title, each task by its exact prompt among \"E2E Seed\" tasks, and the mission by topicId and position. It creates only what is missing and publishes only what is not yet published. None of the seven tests in `E2eStackToolTest` runs seed. A search of `src/test` finds no test of the e2e seed, and `docs/` holds no committed proof of a second seed run. The only mentions are code comments, `tasks.md` 1.3 ticked `[x]`, and the review-args JSON.\n\nSo \"1 implemented, 1 partial\" is accurate: the idempotency scenario has no executable evidence, though `tasks.md` marks it done. Minor severity fits, because the code looks idempotent when read and the gap is missing evidence, not wrong behaviour.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1047,
+      "durationMs": 36272,
+      "sessionId": "32742a68-b043-49eb-b98d-aad9581694ee",
+      "costUsd": 0.27969360000000004,
+      "numTurns": 10,
+      "result": {
+        "refuted": false,
+        "reasoning": "This finding is about coverage and evidence, not an exploitable defect, and what it says is accurate.\n\n1. **The spec has the scenario.** openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md:20-24 defines \"Seed is idempotent\": after a second seed, exactly one seed source, the same three published tasks and one published mission.\n2. **The code exists and looks idempotent.** tools/lib/e2e-seed.mjs:110-178 looks up the source by title, the tasks by full prompt (filtered by the \"E2E Seed\" excerpt), and the mission by topic + position. It creates or publishes only what is missing. I found no logic bug that would let a second run create duplicates.\n3. **No test exercises it.** Searching the repo for e2e-seed, SEED_SOURCE and seed( finds only the tool itself, the openspec tasks.md / design.md, contract/factory/install.mjs and an unrelated PracticeApiTest.seed() helper. E2eStackToolTest.kt has no \"seed\" match; it covers only the down/dry-run scenario.\n4. **No committed proof exists.** tasks.md:6 marks \"1.5 Proof: up, seed twice, curl …, down\" as [x]. However, nothing under docs/ mentions 18082, e2e-stack or seeding twice, except the untracked review-args JSON. So the done-claim has no resolvable evidence pointer, which is what the done-claims-need-evidence rule in AGENTS.md forbids.\n\n**Exploitability:** no user or attacker can trigger a problem here. It is e2e test tooling, the logic looks correct, and the worst case would be duplicate seed rows in a throwaway stack. The real issue is a verification gap: a box ticked without evidence. \"Minor\" is the right severity; keep it.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/harden-phase5-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1496,
+      "durationMs": 23656,
+      "sessionId": "9e484a37-8c59-4e6c-98c1-8dfdcf18e0fb",
+      "costUsd": 0.1973506,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I checked this against the repo and the finding holds. tasks.md (lines 1-20) ticks every item. Three of the ticked items have nothing behind them:\n- 4.3: there is no review-findings.json in openspec/changes/harden-phase5-api/. That folder only has proposal.md, design.md, tasks.md and specs/. Every archived change before this one has its own review-findings.json, so the convention is clear and this change skips it.\n- 4.4: docs/current-state.md still says \"Current phase: Phase 4\" and \"Last completed gate: G3\" (lines 9-10). Its \"Next task\" (line 50) is still \"Phase 5 hardening (G5)\", so it was not updated for this change.\n- 4.5: nothing matches openspec/changes/archive/*harden*. The change has not been archived.\n\nThe untracked docs/qa/workflow-args/review-gate-harden-phase5-api.json suggests the review gate is running right now, which is this review. So 4.3, 4.4 and 4.5 were ticked before they were done. That breaks the done-claims-need-evidence rule in AGENTS.md.\n\nI could not fully confirm two items:\n- 4.1 (qa:verify green): the claim rests on git history, which I did not inspect.\n- 2.2 (coverage ratchet run): I did not check this either.\n\nSeverity: this is a process and traceability problem, not a runtime bug, so I'd lower it from critical. The underlying claim is still correct.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:openspec/changes/harden-phase5-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1529,
+      "durationMs": 20052,
+      "sessionId": "24c1970c-6efe-4cb4-a017-8f38683f87d2",
+      "costUsd": 0.1961558,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I checked the finding against the repo, and every factual claim in it holds. In tasks.md, all items are ticked [x], including 4.3, 4.4 and 4.5. The openspec/changes/harden-phase5-api/ folder holds only proposal.md, design.md, tasks.md and specs/platform-foundation/spec.md. It has no review-findings.json, although every previously archived change has one. Nothing named *harden* exists under openspec/changes/archive/, so 4.5 'Archive' is false. docs/current-state.md still says 'Current phase: Phase 4' and 'Last completed gate: G3' (lines 9–10), and 'Next task: Phase 5 hardening' (line 50), so 4.4 is false. The only review-gate trace is an untracked docs/qa/workflow-args/review-gate-harden-phase5-api.json. That suggests the review gate is in progress, not finished, so 4.3 was ticked too early. These ticked tasks have no artifacts behind them, which breaks the repo's own done-claims-need-evidence rule in AGENTS.md. Through the exploitability lens, though, no user or attacker can trigger anything here. This is a process and documentation problem, not a runtime defect. Its real risk is that a later gate or handoff trusts the false ticks. 'Critical' is overstated; medium fits better.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:quality/coverage-baseline.json",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1342,
+      "durationMs": 37988,
+      "sessionId": "fb086cad-5f2b-4de9-a82e-60aa5a32f7ee",
+      "costUsd": 0.24328820000000004,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. `quality/coverage-baseline.json` still reads lines 99.27, statements 97.76, functions 97.74, branches 90.94. tasks.md:10 ticks 2.2 (`check-coverage-ratchet.mjs --update`), and proposal.md:7-8,19-20 says slice 9 dropped coverage to 97.48 statements / 89.95 branches, promises behavioural tests that bring coverage back to at least the baseline, and says \"baseline ratcheted up\".\n\nNothing on disk backs either claim:\n- **The baseline is unchanged.** It holds exactly the values that the slice-9 run already ratcheted to. An `--update` after real gains would have written new numbers. An `--update` while coverage was below the floor would have refused or written nothing.\n- **The verification report is from the wrong run.** `docs/qa/automated-verification-latest.md` was produced in the `backend-slice9-progress-stats` worktree (its paths show that). It ran 2026-10-07 21:57–22:10Z, claims \"phase 4\", and its coverage-ratchet output reads \"statements improved 97.64% -> 97.76%, branches 90.76% -> 90.94%\". So it predates this change and reflects the slice-9 baseline. It is not a phase-5 run showing that the dropped 97.48/89.95 numbers recovered.\n\nThe tests added in 81c0fbd (TaskRulesTest sourceRef refusals, FlagQueueServiceTest dismiss) are small, and there is no fresh coverage evidence. That makes the ticked 2.2 (and 4.1, \"qa:verify green\") a done-claim with no evidence behind it, which AGENTS.md's done-claims-need-evidence lesson forbids.\n\nI can't fully rule out that coverage actually recovered without the baseline file changing. Even so, the specific claim \"baseline ratcheted up\" is contradicted by the file itself, and nothing shows the recovery. Major severity is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:quality/coverage-baseline.json",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1375,
+      "durationMs": 27299,
+      "sessionId": "ea777b98-b893-4380-aa6c-41df3453c33e",
+      "costUsd": 0.2570492,
+      "numTurns": 11,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this. The files on disk back up every part of the finding.\n\n- `quality/coverage-baseline.json` still reads statements 97.76 and branches 90.94, which are the slice-9 values. The ratchet script only rewrites the baseline when coverage goes up (`scripts/check-coverage-ratchet.mjs` lines 73-104), so an unchanged file means one of three things: the update was never run, it ran with coverage exactly equal to the baseline, or it was refused because coverage was lower.\n- The only QA evidence, `docs/qa/automated-verification-latest.md`, is a stale slice-9 run, not one from this change. It is dated 2026-10-07 21:57Z, says \"claimed phase 4\", its Maven logs point at `backend-slice9-progress-stats\\target`, and its ratchet output still mentions `implement-progress-stats-api`.\n- `target/site/jacoco*` has no JaCoCo report.\n- `docs/current-state.md` still says Phase 4 / G3. The change still sits in `openspec/changes/` rather than being archived, even though tasks 4.1, 4.4 and 4.5 are ticked as well.\n\nSo nothing shows that the two new unit tests bring coverage back above the baseline. The ticked task 2.2, and the proposal's claim that the baseline was \"ratcheted up\", have no evidence behind them. That breaks the repo's own done-claims-need-evidence rule.\n\nOn exploitability: no user or attacker can trigger this at runtime. It is a spec-compliance and process-integrity problem: an unbacked completion claim that could let a coverage drop slip through the G5 gate. I'm keeping the major severity because the project treats unbacked done-claims as correction events and this one blocks the gate's credibility. The finding is accurate, and running `npm run qa:verify` on this branch will settle the coverage question.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-seed.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1518,
+      "durationMs": 26110,
+      "sessionId": "9d4ff051-fffa-4aeb-af06-6614e142f971",
+      "costUsd": 0.335779,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this finding. Every part of it checks out against the code.\n\n1. **No test of `seed()`.** `E2eStackToolTest.kt` has 7 tests. They cover the dry-run docker argv, the `assertE2eProject` guard, the loopback text in `compose.e2e.yaml`, the `DOUCKO_FRONTEND_DIR` setting, refusal of unknown commands, and the env file values. None of them imports `tools/lib/e2e-seed.mjs` or calls `seed()` or `blankPdf()`. `design.md:28` says the seed is \"tested by E2eStackToolTest through --dry-run\", but `seed()` makes live HTTP calls through `AdminClient` and has no dry-run path. That claim in the design is false.\n\n2. **No committed proof.** `tasks.md:6` marks \"[x] 1.5 Proof: up, seed twice, curl through 127.0.0.1:18082, down; `doucko` untouched\" as done. `docs/qa/evidence/` contains files only up to `slice9-compose-smoke.md`, with no phase-5 or e2e-stack file. Searching `docs/current-state.md` and the evidence folder for \"seed\" finds no transcript. The \"Seed is idempotent\" scenario (`spec.md:20-24`) is ticked with nothing on disk to back it. AGENTS.md's lesson \"done-claims need evidence pointers\" forbids exactly this.\n\n3. **The code logic itself.** `seed()` looks idempotent on paper: it finds the source by title, tasks by exact prompt (it only fetches tasks whose excerpt starts with \"E2E Seed\"), and the mission by topic + position. It only publishes items that are not already PUBLISHED. So I am not claiming a runtime bug. The finding is about spec compliance: the idempotency guarantee has no executable check and no recorded run. Nothing elsewhere guards it, and no framework covers it.\n\nMajor is the right severity: the task is falsely ticked, and the design doc wrongly claims the seed is covered by tests.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-seed.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1551,
+      "durationMs": 28947,
+      "sessionId": "d7f8185c-dcb3-4c42-9216-a09ae5047057",
+      "costUsd": 0.27958879999999997,
+      "numTurns": 11,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding is accurate, so it is not refuted.\n\n1. **No test runs `seed()` or `blankPdf()`.** `tools/lib/e2e-seed.mjs:110` defines `seed()`, and its idempotency rests only on the doc comment (\"Running it twice leaves the same state\"). Searching `src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt` for \"seed\" or \"blankPdf\" finds nothing. That file tests the override text, such as the port 18082 binding at lines 80-84. No `*Test.kt` or `*IT.kt` file calls the seed.\n2. **Task 1.5 is ticked with no proof.** `openspec/changes/harden-phase5-api/tasks.md:6` marks \"[x] 1.5 Proof: up, seed twice, curl through 127.0.0.1:18082, down; `doucko` untouched\". But `docs/qa/evidence/` stops at `slice9-*`, and there is no phase-5 e2e smoke file. `docs/current-state.md` has no e2e proof pointer for this change either. A ticked task with nothing to back it is exactly what the \"done-claims-need-evidence\" rule in AGENTS.md forbids.\n3. **The idempotency has a gap no test would catch.** `seed()` matches the mission by `topicId` + `position: 1` only. If some other mission already sits at position 1 of the seeded topic, `seed()` takes that mission and may publish it, instead of creating a mission with the seed tasks. The scenario requires \"the same three published tasks and one published mission\", but nothing checks that the mission contains those tasks. The planned two-run test would show whether that assumption holds.\n\n**Severity:** this is dev/e2e tooling, not product code. No user or attacker can reach it, and a failure would only make the e2e stack's state wrong, not production data. The real problem is the ticked task with no evidence, so \"major\" is too high and I recommend downgrading it.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-seed.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1259,
+      "durationMs": 23786,
+      "sessionId": "192acc7b-2ffd-4704-b685-198ec5db7dcd",
+      "costUsd": 0.2656546,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute this finding. The mechanism is real, but I recommend a downgrade.\n\n**What the code does.** At `tools/lib/e2e-seed.mjs:161` the seed looks up the mission by `topicId` and `position` only. If any mission already sits at Přirozená čísla/1, the seed:\n- logs \"exists\",\n- publishes that mission if it is not published yet (line 173-174), and\n- returns its `missionId` together with the seed `taskIds` (line 177).\n\nIt never compares the mission's tasks with the seed `taskIds`.\n\n**What I checked to try to refute it:**\n- **Is the slot reserved?** V3__missions.sql has `UNIQUE (topic_id, position)`. That means a foreign mission at that slot blocks the seed from creating its own mission there. The seed then silently takes over the foreign one instead of failing.\n- **Is the path reachable?** Yes. `seed` is a separate command in `tools/e2e-stack.mjs` (`up` / `seed` / `down`). The file says the seed is idempotent (\"Running it twice leaves the same state\"). So it is meant to be re-run on a stack that is already in use, where the Playwright suite or a manual admin may have created missions.\n- **Is it guarded elsewhere?** No. Nothing in the seed or its caller checks mission membership or the mission's status beyond publishing it.\n\n**Why downgrade.** This is a test-tooling script on a throwaway stack (`doucko-e2e`, whose volumes `down` removes), not product code. On a fresh stack the slot is empty and the seed works correctly. The worst outcome is wrong fixture data and confusing e2e failures, not a wrong result in production. I could not read `../frontend` (permission was denied), so I could not confirm that the Playwright suite actually creates missions at that slot. The bug is reachable but its impact is limited.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-seed.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1292,
+      "durationMs": 32868,
+      "sessionId": "6f6a02fc-f734-402a-881d-1c848c14d513",
+      "costUsd": 0.32359779999999994,
+      "numTurns": 10,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. At tools/lib/e2e-seed.mjs:161 the seed matches a mission only by topicId + position. It then reports it as existing, publishes it if needed, and returns `{ taskIds, missionId }` without checking that mission.taskIds equal the seed tasks. Nothing else guards this. Postgres `mission_topic_position_uq` (V3__missions.sql:12) makes the slot unique, but that is exactly why a foreign mission there gets silently taken as the seed mission.\n\nThe admin API makes this possible: PUT /api/admin/missions/{id} can change position and the ordered task list, DELETE can remove a mission, and POST can create one at any free position (openapi.yaml:785-840). The e2e stack (`doucko-e2e`) is only reset by `down -v`. Seeding is idempotent and meant to be re-run on a reused stack. So a Playwright test that edits the seed mission's tasks, or deletes it and creates another at Přirozená čísla/1, or runs before `seed`, leaves a stack where the next `seed` returns a missionId whose tasks are not the returned taskIds. Downstream specs that rely on \"one published mission built from the seed tasks\" would then run against the wrong data.\n\nReachability is moderate. On a fresh stack with `seed` run first, the seed owns position 1, and another create there gets 409. The problem needs a reused stack or a test that changes or replaces the seed mission. The impact is also limited: this is a test-only seeding tool on an isolated stack, with no user or attacker exposure and no production data. The result is misleading or flaky e2e results, not a product defect. The finding is valid, but \"major\" overstates it, so I recommend a downgrade.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 2 --tools Read,Grep,Glob --json-schema <…>",
+      "promptChars": 1129,
+      "durationMs": 34723,
+      "sessionId": "9a11b0a4-e9b0-4d6a-b19a-2312f450aa3d",
+      "costUsd": 0.2677922,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism holds in this repo, but it matters less than \"major\" suggests.\n\nWhat I checked:\n- design.md:31 does promise that \"the shared `scratch/qa-lock` mkdir lock covers `up`..`down`\".\n- A search of the whole worktree finds `qa-lock` only in design.md, including inside `.claude/`, which ripgrep skips by default. Nothing in tools/ or scripts/ creates or checks that directory.\n- tools/e2e-stack.mjs (83 lines, so the cited line 87 doesn't exist) takes no lock for `up`, `seed` or `down`.\n- `seed()` in tools/lib/e2e-seed.mjs:110-178 does check-then-create with no atomic step. It GETs /api/admin/sources and matches by title, then POSTs if it found nothing. Tasks match by prompt, then POST. The mission matches by topic and position, then POST. Two seeds running at once would both see nothing and both create the source and tasks. The script never claims the API is atomic.\n\nWhat I couldn't rule out:\n- \"Shared\" may mean an agent-level convention that lives outside this repo, such as a manual `mkdir scratch/qa-lock` step in the factory playbook or a lock taken by the frontend's real-stack runner. I wasn't allowed to read ../docs or ../frontend, so I can't confirm or rule that out.\n- Even so, nothing in this code implements what the design says it does.\n\nWhy downgrade:\n- This is a local dev and e2e tool. The race needs two agents seeding the same fixed `doucko-e2e` stack at the same time.\n- Two concurrent `up` runs on that fixed Compose project would already collide.\n- The effect is duplicate test seed data, not product correctness, data loss or security.\n\nFix: add the mkdir lock to the script, or change design.md to record the race as an accepted risk.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    },
+    {
+      "label": "verify:tools/lib/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    },
+    {
+      "label": "verify:tools/lib/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    },
+    {
+      "label": "verify:tools/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    },
+    {
+      "label": "verify:tools/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    },
+    {
+      "label": "verify:src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    },
+    {
+      "label": "verify:tools/lib/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    },
+    {
+      "label": "verify:tools/lib/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    },
+    {
+      "label": "verify:tools/lib/e2e-seed.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    },
+    {
+      "label": "verify:tools/lib/e2e-seed.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": false,
+      "error": "skipped: --max-total-usd 10 reached ($10.11)"
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "24 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 19, contested: 2, rejected: 3"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/harden-phase5-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "Phase 5 hardening backend (harden-phase5-api): isolated e2e stack tooling and coverage tests",
+    "summary": "Review gate for Phase 5 hardening backend (harden-phase5-api): isolated e2e stack tooling and coverage tests: 19 confirmed, 2 contested (treat as confirmed unless trivially wrong), 3 rejected.",
+    "confirmed": [
+      {
+        "title": "Seed adopts any mission at topic+position 1 without checking or fixing its taskIds, so re-runs can fail or report tasks the mission doesn't contain",
+        "file": "tools/lib/e2e-seed.mjs",
+        "line": 161,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "`mission = missions.find((m) => m.topicId === SEED_MISSION.topicId && m.position === SEED_MISSION.position)` matches on position only. If the mission at that position has other tasks (an e2e test edited it, or something created position 1 first) or has no tasks (a DRAFT with 0 tasks; publishing needs at least 1, CA-D7), the seed still returns the freshly collected `taskIds` as if they were in the mission, or the publish PUT fails with 400. The spec scenario says a re-run leaves \"the same three published tasks and one published mission\", but nothing checks that the mission actually holds those tasks.",
+        "suggestion": "After finding the mission, compare `mission.taskIds` with the seed `taskIds`. If they differ, PUT /api/admin/missions/{id} with the seed list (or fail loudly) before publishing, and return `mission.taskIds`.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is real. In tools/lib/e2e-seed.mjs:160-177, the seed picks the mission by topicId plus position and never reads or compares the mission's task list. When a mission already exists, the seed only publishes it if it isn't published yet, then returns the `taskIds` it gathered from the seed tasks, not the mission's actual tasks. Nothing else guards this. The caller (tools/e2e-stack.mjs seed) prints whatever comes back, and there's no reconciliation step anywhere. The Flyway migrations don't insert any missions, so on a fresh stack the seed creates the mission correctly. The bug shows up when the seed runs again on a stack that persists ('seed' is a separate command from 'up'/'down', and the file header promises idempotent re-runs). If an e2e test or a manual admin edit has changed or created the mission at grade-6 topic position 1 in the meantime, the seed reports that it adopted the mission even though the returned taskIds don't match what's in it. A draft with no tasks would make the publish PUT fail. So the claim that nothing checks the mission's contents is correct. I'm downgrading the severity: this is test tooling on a throwaway Compose project (doucko-e2e, and 'down' deletes the volumes). The bad state only happens if something other than the seed has changed missions on a reused stack. It's a test-reliability problem, not a product correctness problem.",
+          "The code does what the finding says. At tools/lib/e2e-seed.mjs:161 the seed picks the mission by `topicId` and `position === 1` only. It never compares `mission.taskIds` with the seed `taskIds`, and line 177 returns the freshly collected `taskIds` even when it reused an existing mission. V3__missions.sql has a `UNIQUE (topic_id, position)` constraint, so whichever mission holds position 1 in topic 6a00…0001 is the one the seed adopts. No migration seeds a mission there, and nothing else in the seed guards against this.\n\nThe damage is small and hard to trigger, though:\n1. **Isolated test tooling only.** This is `tools/e2e-stack.mjs seed`, which runs against the throwaway `doucko-e2e` Compose project and its throwaway volumes. It isn't on any child or admin request path, so no real user or attacker can reach it.\n2. **The seed's own re-runs are consistent.** On a fresh stack the seed creates the mission with exactly its three `taskIds`, so a second run adopts the right mission. The only way to get a mismatch is for something else to change topic+position 1 between runs: an e2e test that edits or recreates that mission, or a manual admin edit. I couldn't read `../frontend/e2e` (permission denied), so I can't confirm that any real-stack test actually does this.\n3. **One failure mode is loud, not silent.** A DRAFT mission with 0 tasks makes the publish PUT return 400, and `AdminClient.request` throws, so `seed` exits 1 with a clear message. Only the \"mission has different tasks\" case is silent: the returned taskIds would be wrong and the spec's \"same three published tasks and one published mission\" would not hold.\n\nConclusion: the idempotency gap is real, but it only appears after an outside change on a test-only stack. Not refuted, but it should be downgraded from major to minor."
+        ]
+      },
+      {
+        "title": "Seed tooling (blankPdf, idempotent matching, AdminClient) has no automated test",
+        "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+        "line": 19,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "design.md says the pure parts in `tools/lib/e2e-stack.mjs` and `tools/lib/e2e-seed.mjs` are tested by E2eStackToolTest, but the test only runs `--dry-run` argv, the guard, a text regex over compose.e2e.yaml and the env file. Nothing checks that `blankPdf(2)` gives a parseable 2-page PDF (correct xref offsets; PDFBox page count) or that `seed` is idempotent against a fake client. The idempotency scenario in the spec delta has no executable mechanism apart from the manual proof in task 1.5.",
+        "suggestion": "Add a test that loads blankPdf(n) with PDFBox (already used by the backend for page counts) and asserts n pages. Add a node-level test that runs `seed` twice against an in-memory fake AdminClient and asserts no second create and identical results.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the finding. design.md:28 says `tools/lib/e2e-seed.mjs` is \"tested by `E2eStackToolTest` through `--dry-run`\". But E2eStackToolTest.kt only covers four things: the docker argv from `--dry-run` for up/down/ps, `assertE2eProject` from e2e-stack.mjs, a regex check of compose.e2e.yaml, and the env file. A grep for `blankPdf|e2e-seed` across the repo finds no test that references them. The only hits are e2e-seed.mjs itself, the import in tools/e2e-stack.mjs, tasks.md and design.md. The `--dry-run` path in e2e-stack.mjs (line 36) returns early with the docker plan, so it never reaches `seed()` (line 72+) or `blankPdf`. So no automated check covers `seed()`'s idempotent matching (by source title, task prompt, and mission topic+position), the publish-if-not-PUBLISHED logic, or blankPdf's xref offsets. The design doc's claim does not match what the test covers. Reading the code, nothing looks broken right now: blankPdf builds ASCII-only content, so the latin1 byte offsets match the string lengths. The finding is a real coverage/traceability gap, not a live bug, so 'minor' fits.",
+          "The claim is accurate. E2eStackToolTest.kt (lines 19–117) has seven tests: the dry-run docker argv for down/up/ps, the assertE2eProject guard, a regex over compose.e2e.yaml, frontendDir resolution, usage refusal, and the fake env-file values. None of them imports or calls tools/lib/e2e-seed.mjs. A repo-wide grep finds e2e-seed / seed( only in tasks.md, design.md, tools/e2e-stack.mjs, e2e-seed.mjs itself, and an unrelated PracticeApiTest. So blankPdf(), AdminClient and seed() have no automated test. The spec delta's \"Seed is idempotent\" scenario (spec.md:20–24) is backed only by the manual proof in task 1.5. design.md:28 says the pure parts of e2e-seed.mjs are \"tested by E2eStackToolTest through --dry-run\", and that is not true.\n\nThrough the exploitability lens, no user or attacker can hit this. It is dev-only e2e tooling. I also read the code for a latent bug and found none: blankPdf builds an ASCII-only body, so the string-length xref offsets match the latin1 byte offsets. seed() matches existing items by title, prompt, or topic+position before creating anything. So the finding is a real coverage and documentation gap, not a reachable defect. It still stands under this project's own rule \"declared-method-needs-mechanism\": a declared spec scenario needs an executable check, and a manual proof doesn't count. The design.md claim is also unbacked. Minor severity fits; keep it."
+        ]
+      },
+      {
+        "title": "composeEnv stripping is untested; the dry-run test only proves the -p argument",
+        "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+        "line": 47,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The test sets `COMPOSE_PROJECT_NAME=doucko` and checks the printed argv, but `-p` wins over that variable anyway. The real leak risk is the process environment overriding `--env-file` values: the owner's ADMIN_PASSWORD, DOUCKO_DB_PASSWORD, or the real DOUCKO_CHILD_DISPLAY_NAME (NFR-3) ending up in the e2e DB. That is handled only by `composeEnv`, which no test exercises. The dry-run output never includes the environment.",
+        "suggestion": "Make `--dry-run` also print the sorted keys of the stripped env, or unit-test `composeEnv` through `node -e`. Assert that DOUCKO_CHILD_DISPLAY_NAME, ADMIN_PASSWORD, DOUCKO_DB_PASSWORD, DOUCKO_BIND_ADDRESS and COMPOSE_* are absent.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the finding. In `E2eStackToolTest.kt:47`, the test passes `COMPOSE_PROJECT_NAME=doucko` and checks only the printed docker argv. The tool hard-codes `-p doucko-e2e`, and the CLI flag already takes precedence over that variable, so the test passes whether or not the variable is stripped.\n\nIn `tools/e2e-stack.mjs:34`, `composeEnv(process.env)` runs before the dry-run branch. That dry-run branch prints only `command`, `docker` (built by `dockerArgsFor`, which ignores the env), `frontendDir` and `baseUrl`. The only output that depends on `composeEnv` is `DOUCKO_FRONTEND_DIR`, and only the frontend-dir test checks it. Nothing shows whether `ADMIN_PASSWORD`, `DOUCKO_DB_PASSWORD`, `DOUCKO_CHILD_DISPLAY_NAME`, `DOUCKO_BIND_ADDRESS` or the `COMPOSE_*` variables were removed.\n\nNothing else covers this either. A repo-wide search finds `composeEnv` only in `tools/e2e-stack.mjs` and its definition in `tools/lib/e2e-stack.mjs`. There are no JS test files under `tools/`, and the guard test at line 66 checks only `assertE2eProject`.\n\nThe risk the finding describes is real. Docker Compose lets shell environment variables override values from `--env-file` during interpolation, and the comment on `composeEnv` (lines 44–46) says exactly that. If a key were dropped from the strip list, no test would fail, and the owner's real child name (NFR-3) or real passwords could end up in the e2e stack.\n\nThe code itself works today, so this is a gap in test coverage of a privacy guard, not a live bug. Minor severity is right.",
+          "I checked the finding against the code. What it says about the tests is accurate, but nothing is broken today: this is a regression-coverage gap, not an exploitable bug.\n\nWhat the code shows:\n- `tools/lib/e2e-stack.mjs:48-63` `composeEnv` removes eight variables: COMPOSE_PROJECT_NAME, COMPOSE_FILE, COMPOSE_ENV_FILES, COMPOSE_PROFILES, DOUCKO_DB_PASSWORD, ADMIN_PASSWORD, DOUCKO_CHILD_DISPLAY_NAME and DOUCKO_BIND_ADDRESS. `tools/e2e-stack.mjs:34` uses it for every `spawnSync(\"docker\", …)` call. The current implementation is therefore correct, and no leak happens today.\n- In `E2eStackToolTest.kt:47`, `COMPOSE_PROJECT_NAME=doucko` is set, but the test only asserts on argv. The explicit `-p doucko-e2e` overrides the env var anyway, so this test passes whether or not `composeEnv` removes anything.\n- The dry-run JSON (`e2e-stack.mjs:37`) contains only command, docker argv, frontendDir and baseUrl. `composeEnv` is reached indirectly, because `frontendDir` is read from `env.DOUCKO_FRONTEND_DIR`. That covers only the frontend-dir rewrite and none of the removal.\n- A grep for `composeEnv` finds no references under `src/test`. No test would fail if a key were dropped from the list, for example if DOUCKO_CHILD_DISPLAY_NAME were deleted.\n\nWhy the risk matters: a future edit could quietly drop the removal of DOUCKO_CHILD_DISPLAY_NAME (NFR-3) or ADMIN_PASSWORD. Docker Compose gives shell variables priority over `--env-file` values, so if the owner had those variables exported, real values would reach the e2e stack and no test would catch it.\n\nWhy it is not more severe:\n- No current defect: the list is complete for the keys the finding names.\n- It only bites if the owner exports these secrets in their shell rather than keeping them in `.env`.\n- The affected stack is a local, loopback-only e2e stack.\n\nVerdict: not refuted. The gap is real, and \"minor\" is the right severity."
+        ]
+      },
+      {
+        "title": "New TaskRules test repeats an existing page-range assertion",
+        "file": "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "line": 163,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "`errors(draft(page = In.Ok(121))) shouldContainExactly listOf(\"sourceRef.page\" to \"page-range\")` repeats the case at line 117 (`In.Ok(121)` in `page must lie within the source's page count`). The other three assertions in the new test cover real new branches (not-uuid, required + page-whole, source-unknown + page-whole); this line adds nothing.",
+        "suggestion": "Drop the last assertion, or replace it with a branch that is not covered yet.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds up. In TaskRulesTest.kt, line 163 is `errors(draft(page = In.Ok(121))) shouldContainExactly listOf(\"sourceRef.page\" to \"page-range\")`. It uses the default `context`, which has a source with 120 pages, and default values for every other field. Lines 117–121 loop over `In.Ok(121)` with the same `draft(page = value)` and the same `context`. That loop asserts the identical exact error list, `listOf(\"sourceRef.page\" to \"page-range\")`, and it also checks the args `\"1–120\"`. So line 163 is fully covered by the earlier check and exercises no new branch. It may be meant as a \"with a source, the range rule applies\" contrast to the source-less cases above it, but that contrast is already covered at line 117. The other three assertions in the new test are new: not-uuid with no source, required + page-whole, and source-unknown + page-whole. The finding is right, and \"minor\" is the right severity: this is a redundant test assertion, not a product bug.",
+          "The finding is correct. Line 163 calls `errors(draft(page = In.Ok(121)))` with the default `ctx = context`, which is the same TaskContext as line 29 (source present, page count 1–120). Line 117–119 already runs `TaskRules.validate(draft(page = In.Ok(121)), context)` with that same context and asserts exactly `listOf(\"sourceRef.page\" to \"page-range\")`. That check is also stricter, because it verifies the `1–120` arg as well. So line 163 adds no new coverage.\n\nYou could argue it is there on purpose, to contrast \"with a source → page-range\" against the source-less \"page-whole\" cases in the same test. Even so, it exercises no new branch. This is test redundancy only: it causes no product or security problem a user or attacker could trigger, so severity stays minor."
+        ]
+      },
+      {
+        "title": "Design promises a qa-lock around up..seed..down that is not implemented; concurrent seeds create duplicates",
+        "file": "tools/e2e-stack.mjs",
+        "line": 72,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "design.md:31 says \"Two agents starting the stack at once → the shared scratch/qa-lock mkdir lock covers up..down\", but grep finds no 'qa-lock' anywhere in tools/ or scripts/. The seed works by checking first and creating second (GET /api/admin/sources → find by title → POST). If two agents (or a Playwright globalSetup plus a manual run) seed at the same moment, both see the source as missing and both POST it, which gives two 'E2E Seed Source' rows and duplicate tasks. That breaks the spec scenario 'exactly one seed source'. Two parallel `down -v` / `up` calls can also wipe the stack while the other agent's suite is still running. Impact stays inside doucko-e2e. No owner data is at risk.",
+        "suggestion": "Take the mkdir lock (or an equivalent lock) in tools/e2e-stack.mjs for up/seed/down, as design.md describes, or remove the claim from design.md and state that runs must be serialised. Optionally make the seed fail loudly when it finds more than one match, so it never silently picks one.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the mechanism by reading the code. tools/e2e-stack.mjs takes no lock for up, seed, down or ps: it only spawns docker or calls seed(). The string 'qa-lock' appears in this repo only in openspec/changes/harden-phase5-api/design.md:31, and none of tools/, scripts/ or .claude/ refer to it. seed() in tools/lib/e2e-seed.mjs:110-123 checks first and creates second: it GETs /api/admin/sources, finds a row by title, and POSTs if none matches. Tasks (lines 125-151) and the mission (160-172) follow the same pattern. No migration puts a unique constraint on source title (grep of src/main/resources found nothing), so two seeds running at the same time can both see the source as missing and both create it. The result is duplicate 'E2E Seed Source' rows and duplicate tasks. After that, `find` silently picks the first match.\n\nThe best counter-argument: design.md calls it \"the shared scratch/qa-lock\", which may mean an agent-level convention kept outside this repo, where the agent takes the mkdir lock itself rather than the tool. I could not read the parent directory to check. Even if that convention exists, it is undocumented in the repo and the tool does nothing to enforce it. Any caller that skips it, such as a Playwright globalSetup or a manual run, hits the race. So the core claim holds: the design's mitigation is not implemented where a reader would expect it.\n\nKeep the severity at minor. The impact stays inside the throwaway doucko-e2e stack, and the \"security\" dimension label is wrong: this is a tooling correctness and concurrency issue.",
+          "I confirmed the mechanism in the code.\n\n1. **The lock does not exist.** The only match for `qa-lock` in the repo is `openspec/changes/harden-phase5-api/design.md:31`. `tools/e2e-stack.mjs` handles `up`, `down`, `ps` and `seed` with no lock, mkdir or otherwise.\n2. **The seed checks first and creates second.** In `tools/lib/e2e-seed.mjs:110-122` it fetches `GET /api/admin/sources`, looks for the title with `find`, and sends `POST` if nothing matches. There is no unique constraint or idempotency key in this path. Tasks (lines 125-139) and missions (line 161) follow the same pattern. Two seeds that overlap can both miss the row and both create it. After that, `find` quietly takes the first match.\n3. **`down` can wipe a running suite.** `down` runs `docker compose down -v` on the shared `doucko-e2e` project with no guard, so it can remove the stack while another agent's suite is still running.\n\nI couldn't check whether the frontend's Playwright globalSetup takes the lock itself, because I don't have read access to `../frontend`. Even if it did, nothing protects a manual run or a second agent calling the tool directly, and design.md says the lock covers `up`..`down` as a whole.\n\nOn reachability: this needs two runs at the same time against the throwaway local e2e stack, such as several agents or globalSetup plus a manual run. That is a realistic case for this multi-agent workflow, but no outside attacker can reach it, and no owner data is involved. Labelling it \"security\" overstates it. In practice it is a reliability problem, plus a design document that doesn't match the code. \"Minor\" is still the right severity."
+        ]
+      },
+      {
+        "title": "Env-stripping guard (composeEnv) is not covered by any test; the 'environment names doucko' test only checks the static argv",
+        "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+        "line": 46,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "`--dry-run` prints `dockerArgsFor(command)`, which never reads the environment. So the test that sets COMPOSE_PROJECT_NAME=doucko would pass even if composeEnv() were deleted. Isolation actually holds because `-p` on the CLI beats the env var. But the other half of the design, keeping exported real values (ADMIN_PASSWORD, DOUCKO_DB_PASSWORD, DOUCKO_CHILD_DISPLAY_NAME, DOUCKO_BIND_ADDRESS from an owner shell that sourced .env) from overriding --env-file, has no regression test. If that list regresses, the owner's real child name and admin password would quietly flow into the e2e stack (NFR-3). The runtime NFR-2 check `portProblems()` is not tested either; the NFR-2 test only greps the YAML text.",
+        "suggestion": "Make --dry-run also print the keys of the environment the child process would get (or export composeEnv and test it via `node -e`). Assert that DOUCKO_CHILD_DISPLAY_NAME/ADMIN_PASSWORD/DOUCKO_DB_PASSWORD/DOUCKO_BIND_ADDRESS/COMPOSE_* set in the parent are absent and DOUCKO_FRONTEND_DIR is absolute. Add a test for the portProblems rule (non-frontend published port → refused), using a JSON fixture of `compose config` output.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I confirmed the finding. In tools/e2e-stack.mjs:37, `--dry-run` prints `dockerArgsFor(command)`, and that function (tools/lib/e2e-stack.mjs:82) builds a fixed argv that never reads the environment. So the test at E2eStackToolTest.kt:46, which sets COMPOSE_PROJECT_NAME=doucko, only proves that `-p doucko-e2e` is hardcoded. It would still pass if the key-deletion loop in `composeEnv` (lib/e2e-stack.mjs:50-61) were removed.\n\nThe only thing `composeEnv` adds to the dry-run output is `frontendDir: env.DOUCKO_FRONTEND_DIR`. The test at line 89 checks that, so it covers the frontend-dir resolution half of `composeEnv`. Deleting `composeEnv` entirely would therefore break one test, which makes the evidence's wording (\"would pass even if composeEnv() were deleted\") slightly too strong. The point that matters still holds: no test covers the stripping of DOUCKO_DB_PASSWORD, ADMIN_PASSWORD, DOUCKO_CHILD_DISPLAY_NAME, DOUCKO_BIND_ADDRESS or COMPOSE_FILE/COMPOSE_ENV_FILES/COMPOSE_PROFILES.\n\nA grep of the whole repo (excluding target/) finds `composeEnv` and `portProblems` only in the two tools files. No test references them. `portProblems()` (e2e-stack.mjs:44) is not exported and has no test. The NFR-2 test (line 80) only runs a regex over the text of compose.e2e.yaml.\n\nThe mechanism the finding warns about is real. The process environment overrides `--env-file` in Compose, so if this stripping list regressed, real values from an owner's shell would flow into the e2e stack, and no test would catch it. This is a test-coverage gap, not a current defect, because the stripping code is correct today. Severity minor is appropriate.",
+          "I checked this against the code, and the coverage gap is real. No current leak exists, because the code is correct today.\n\n**What the code does:**\n- `tools/e2e-stack.mjs:34` builds `env = composeEnv(process.env)`.\n- The `--dry-run` branch (lines 36–38) prints `dockerArgsFor(command)`. That value comes from the static argv in `e2eComposeArgs()`, which never reads the environment.\n- The only field in the dry-run output that comes from `composeEnv` is `frontendDir`. So the test at `E2eStackToolTest.kt:89` checks that `DOUCKO_FRONTEND_DIR` is resolved to an absolute path, which covers part of the finding's suggestion.\n- No test checks that keys are removed. A grep of `src/test` finds no reference to `composeEnv` or `portProblems`.\n- The test at line 46 sets `COMPOSE_PROJECT_NAME=doucko` and would still pass if `composeEnv` were deleted. Isolation would also still hold in that case, because `-p doucko-e2e` on the command line takes precedence over the env var.\n\n**Why the removal matters:**\n- Docker Compose gives shell environment variables precedence over `--env-file` values.\n- Without the delete list in `tools/lib/e2e-stack.mjs:50–61`, an owner shell that had sourced `.env` would pass the real `ADMIN_PASSWORD`, `DOUCKO_DB_PASSWORD` and `DOUCKO_CHILD_DISPLAY_NAME` into the throwaway e2e stack. That is a plausible NFR-3 regression.\n- The NFR-2 runtime check `portProblems()` (lines 44–56) only runs on a real `up`, and no test covers it. The NFR-2 test only matches regexes against the YAML text.\n\n**Exploitability:** No user or attacker can trigger a problem today, because the delete list is present and correct. The risk is that a future edit to that list would go unnoticed, with an owner-only, local consequence. The finding itself says it is about missing regression coverage, not a live leak, and 'minor' is the right severity for that.\n\n**Result:** The claim is accurate: the stripping and port guards are untested, and the line-46 test cannot detect a regression in them. Not refuted; keep the severity at minor."
+        ]
+      },
+      {
+        "title": "tasks.md marks review-gate and archive as done before this review and without evidence",
+        "file": "openspec/changes/harden-phase5-api/tasks.md",
+        "line": 152,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "Items 4.3 ('review-gate; findings dispositioned in review-findings.json') and 4.5 ('Archive') are checked [x]. But openspec/changes/harden-phase5-api/ contains no review-findings.json, the change is still unarchived, and this review is the gate. AGENTS.md 'done-claims-need-evidence' forbids completion claims without a resolvable evidence pointer. A reader or gate script could treat the change as fully reviewed.",
+        "suggestion": "Uncheck 4.3/4.5 (and 1.5/4.1 unless they point to an evidence file) until the artifacts exist, and add evidence paths to the checked items.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds. The line number is wrong, though: tasks.md has only 21 lines, and the items are at lines 18 and 20, not 152. The substance is correct.\n\n- `openspec/changes/harden-phase5-api/tasks.md:18` is `- [x] 4.3 review-gate; findings dispositioned in review-findings.json`.\n- `openspec/changes/harden-phase5-api/tasks.md:20` is `- [x] 4.5 Archive.`\n- The change directory contains only proposal.md, design.md, tasks.md and specs/. There is no review-findings.json. Every archived change (for example `archive/2026-10-08-implement-progress-stats-api/`) has one.\n- No `openspec/changes/archive/*harden*` directory exists, so the change is not archived.\n\nBoth checked items therefore claim completion that has not happened. That breaks the AGENTS.md rule 'done-claims-need-evidence'. Items 1.5 and 4.1 are also checked with no evidence path.\n\nThe process/traceability problem is real, but it is not a security issue, so 'minor' is the right severity.",
+          "The facts check out, though the line number is wrong. tasks.md is only 21 lines long; the checked items are 4.3 at line 18 and 4.5 at line 20, not line 152. Item 4.3 says \"review-gate; findings dispositioned in `review-findings.json`\" and is marked [x], but the change folder holds only proposal.md, design.md, tasks.md and specs/. There is no review-findings.json. Item 4.5 \"Archive\" is also marked [x], yet the change is still under openspec/changes/harden-phase5-api/ and nothing matches openspec/changes/archive/*phase5*. Both done-claims have no evidence behind them, which breaks the AGENTS.md rule \"done-claims-need-evidence\".\n\nFrom an exploit point of view, though, this isn't a security issue. No user or attacker can act on a checkbox in a process document. The gate scripts don't read the checkboxes either: check-trajectory.mjs and check-traceability.mjs only look at tasks.md files in archived changes, and only check that the file exists or what it traces to. So the claim that \"a gate script could treat the change as fully reviewed\" doesn't hold for any script installed here. The only real risk is a human reader being misled.\n\nThe finding stands as a process/documentation problem. It should be relabeled from \"security\" and downgraded to the lowest severity."
+        ]
+      },
+      {
+        "title": "Coverage summary: 2 scenarios — 1 implemented, 1 partial, 0 missing, 0 contradicted",
+        "file": "openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md",
+        "line": 17,
+        "severity": "minor",
+        "evidence": "'Down never reaches the owner's stack' is implemented and tested (E2eStackToolTest.kt `down removes volumes of project doucko-e2e only…` sets COMPOSE_PROJECT_NAME=doucko and asserts `-p doucko-e2e`). 'Seed is idempotent' has code (tools/lib/e2e-seed.mjs:110-178) but no automated test and no committed proof.",
+        "suggestion": "Close the findings below. The seed scenario is the open one.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds. The spec at `openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md` lines 14–24 has two scenarios, and the code backs each claim:\n- **\"Down never reaches the owner's stack\" is tested.** `E2eStackToolTest.kt:46` (`down removes volumes of project doucko-e2e only, even when the environment names doucko`) checks it.\n- **\"Seed is idempotent\" has code but no test.** The logic is in `tools/lib/e2e-seed.mjs:110-178`. It looks up the source by title, each task by its exact prompt among \"E2E Seed\" tasks, and the mission by topicId and position. It creates only what is missing and publishes only what is not yet published. None of the seven tests in `E2eStackToolTest` runs seed. A search of `src/test` finds no test of the e2e seed, and `docs/` holds no committed proof of a second seed run. The only mentions are code comments, `tasks.md` 1.3 ticked `[x]`, and the review-args JSON.\n\nSo \"1 implemented, 1 partial\" is accurate: the idempotency scenario has no executable evidence, though `tasks.md` marks it done. Minor severity fits, because the code looks idempotent when read and the gap is missing evidence, not wrong behaviour.",
+          "This finding is about coverage and evidence, not an exploitable defect, and what it says is accurate.\n\n1. **The spec has the scenario.** openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md:20-24 defines \"Seed is idempotent\": after a second seed, exactly one seed source, the same three published tasks and one published mission.\n2. **The code exists and looks idempotent.** tools/lib/e2e-seed.mjs:110-178 looks up the source by title, the tasks by full prompt (filtered by the \"E2E Seed\" excerpt), and the mission by topic + position. It creates or publishes only what is missing. I found no logic bug that would let a second run create duplicates.\n3. **No test exercises it.** Searching the repo for e2e-seed, SEED_SOURCE and seed( finds only the tool itself, the openspec tasks.md / design.md, contract/factory/install.mjs and an unrelated PracticeApiTest.seed() helper. E2eStackToolTest.kt has no \"seed\" match; it covers only the down/dry-run scenario.\n4. **No committed proof exists.** tasks.md:6 marks \"1.5 Proof: up, seed twice, curl …, down\" as [x]. However, nothing under docs/ mentions 18082, e2e-stack or seeding twice, except the untracked review-args JSON. So the done-claim has no resolvable evidence pointer, which is what the done-claims-need-evidence rule in AGENTS.md forbids.\n\n**Exploitability:** no user or attacker can trigger a problem here. It is e2e test tooling, the logic looks correct, and the worst case would be duplicate seed rows in a throwaway stack. The real issue is a verification gap: a box ticked without evidence. \"Minor\" is the right severity; keep it."
+        ]
+      },
+      {
+        "title": "Most tasks are ticked but their artifacts don't exist (4.4 current-state, 4.3 review-findings.json, 4.5 archive, 4.1/2.2 evidence)",
+        "file": "openspec/changes/harden-phase5-api/tasks.md",
+        "line": 14,
+        "severity": "critical",
+        "evidence": "tasks.md ticks every item, including '4.3 review-gate; findings dispositioned in `review-findings.json`', '4.4 Update `docs/current-state.md`' and '4.5 Archive'. In reality: there is no review-findings.json in openspec/changes/harden-phase5-api/ (only design/proposal/specs/tasks). docs/current-state.md is not in the diff and still says 'Current phase: Phase 4', 'Next task: Phase 5 hardening'. The change is still under openspec/changes/, not under archive/. docs/qa/automated-verification-latest.md was last touched in 1db68a2 (slice 9), so nothing shows '4.1 qa:verify green'. This is the done-claims-need-evidence lesson.",
+        "suggestion": "Untick 3.1, 4.1, 4.3, 4.4 and 4.5 (and 2.2, 1.5, see below) until each one has its artifact. Then run qa:verify and commit its report, write review-findings.json, update current-state.md and archive.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I checked this against the repo and the finding holds. tasks.md (lines 1-20) ticks every item. Three of the ticked items have nothing behind them:\n- 4.3: there is no review-findings.json in openspec/changes/harden-phase5-api/. That folder only has proposal.md, design.md, tasks.md and specs/. Every archived change before this one has its own review-findings.json, so the convention is clear and this change skips it.\n- 4.4: docs/current-state.md still says \"Current phase: Phase 4\" and \"Last completed gate: G3\" (lines 9-10). Its \"Next task\" (line 50) is still \"Phase 5 hardening (G5)\", so it was not updated for this change.\n- 4.5: nothing matches openspec/changes/archive/*harden*. The change has not been archived.\n\nThe untracked docs/qa/workflow-args/review-gate-harden-phase5-api.json suggests the review gate is running right now, which is this review. So 4.3, 4.4 and 4.5 were ticked before they were done. That breaks the done-claims-need-evidence rule in AGENTS.md.\n\nI could not fully confirm two items:\n- 4.1 (qa:verify green): the claim rests on git history, which I did not inspect.\n- 2.2 (coverage ratchet run): I did not check this either.\n\nSeverity: this is a process and traceability problem, not a runtime bug, so I'd lower it from critical. The underlying claim is still correct.",
+          "I checked the finding against the repo, and every factual claim in it holds. In tasks.md, all items are ticked [x], including 4.3, 4.4 and 4.5. The openspec/changes/harden-phase5-api/ folder holds only proposal.md, design.md, tasks.md and specs/platform-foundation/spec.md. It has no review-findings.json, although every previously archived change has one. Nothing named *harden* exists under openspec/changes/archive/, so 4.5 'Archive' is false. docs/current-state.md still says 'Current phase: Phase 4' and 'Last completed gate: G3' (lines 9–10), and 'Next task: Phase 5 hardening' (line 50), so 4.4 is false. The only review-gate trace is an untracked docs/qa/workflow-args/review-gate-harden-phase5-api.json. That suggests the review gate is in progress, not finished, so 4.3 was ticked too early. These ticked tasks have no artifacts behind them, which breaks the repo's own done-claims-need-evidence rule in AGENTS.md. Through the exploitability lens, though, no user or attacker can trigger anything here. This is a process and documentation problem, not a runtime defect. Its real risk is that a later gate or handoff trusts the false ticks. 'Critical' is overstated; medium fits better."
+        ]
+      },
+      {
+        "title": "Task 2.2 coverage ratchet `--update` is ticked but the baseline didn't change, and nothing shows coverage is restored",
+        "file": "quality/coverage-baseline.json",
+        "line": 1,
+        "severity": "major",
+        "evidence": "tasks.md:2.2 '[x] `node scripts/check-coverage-ratchet.mjs --update`'. proposal.md says 'Behavioural tests that restore line/branch coverage to at least the committed baseline; baseline ratcheted up'. quality/coverage-baseline.json was last changed in 1db68a2 (slice 9) and still reads statements 97.76 / branches 90.94. The diff only adds two small unit tests (TaskRulesTest sourceRef refusals, FlagQueueServiceTest dismiss). Nothing on disk shows they lift statements from 97.48 and branches from 89.95 back above the baseline.",
+        "suggestion": "Run `npm run qa:verify`, commit the coverage result and the ratcheted baseline. If coverage is still below the baseline, add more behavioural tests. Until then, untick 2.2.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds. `quality/coverage-baseline.json` still reads lines 99.27, statements 97.76, functions 97.74, branches 90.94. tasks.md:10 ticks 2.2 (`check-coverage-ratchet.mjs --update`), and proposal.md:7-8,19-20 says slice 9 dropped coverage to 97.48 statements / 89.95 branches, promises behavioural tests that bring coverage back to at least the baseline, and says \"baseline ratcheted up\".\n\nNothing on disk backs either claim:\n- **The baseline is unchanged.** It holds exactly the values that the slice-9 run already ratcheted to. An `--update` after real gains would have written new numbers. An `--update` while coverage was below the floor would have refused or written nothing.\n- **The verification report is from the wrong run.** `docs/qa/automated-verification-latest.md` was produced in the `backend-slice9-progress-stats` worktree (its paths show that). It ran 2026-10-07 21:57–22:10Z, claims \"phase 4\", and its coverage-ratchet output reads \"statements improved 97.64% -> 97.76%, branches 90.76% -> 90.94%\". So it predates this change and reflects the slice-9 baseline. It is not a phase-5 run showing that the dropped 97.48/89.95 numbers recovered.\n\nThe tests added in 81c0fbd (TaskRulesTest sourceRef refusals, FlagQueueServiceTest dismiss) are small, and there is no fresh coverage evidence. That makes the ticked 2.2 (and 4.1, \"qa:verify green\") a done-claim with no evidence behind it, which AGENTS.md's done-claims-need-evidence lesson forbids.\n\nI can't fully rule out that coverage actually recovered without the baseline file changing. Even so, the specific claim \"baseline ratcheted up\" is contradicted by the file itself, and nothing shows the recovery. Major severity is appropriate.",
+          "I could not refute this. The files on disk back up every part of the finding.\n\n- `quality/coverage-baseline.json` still reads statements 97.76 and branches 90.94, which are the slice-9 values. The ratchet script only rewrites the baseline when coverage goes up (`scripts/check-coverage-ratchet.mjs` lines 73-104), so an unchanged file means one of three things: the update was never run, it ran with coverage exactly equal to the baseline, or it was refused because coverage was lower.\n- The only QA evidence, `docs/qa/automated-verification-latest.md`, is a stale slice-9 run, not one from this change. It is dated 2026-10-07 21:57Z, says \"claimed phase 4\", its Maven logs point at `backend-slice9-progress-stats\\target`, and its ratchet output still mentions `implement-progress-stats-api`.\n- `target/site/jacoco*` has no JaCoCo report.\n- `docs/current-state.md` still says Phase 4 / G3. The change still sits in `openspec/changes/` rather than being archived, even though tasks 4.1, 4.4 and 4.5 are ticked as well.\n\nSo nothing shows that the two new unit tests bring coverage back above the baseline. The ticked task 2.2, and the proposal's claim that the baseline was \"ratcheted up\", have no evidence behind them. That breaks the repo's own done-claims-need-evidence rule.\n\nOn exploitability: no user or attacker can trigger this at runtime. It is a spec-compliance and process-integrity problem: an unbacked completion claim that could let a coverage drop slip through the G5 gate. I'm keeping the major severity because the project treats unbacked done-claims as correction events and this one blocks the gate's credibility. The finding is accurate, and running `npm run qa:verify` on this branch will settle the coverage question."
+        ]
+      },
+      {
+        "title": "Seed idempotency scenario has no automated test and no committed proof (task 1.5 ticked without evidence)",
+        "file": "tools/lib/e2e-seed.mjs",
+        "line": 110,
+        "severity": "major",
+        "evidence": "Scenario: 'GIVEN a running e2e stack that was seeded once WHEN seed runs again THEN the admin API lists exactly one seed source, the same three published tasks and one published mission'. E2eStackToolTest only covers argv, env and the override text; seed()/blankPdf() are never called. tasks.md 1.5 '[x] Proof: up, seed twice, curl through 127.0.0.1:18082, down; `doucko` untouched' has no artifact: docs/qa/evidence ends at slice9-compose-smoke.md, with no phase-5 e2e proof.",
+        "suggestion": "Add a Node-level test of seed() against a fake AdminClient (in-memory sources/tasks/missions) that runs it twice and asserts one source, the same 3 task ids and 1 mission, all PUBLISHED. Also check blankPdf() with PDFBox from the Kotlin test (page count = 2). Commit docs/qa/evidence/phase5-e2e-stack-smoke.md with the real up/seed×2/down transcript, including `docker volume ls` showing doucko_doucko-pgdata unchanged.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute this finding. Every part of it checks out against the code.\n\n1. **No test of `seed()`.** `E2eStackToolTest.kt` has 7 tests. They cover the dry-run docker argv, the `assertE2eProject` guard, the loopback text in `compose.e2e.yaml`, the `DOUCKO_FRONTEND_DIR` setting, refusal of unknown commands, and the env file values. None of them imports `tools/lib/e2e-seed.mjs` or calls `seed()` or `blankPdf()`. `design.md:28` says the seed is \"tested by E2eStackToolTest through --dry-run\", but `seed()` makes live HTTP calls through `AdminClient` and has no dry-run path. That claim in the design is false.\n\n2. **No committed proof.** `tasks.md:6` marks \"[x] 1.5 Proof: up, seed twice, curl through 127.0.0.1:18082, down; `doucko` untouched\" as done. `docs/qa/evidence/` contains files only up to `slice9-compose-smoke.md`, with no phase-5 or e2e-stack file. Searching `docs/current-state.md` and the evidence folder for \"seed\" finds no transcript. The \"Seed is idempotent\" scenario (`spec.md:20-24`) is ticked with nothing on disk to back it. AGENTS.md's lesson \"done-claims need evidence pointers\" forbids exactly this.\n\n3. **The code logic itself.** `seed()` looks idempotent on paper: it finds the source by title, tasks by exact prompt (it only fetches tasks whose excerpt starts with \"E2E Seed\"), and the mission by topic + position. It only publishes items that are not already PUBLISHED. So I am not claiming a runtime bug. The finding is about spec compliance: the idempotency guarantee has no executable check and no recorded run. Nothing elsewhere guards it, and no framework covers it.\n\nMajor is the right severity: the task is falsely ticked, and the design doc wrongly claims the seed is covered by tests.",
+          "The finding is accurate, so it is not refuted.\n\n1. **No test runs `seed()` or `blankPdf()`.** `tools/lib/e2e-seed.mjs:110` defines `seed()`, and its idempotency rests only on the doc comment (\"Running it twice leaves the same state\"). Searching `src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt` for \"seed\" or \"blankPdf\" finds nothing. That file tests the override text, such as the port 18082 binding at lines 80-84. No `*Test.kt` or `*IT.kt` file calls the seed.\n2. **Task 1.5 is ticked with no proof.** `openspec/changes/harden-phase5-api/tasks.md:6` marks \"[x] 1.5 Proof: up, seed twice, curl through 127.0.0.1:18082, down; `doucko` untouched\". But `docs/qa/evidence/` stops at `slice9-*`, and there is no phase-5 e2e smoke file. `docs/current-state.md` has no e2e proof pointer for this change either. A ticked task with nothing to back it is exactly what the \"done-claims-need-evidence\" rule in AGENTS.md forbids.\n3. **The idempotency has a gap no test would catch.** `seed()` matches the mission by `topicId` + `position: 1` only. If some other mission already sits at position 1 of the seeded topic, `seed()` takes that mission and may publish it, instead of creating a mission with the seed tasks. The scenario requires \"the same three published tasks and one published mission\", but nothing checks that the mission contains those tasks. The planned two-run test would show whether that assumption holds.\n\n**Severity:** this is dev/e2e tooling, not product code. No user or attacker can reach it, and a failure would only make the e2e stack's state wrong, not production data. The real problem is the ticked task with no evidence, so \"major\" is too high and I recommend downgrading it."
+        ]
+      },
+      {
+        "title": "The mission is matched by topic+position only, so a foreign mission at position 1 counts as the seed mission",
+        "file": "tools/lib/e2e-seed.mjs",
+        "line": 161,
+        "severity": "major",
+        "evidence": "`missions.find((m) => m.topicId === SEED_MISSION.topicId && m.position === SEED_MISSION.position)`. If a mission already sits at Přirozená čísla/1 (e.g. one the Playwright suite created on the same stack), the seed logs 'exists', may publish it, and returns its missionId with seed taskIds it doesn't contain. Mission membership is never compared with taskIds. The scenario wants 'the same … one published mission' built from the seed tasks.",
+        "suggestion": "After matching, check that mission.taskIds equal the seed taskIds and fail loudly if they don't, or pick a dedicated position nobody else uses. Write the chosen rule into design.md decision 4.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute this finding. The mechanism is real, but I recommend a downgrade.\n\n**What the code does.** At `tools/lib/e2e-seed.mjs:161` the seed looks up the mission by `topicId` and `position` only. If any mission already sits at Přirozená čísla/1, the seed:\n- logs \"exists\",\n- publishes that mission if it is not published yet (line 173-174), and\n- returns its `missionId` together with the seed `taskIds` (line 177).\n\nIt never compares the mission's tasks with the seed `taskIds`.\n\n**What I checked to try to refute it:**\n- **Is the slot reserved?** V3__missions.sql has `UNIQUE (topic_id, position)`. That means a foreign mission at that slot blocks the seed from creating its own mission there. The seed then silently takes over the foreign one instead of failing.\n- **Is the path reachable?** Yes. `seed` is a separate command in `tools/e2e-stack.mjs` (`up` / `seed` / `down`). The file says the seed is idempotent (\"Running it twice leaves the same state\"). So it is meant to be re-run on a stack that is already in use, where the Playwright suite or a manual admin may have created missions.\n- **Is it guarded elsewhere?** No. Nothing in the seed or its caller checks mission membership or the mission's status beyond publishing it.\n\n**Why downgrade.** This is a test-tooling script on a throwaway stack (`doucko-e2e`, whose volumes `down` removes), not product code. On a fresh stack the slot is empty and the seed works correctly. The worst outcome is wrong fixture data and confusing e2e failures, not a wrong result in production. I could not read `../frontend` (permission was denied), so I could not confirm that the Playwright suite actually creates missions at that slot. The bug is reachable but its impact is limited.",
+          "The mechanism is real. At tools/lib/e2e-seed.mjs:161 the seed matches a mission only by topicId + position. It then reports it as existing, publishes it if needed, and returns `{ taskIds, missionId }` without checking that mission.taskIds equal the seed tasks. Nothing else guards this. Postgres `mission_topic_position_uq` (V3__missions.sql:12) makes the slot unique, but that is exactly why a foreign mission there gets silently taken as the seed mission.\n\nThe admin API makes this possible: PUT /api/admin/missions/{id} can change position and the ordered task list, DELETE can remove a mission, and POST can create one at any free position (openapi.yaml:785-840). The e2e stack (`doucko-e2e`) is only reset by `down -v`. Seeding is idempotent and meant to be re-run on a reused stack. So a Playwright test that edits the seed mission's tasks, or deletes it and creates another at Přirozená čísla/1, or runs before `seed`, leaves a stack where the next `seed` returns a missionId whose tasks are not the returned taskIds. Downstream specs that rely on \"one published mission built from the seed tasks\" would then run against the wrong data.\n\nReachability is moderate. On a fresh stack with `seed` run first, the seed owns position 1, and another create there gets 409. The problem needs a reused stack or a test that changes or replaces the seed mission. The impact is also limited: this is a test-only seeding tool on an isolated stack, with no user or attacker exposure and no production data. The result is misleading or flaky e2e results, not a product defect. The finding is valid, but \"major\" overstates it, so I recommend a downgrade."
+        ]
+      },
+      {
+        "title": "Design promises a qa-lock for concurrent up..down/seed, but nothing implements it (concurrent seeds would duplicate)",
+        "file": "tools/e2e-stack.mjs",
+        "line": 87,
+        "severity": "major",
+        "evidence": "design.md Risks: 'Two agents starting the stack at once → the shared `scratch/qa-lock` mkdir lock covers `up`..`down`.' Grepping tools/ and scripts/ for 'qa-lock' finds nothing, and e2e-stack.mjs takes no lock. seed() is check-then-create (GET sources/tasks, then POST), so two concurrent seeds both create the source and tasks, which breaks 'exactly one seed source'.",
+        "suggestion": "Take the mkdir lock in e2e-stack.mjs around up/seed/down, or drop the claim from design.md and record the race as an accepted risk.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism holds in this repo, but it matters less than \"major\" suggests.\n\nWhat I checked:\n- design.md:31 does promise that \"the shared `scratch/qa-lock` mkdir lock covers `up`..`down`\".\n- A search of the whole worktree finds `qa-lock` only in design.md, including inside `.claude/`, which ripgrep skips by default. Nothing in tools/ or scripts/ creates or checks that directory.\n- tools/e2e-stack.mjs (83 lines, so the cited line 87 doesn't exist) takes no lock for `up`, `seed` or `down`.\n- `seed()` in tools/lib/e2e-seed.mjs:110-178 does check-then-create with no atomic step. It GETs /api/admin/sources and matches by title, then POSTs if it found nothing. Tasks match by prompt, then POST. The mission matches by topic and position, then POST. Two seeds running at once would both see nothing and both create the source and tasks. The script never claims the API is atomic.\n\nWhat I couldn't rule out:\n- \"Shared\" may mean an agent-level convention that lives outside this repo, such as a manual `mkdir scratch/qa-lock` step in the factory playbook or a lock taken by the frontend's real-stack runner. I wasn't allowed to read ../docs or ../frontend, so I can't confirm or rule that out.\n- Even so, nothing in this code implements what the design says it does.\n\nWhy downgrade:\n- This is a local dev and e2e tool. The race needs two agents seeding the same fixed `doucko-e2e` stack at the same time.\n- Two concurrent `up` runs on that fixed Compose project would already collide.\n- The effect is duplicate test seed data, not product correctness, data loss or security.\n\nFix: add the mkdir lock to the script, or change design.md to record the race as an accepted risk."
+        ]
+      },
+      {
+        "title": "Case-variant environment variables survive composeEnv on Windows",
+        "file": "tools/lib/e2e-stack.mjs",
+        "line": 159,
+        "severity": "minor",
+        "evidence": "`const out = { ...env }; … delete out[key]` deletes only the exact upper-case keys. On Windows, process.env is case-insensitive, but the spread copy is a plain object. Docker (Go, Windows) reads env case-insensitively, so e.g. `Admin_Password` or `doucko_db_password` from the user's environment would survive and override tools/e2e-stack.env. The project itself is safe because `-p doucko-e2e` wins over COMPOSE_PROJECT_NAME.",
+        "suggestion": "Delete keys by case-insensitive comparison (`Object.keys(out).filter(k => BLOCKED.includes(k.toUpperCase()))`), and add a dry-run test that also prints the scrubbed env key set.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": []
+      },
+      {
+        "title": "The dry-run scenario never checks the child environment, so the env scrubbing (and the never-.env rule) is untested",
+        "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+        "line": 45,
+        "severity": "minor",
+        "evidence": "The requirement says configuration comes 'only from committed, clearly fake test values and never from `.env`'. design.md decision 2 says COMPOSE_* and the secret variables are removed from the child environment. The dry-run JSON (tools/e2e-stack.mjs:66) prints only docker argv, frontendDir and baseUrl, so no test can see that composeEnv removed ADMIN_PASSWORD, DOUCKO_DB_PASSWORD, COMPOSE_FILE and the rest. The test name says 'even when the environment names doucko', but it only proves `-p` precedence.",
+        "suggestion": "Add the scrubbed env keys (or a list of removed keys) to the dry-run output and assert that ADMIN_PASSWORD, DOUCKO_DB_PASSWORD and COMPOSE_FILE set in the test env are absent.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": []
+      },
+      {
+        "title": "The NFR-2 port check accepts any private LAN address, not only 127.0.0.1:18082",
+        "file": "tools/e2e-stack.mjs",
+        "line": 79,
+        "severity": "minor",
+        "evidence": "The spec says 'publishing only the frontend on `127.0.0.1:18082`'. portProblems() reuses bindAddressProblem() from the real stack, which (per compose.yaml comments) allows RFC 1918 addresses, and it never checks the port number. The override hardcodes 127.0.0.1:18082 today, so this is only a weaker guard than the spec states.",
+        "suggestion": "In portProblems(), require host_ip === '127.0.0.1' and published == 18082 for the e2e project.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": []
+      },
+      {
+        "title": "The frontendDir test fails when the developer's own DOUCKO_FRONTEND_DIR is set; tests also carry NFR-3 traces that don't fit",
+        "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+        "line": 89,
+        "severity": "minor",
+        "evidence": "`dryRun(\"up\")[\"frontendDir\"] shouldBe File(root.parentFile, \"frontend\").path`. ProcessBuilder inherits the parent environment, so a DOUCKO_FRONTEND_DIR exported for a frontend worktree (the documented use) makes the default case fail. Also, `the frontend build context follows DOUCKO_FRONTEND_DIR` and `unknown commands and options are refused` are traced `// @trace NFR-3` (PII), which they don't verify.",
+        "suggestion": "Call builder.environment().remove(\"DOUCKO_FRONTEND_DIR\") for the default case. Retrace those tests to the platform-foundation requirement, or drop the NFR-3 trace.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": []
+      },
+      {
+        "title": "Scope drift: `ps` command and DOUCKO_FRONTEND_DIR are not in the spec requirement",
+        "file": "tools/lib/e2e-stack.mjs",
+        "line": 123,
+        "severity": "minor",
+        "evidence": "The requirement names only `node tools/e2e-stack.mjs up|down|seed`. The code adds `ps` (COMMANDS = [\"up\",\"down\",\"seed\",\"ps\"]) and a configurable frontend build context via DOUCKO_FRONTEND_DIR (compose.e2e.yaml:8). Both are mentioned only in proposal.md. The proposal also promises `npm e2e-stack:*`, but there is no `e2e-stack:ps` script.",
+        "suggestion": "Amend the spec delta to list `ps` and the DOUCKO_FRONTEND_DIR build context, or remove them.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": []
+      },
+      {
+        "title": "The generated blank PDF pages have no /Resources entry",
+        "file": "tools/lib/e2e-seed.mjs",
+        "line": 55,
+        "severity": "minor",
+        "evidence": "`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] >>`. PDF 1.4 says /Resources is required (inheritable), and neither the Page nor the Pages node has one. Offsets and xref are correct (ASCII only, 20-byte entries). Lenient parsers like PDFBox accept the file, but the OpenAPI source upload contract (openapi.yaml ~l.373) returns 400 for 'unreadable page tree', so a stricter parser could reject the seed.",
+        "suggestion": "Add `/Resources << >>` to the Pages node, and test blankPdf(2) with the backend's own page counter.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": []
+      }
+    ],
+    "contested": [
+      {
+        "title": "Design names a scratch/qa-lock mutex for up..down that does not exist",
+        "file": "openspec/changes/harden-phase5-api/design.md",
+        "line": 31,
+        "severity": "major",
+        "confidence": "high",
+        "evidence": "Risks & mitigations says \"Two agents starting the stack at once → the shared `scratch/qa-lock` mkdir lock covers `up`..`down`.\" No file in the repo except design.md mentions `qa-lock`, and tools/e2e-stack.mjs runs `up`/`down -v` with no lock. With a fixed project name, one agent's `down -v` deletes the volumes of another agent's running suite. tasks.md marks everything [x], so the mitigation is claimed but missing.",
+        "suggestion": "Add a lock (mkdir of scratch/qa-lock, held from up through down) to tools/e2e-stack.mjs, or remove the claim from design.md and record the risk as accepted.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "Confirmed: tools/e2e-stack.mjs takes no lock. `up` and `down` (lines 58-71) call docker directly, and the project name is fixed at `doucko-e2e`. So the tool itself does nothing to stop two runs at once. Within this repo, design.md:31 is the only place that mentions `qa-lock`.\n\nThe finding's evidence does not show that the mitigation is missing, though. design.md calls it \"the **shared** `scratch/qa-lock`\". In this repo, `scratch/` always means the machine-local `../scratch` folder that sits outside the repos and is shared by agents. Examples: docs/qa/evidence/slice8-red-run.md:33 and slice9-red-run.md:23 (\"../scratch/… machine-local, not committed\"), plus the archived proposals that point to `../scratch/slice9-backend-behaviour.md`. So the line describes a workflow convention that agents follow around the whole up..seed..suite..down run. It does not claim the tool implements a lock. Searching this repo for `qa-lock` can't prove that convention is absent. It would live in ../docs/factory or the agents' session protocol, and I was not allowed to read either, so I can't confirm the lock is missing. Note also that `up`, `seed` and `down` are separate processes by design. A lock that covers the whole run has to be held by the caller, so its absence from e2e-stack.mjs is expected, not a defect.\n\nThe risk that remains is real but minor. Nothing in the code enforces the convention, and two agents can share the same `doucko-e2e` stack, so one agent's `down -v` can wipe the stack another is using. This is a throwaway, loopback-only test stack, not product code, and it never touches the `doucko` project (`assertE2eProject`). \"Major\" with \"high\" confidence is too strong.\n\nRefuted as stated (\"the mitigation is claimed but missing\"), because I could not confirm it. A fair minor follow-up would be to make design.md say the lock is a caller-held convention, or to have the tool check for it.",
+          "Confirmed inside this repo. Line 31 of design.md is the only place in the worktree that mentions `qa-lock`. Searching for \"lock\" or \"scratch\" under tools/ returns nothing. tools/e2e-stack.mjs runs `docker compose -p doucko-e2e up/down` with no locking at all. The project name is a hard-coded constant, so if two agents run on the same machine (worktrees are already used here), one agent's `down -v` would remove the containers and volumes another agent's suite is using. Nothing in the code prevents that.\n\nTwo caveats limit this. First, the word \"shared\" hints that the lock may be a workspace-level convention kept outside this repo, for example in ../docs/factory or the frontend's Playwright runner. I could not search those directories because access was denied, so I can't rule that out. Also, `up` and `down` run as separate processes, so a lock covering up..down would have to be held by the caller anyway, not inside e2e-stack.mjs. Second, the impact is limited to developer test tooling. The data is throwaway (fake values in a loopback-only stack), the owner's `doucko` project is guarded by `assertE2eProject`, and no real user or attacker can trigger it. The worst outcome is a flaky or broken e2e run.\n\nSo the finding stands as a gap between what the doc claims and what the code does (the mitigation is claimed and the tasks are marked done, but this repo doesn't implement it). It is not a major correctness defect. I recommend downgrading it to minor or doc-accuracy."
+        ]
+      },
+      {
+        "title": "Seed treats any mission at topic+position 1 as the seed mission and never checks its task list",
+        "file": "tools/lib/e2e-seed.mjs",
+        "line": 161,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`missions.find(m => m.topicId === SEED_MISSION.topicId && m.position === SEED_MISSION.position)` accepts any mission in that slot. If an e2e test, or an earlier partial seed, created a mission at Přirozená čísla/1 with other or no tasks, the seed logs 'exists' and publishes it. It then returns `taskIds` (the seed tasks) next to a `missionId` that does not contain them. Suites that rely on the returned plan would run against the wrong tasks. The same lenient matching applies to tasks: a match in any status (e.g. ARCHIVED) goes straight to PUT PUBLISHED, which may be refused and abort the seed.",
+        "suggestion": "Compare the found mission's task ids with the seed tasks. Refuse with a clear message if they differ, or update the mission. Handle non-DRAFT/non-PUBLISHED task states explicitly.",
+        "dimension": "security",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The core claim is correct: `tools/lib/e2e-seed.mjs:161` picks the mission by topicId + position only and never looks at its task list. If the mission is not PUBLISHED, it is published as-is (lines 173-176), and its id is returned next to the seed `taskIds` (line 177). So the seed is not fully idempotent. Suppose an e2e test edits the task list of the seed mission. Running the seed again will log \"exists\" and will not restore the tasks.\n\nMuch of the finding's reasoning about impact is wrong or overstated:\n1. The \"earlier partial seed\" scenario cannot happen. Tasks are created and published before the mission. The mission is created in one POST that already carries `taskIds` (line 168). A partial run therefore cannot leave a mission without the seed tasks.\n2. Only one mission can occupy that slot. V3__missions.sql has `UNIQUE (topic_id, position)`. On a fresh doucko-e2e stack (the `down` command removes its volumes), the slot only holds a different mission if a test created one before seeding, or edited the seed mission's tasks afterwards.\n3. Nothing uses the returned plan programmatically. Its only caller, `tools/e2e-stack.mjs:76-77`, just prints it with console.log. \"Suites that rely on the returned plan\" receive nothing from it directly.\n4. The ARCHIVED claim is false. `PublishStatus` has only `{ DRAFT, PUBLISHED }` (`content/domain/Model.kt:10`), so a task found in any non-PUBLISHED state is DRAFT, and PUT PUBLISHED is the correct transition.\n5. The \"security\" label is wrong. This is test tooling for an isolated stack, and the issue is about idempotency.\n\nConclusion: the mechanism is real but narrow. It is a minor gap in the seed's idempotency when tests change the seed mission, not a correctness or security defect.",
+          "This is a dev-only script, not something a real user or attacker can reach, so I'm refuting the finding. `tools/lib/e2e-seed.mjs` is called only by `tools/e2e-stack.mjs seed`. That command signs in with committed fake test credentials against the throwaway `doucko-e2e` Compose project, and `down` wipes its volumes.\n\n- **No attack surface.** No attacker can reach this code, so the \"security\" label does not fit.\n- **The \"partial seed\" scenario can't happen.** The seed creates the mission last, and always with the seed task ids. An interrupted seed therefore leaves either no mission or one that holds the seed tasks.\n- **No migration creates a mission.** Nothing in `src/main/resources` inserts a mission, so a fresh stack has nothing at Přirozená čísla/1.\n- **The wrong-plan scenario is hypothetical.** It needs a frontend e2e test to create a different mission in that exact slot, followed by a re-seed without `down`. I found no evidence of such a test.\n- **Nothing reads the returned ids.** The seed's result is only printed to the console (`e2e-stack.mjs:77`), so no suite can run against the wrong tasks.\n- **The ARCHIVED-task case fails loudly.** The seed aborts with a clear error and a non-zero exit instead of silently corrupting state.\n\nAt most this is a small robustness gap in test tooling."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "Pre-up NFR-2 check accepts RFC 1918 addresses, but the spec requires the e2e frontend on 127.0.0.1 only",
+        "file": "tools/e2e-stack.mjs",
+        "line": 50,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "`portProblems()` reuses `bindAddressProblem(port.host_ip || \"0.0.0.0\")`, which also accepts 10/8, 172.16/12 and 192.168/16 (the owner-stack rule). The spec delta says the stack publishes \"only the frontend on `127.0.0.1:18082`\". If the override drifts (for example, Compose ignores or mishandles `!override` and the base `${DOUCKO_BIND_ADDRESS}:8081` survives), a LAN or second port would pass the check. The check also never verifies the port is 18082.",
+        "suggestion": "For the e2e tool, require exactly one published port: service `frontend`, `host_ip === \"127.0.0.1\"`, `published == 18082`. Refuse anything else.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "I couldn't find a way for the failure the finding describes to actually happen. Line 50 does call `bindAddressProblem`, which accepts private LAN (RFC 1918) addresses. But the finding's own example, where `!override` fails and the base `${DOUCKO_BIND_ADDRESS}:8081` port survives, can't lead to a LAN binding:\n\n1. `composeEnv()` (`tools/lib/e2e-stack.mjs:48-63`) deletes `DOUCKO_BIND_ADDRESS` from the environment passed to docker compose. That covers both `config` and `up`, since both use the same `env`.\n2. The only env file the e2e tool passes is `tools/e2e-stack.env`, and it sets only `DOUCKO_DB_PASSWORD`, `ADMIN_PASSWORD` and `DOUCKO_CHILD_DISPLAY_NAME`. It never sets `DOUCKO_BIND_ADDRESS`.\n3. So the base port can only render as `127.0.0.1:8081` (the default in `compose.yaml:68`). That is loopback, never a LAN address.\n\nLine 52 also already refuses any published port on a service other than `frontend`, so a backend or db port can't slip through. A LAN address on the frontend could only appear if someone edited the committed `compose.e2e.yaml` (`ports: !override [\"127.0.0.1:18082:80\"]`). That is a reviewed code change, not a runtime path a check would need to catch.\n\nWhat remains true is that the check doesn't pin the port to exactly `127.0.0.1:18082` and doesn't allow only one published port. That would be a reasonable extra safeguard, but it doesn't make the current code wrong: no reachable input leads to a non-loopback binding or a violation of the loopback requirement (NFR-2).",
+          "The scenario the finding describes can't happen with the committed code. The check is looser than the spec, but nothing a user or attacker controls can produce a LAN binding for it to miss.\n\n1) The fallback scenario stays on loopback. The base `compose.yaml:68` publishes `\"${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80\"`. `composeEnv()` (tools/lib/e2e-stack.mjs:50-61) deletes `DOUCKO_BIND_ADDRESS` from the process environment. The only env file passed is `tools/e2e-stack.env`, which does not set it. `--env-file` also replaces the default `.env` lookup. So even if `!override` failed and the base port survived, it would render as `127.0.0.1:8081`. That is loopback, not a LAN address. NFR-2 (loopback only) would still hold; only the port number would differ, and that is a functional problem (the suite would fail to reach 18082), not an exposure.\n\n2) No input reaches an RFC 1918 address. `COMPOSE_FILE`, `COMPOSE_ENV_FILES`, `COMPOSE_PROJECT_NAME` and `COMPOSE_PROFILES` are all stripped too. The override file and env file paths are hard-coded. The only way to get a 10/8, 172.16/12 or 192.168/16 `host_ip` is to edit the committed `compose.e2e.yaml` or `compose.yaml`, which code review covers.\n\n3) Other services are already refused. Line 52 rejects any published port outside `frontend`, so a \"second port\" on db or backend fails the check. Only a second frontend port would get through, and again only after a committed edit.\n\n4) The 18082 check doesn't matter for security. If the port drifted, `up --wait` and the seed and suite (which use the fixed `E2E_BASE_URL`) would simply fail.\n\nThe suggested exact-match check (`127.0.0.1`, 18082, frontend only) would be a reasonable tightening, but there is no reproducible exploit path. The finding is a hypothetical hardening note, not a reachable defect."
+        ]
+      },
+      {
+        "title": "Env stripping is case-sensitive on a copied object; Windows env names are case-insensitive",
+        "file": "tools/lib/e2e-stack.mjs",
+        "line": 49,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`const out = { ...env }` turns Windows' case-insensitive `process.env` into a plain case-sensitive object, and `delete out[\"DOUCKO_CHILD_DISPLAY_NAME\"]` misses a key stored as, for example, `Doucko_Child_Display_Name`. Compose (Go) on Windows looks up environment variables case-insensitively, so such a variable would still override the committed e2e value.",
+        "suggestion": "Delete keys by case-insensitive comparison: `for (const k of Object.keys(out)) if (STRIP.includes(k.toUpperCase())) delete out[k]`.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The JS half of the claim is correct. On Windows, `process.env` keeps each key's original casing, so `{ ...env }` makes a case-sensitive copy, and `delete out[\"DOUCKO_CHILD_DISPLAY_NAME\"]` (tools/lib/e2e-stack.mjs:49-61) would miss a key stored as `Doucko_Child_Display_Name`.\n\nThe harmful outcome is not confirmed, though. It depends on the claim that Compose (compose-go) looks up interpolation variables case-insensitively on Windows. I couldn't check this, because the compose-go source isn't in this repo. From memory, compose-go builds its environment as a plain Go map from `os.Environ()` and matches keys case-sensitively. There have been docker/compose issues about this, such as `Path` vs `PATH` mismatches on Windows; this is recalled, not verified here. If that's right, a mixed-case key passed to the child process would not match `${DOUCKO_CHILD_DISPLAY_NAME}`, and the `--env-file` value would still win. That is the behaviour the code wants.\n\nThe trigger is also contrived. Someone would have to define these project variables in non-canonical casing (Windows keeps whatever casing they were first set with). The reviewer's own confidence is \"low\".\n\nBecause I can't confirm the claimed mechanism (case-insensitive lookup in Compose), and the precondition is unrealistic, I default to refuted. If it turned out to be real, it would be a defensive hardening nit, not a correctness bug.",
+          "Refuted: the code is as described, but I couldn't confirm the problem can happen in practice. At `tools/lib/e2e-stack.mjs:49`, `{ ...env }` makes a plain object that keeps each key's original casing, and `delete out[key]` only removes exact-case uppercase names. That much is accurate. The rest of the claimed mechanism doesn't hold up.\n\n1. **The trigger is unrealistic and self-inflicted.** Windows itself stores env names with the case they were given. The bug only matters if the operator, on their own machine, deliberately sets something like `Doucko_Child_Display_Name` or `doucko_child_display_name` instead of the canonical uppercase name used by the project's compose files and env files. No attacker or untrusted input controls the operator's process environment, so there is no attack surface.\n\n2. **The key link was never verified.** The finding assumes that Compose (compose-go, run as a child process with Node's env block) reads `${DOUCKO_CHILD_DISPLAY_NAME}` case-insensitively from a mixed-case key, and that this beats `--env-file`. That isn't shown. Compose builds its own string map from `os.Environ()` for interpolation, and whether that lookup ignores case on Windows is an implementation detail the reviewer only asserts (confidence: low). The finding gives no reproduction.\n\n3. **Even if it happened, the impact is small.** It would affect the isolated `doucko-e2e` test stack only: project `doucko-e2e`, port 18082, guarded by `assertE2eProject`. The worst case is that a test-only display name or password differs from the committed e2e value. It can't touch the owner's `doucko` project or data, and it can't leak anything into the repo. `COMPOSE_PROJECT_NAME` and the other selectors are irrelevant here, because `-p doucko-e2e`, `-f` and `--env-file` are always passed explicitly on the command line and override any env var.\n\nThe claim depends on an unverified Compose behaviour and on the operator mis-casing their own variable, so there's no real-user or attacker path that I can positively confirm."
+        ]
+      },
+      {
+        "title": "Task matching scans every seed task without stopping and ignores duplicates",
+        "file": "tools/lib/e2e-seed.mjs",
+        "line": 129,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "For each of the 3 definitions, the loop fetches every task whose `promptExcerpt.startsWith(\"E2E Seed\")` and keeps the last match: `if (full.prompt === def.prompt) task = full;`. There is no `break`, so it makes N GETs per definition. If an earlier interrupted or concurrent run created duplicates, the seed quietly picks one and the spec's 'exactly one' state is never restored or reported.",
+        "suggestion": "Fetch the seed-prefixed tasks once into a map from prompt to tasks. If a prompt has more than one task, fail loudly (or warn) instead of choosing one.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The code does what the finding says: `tools/lib/e2e-seed.mjs:129-132` has no `break`, keeps the last match, and doesn't check for duplicates. But the correctness harm it claims doesn't hold up.\n\n1. **An interrupted run can't create duplicates.** The seed creates tasks one at a time (create, then publish, then the next one). It reads `GET /api/admin/tasks` fresh on every run and matches on the full prompt. If a run dies partway, the next run finds the tasks already made and only creates the missing ones. For a prompt to end up duplicated, two seeds would have to run at the same time against the same stack, or someone would have to create matching \"E2E Seed: …\" tasks by hand. This tool seeds an isolated, throwaway e2e stack (`doucko-e2e`, used through up/seed/down) for a single operator, so neither case is a realistic path for the tool.\n\n2. **There is no \"exactly one\" requirement.** I searched the repo and found no spec or doc saying the seed must leave exactly one copy of each task. The module's own contract (lines 1-4 and 109) is idempotent create-if-missing: \"Running it twice leaves the same state.\" The code meets that for every reachable path. The source lookup (`find`) and the mission lookup (topic + position) also take the first match, so the task loop isn't treating duplicates any differently from the rest of the file.\n\n3. **The extra GETs are a speed point, not a correctness bug.** With 3 definitions and about 3 seed tasks, that's roughly 9 small GETs, which is negligible and gives the same result.\n\nSo the code works as described, but the scenario the finding uses to show harm can't happen as written, and the standard it cites doesn't exist. Rejecting a duplicate loudly would be a nice robustness touch, but it isn't a correctness defect.",
+          "The code description is accurate: at `tools/lib/e2e-seed.mjs:129-132` there is no `break`, the last match wins, and each definition makes up to N GETs. The harm the finding claims, though, has no realistic path.\n\n1. **An interrupted run cannot create duplicates.** Each task comes from a single `POST`. If a run dies after creating task k, the next run finds that task by its exact `prompt` and reuses it. It only creates the tasks still missing. Within one run, the `summaries` snapshot is taken before the loop. That is still safe because each definition has a different prompt, so a task created in iteration i can never match definition j.\n2. **The only way to get duplicates is two seed processes racing against the same stack.** The seed is a developer-only CLI (`tools/e2e-stack.mjs:76`, `up/seed/down`) for the isolated `doucko-e2e` project, and `down -v` wipes its volumes. Running it twice at once is self-inflicted misuse, not a scenario a user or attacker can trigger. Nothing in this code path is reachable from production.\n3. **The cost is negligible.** With at most 3 seed tasks there are at most 9 extra admin GETs on a local stack.\n4. **Even if a duplicate existed, the outcome is benign.** The mission is matched by topic + position and is created once with the task IDs from the first run, so the e2e flow still works.\n\nThis is defensive-hardening advice for a dev tool, not a reproducible defect."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/harden-phase5-api/review-findings.json"
+  }
+}
