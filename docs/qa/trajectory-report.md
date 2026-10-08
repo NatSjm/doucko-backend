@@ -5,7 +5,7 @@ archived slice took: review evidence, `Slice:` trailers, and module scope.
 It does NOT verify test-first ordering or test integrity (not derivable from
 one-commit-per-slice history) — those are graded by the trajectory-eval workflow.
 
-Scope: 10 archived slice(s).
+Scope: 11 archived slice(s).
 Result: PASS, 3 warning(s)
 
 | Slice | Review evidence | Trailer commits | design+tasks | lib domains touched |
@@ -19,7 +19,8 @@ Result: PASS, 3 warning(s)
 | 2026-10-05-fix-restore-schema-drift | clean | 3 | yes | - |
 | 2026-10-05-implement-practice-flow-api | clean | 4 | yes | practice, content, profile, shared |
 | 2026-10-07-implement-gamification-api | clean | 4 | yes | practice, content |
-| 2026-10-08-implement-progress-stats-api | clean | 5 | yes | practice, content |
+| 2026-10-08-harden-phase5-api | clean | 4 | yes | - |
+| 2026-10-08-implement-progress-stats-api | clean | 6 | yes | practice, content |
 
 ## Cross-slice module overlap
 

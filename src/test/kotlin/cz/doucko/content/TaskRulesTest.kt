@@ -48,13 +48,14 @@ class TaskRulesTest {
         hints: List<In<String>> = emptyList(),
         translations: In<Map<String, In<TranslationDraft>>> = In.Missing,
         topicId: In<UUID> = In.Ok(Topics.DECIMALS),
+        sourceRefId: In<UUID> = In.Ok(sourceId),
     ) = TaskDraft(
         prompt = prompt,
         topicId = topicId,
         grade = grade,
         difficulty = difficulty,
         modality = modality,
-        sourceRef = In.Ok(SourceRefDraft(In.Ok(sourceId), page, taskNo, subPart)),
+        sourceRef = In.Ok(SourceRefDraft(sourceRefId, page, taskNo, subPart)),
         parts = In.Ok(parts),
         hints = In.Ok(hints),
         translations = translations,
@@ -148,6 +149,17 @@ class TaskRulesTest {
         errors(draft(subPart = ok("b".repeat(11)))) shouldContainExactly listOf("sourceRef.subPart" to "too-long")
         valid(draft(subPart = ok("  "))).sourceRef.subPart.shouldBeNull()
         valid(draft(subPart = In.Missing)).sourceRef.subPart.shouldBeNull()
+    }
+
+    // @trace FR-3
+    @Test
+    fun `a source id that is not a UUID is named as such, and without a source a page must be a whole number from 1`() {
+        errors(draft(sourceRefId = In.Invalid), context.copy(source = null)) shouldContainExactly
+            listOf("sourceRef.sourceId" to "not-uuid")
+        errors(draft(sourceRefId = In.Missing, page = In.Ok(0)), context.copy(source = null)) shouldContainExactly
+            listOf("sourceRef.sourceId" to "required", "sourceRef.page" to "page-whole")
+        errors(draft(page = In.Invalid), context.copy(source = null)) shouldContainExactly
+            listOf("sourceRef.sourceId" to "source-unknown", "sourceRef.page" to "page-whole")
     }
 
     // @trace FR-5

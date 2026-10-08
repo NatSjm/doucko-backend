@@ -67,6 +67,10 @@ const GATE_COMMANDS = {
   trajectory: { script: "check-trajectory", args: [] },
   recordings: { script: "check-recordings", args: [] },
   coverage: { script: "check-coverage-ratchet", args: [] },
+  // Doučko PD-16: real-stack Playwright evidence (docs/qa/e2e-stack-latest.md)
+  // fresh for HEAD. `roles`: the key applies only to these repo roles; every
+  // other role renders it "n/a (<repo> role)", exactly like gateKeysExcluded.
+  e2eStack: { script: "check-e2e-stack", args: [], roles: ["frontend"] },
   evals: { script: "check-eval-ratchet", args: [] },
   acceptanceExistence: { script: "check-acceptance-methods", args: ["--mode=existence"] },
   acceptanceArtifact: { script: "check-acceptance-methods", args: ["--mode=artifact"] },
@@ -181,6 +185,9 @@ function runCheck(key) {
   if (status === "SKIP-pending" && productCode) status = "NOT-EARNED";
   return { status, out, scopeN };
 }
+// PD-16: role-scoped keys (GATE_COMMANDS[key].roles) join the exclusion set
+// for every other role, so seeded factory.config.json files need no edit.
+for (const [key, def] of Object.entries(GATE_COMMANDS)) if (def.roles && !def.roles.includes(CFG.repo)) EXCLUDED.add(key);
 const checks = {};
 for (const key of Object.keys(GATE_COMMANDS)) {
   if (EXCLUDED.has(key)) checks[key] = { status: `n/a (${CFG.repo} role)`, out: `excluded for repo ${CFG.repo} (factory.config.json gateKeysExcluded)`, scopeN: null, excluded: true };
@@ -211,7 +218,7 @@ const GATES = [
   { g: "G2", desc: "baseline specs", keys: ["traceability"] },
   { g: "G3", desc: "capability plan + acceptance methods exist", keys: ["acceptanceExistence"], fixed: (fold) => worst(has(CFG.paths.plan) ? "needs sign-off" : "FAIL", fold) },
   { g: "G4", desc: "per-slice", keys: ["traceability", "trajectory", "acceptanceArtifact", "integrity", "workspace"] },
-  { g: "G5", desc: "hardening (coverage)", keys: ["coverage"] },
+  { g: "G5", desc: "hardening (coverage + real-stack e2e)", keys: ["coverage", "e2eStack"] },
   { g: "G6", desc: "QA proof", keys: ["recordings", "evals", "acceptanceArtifact", "visual"] },
   { g: "G7", desc: "release", keys: ["traceabilityRelease", "trajectoryRelease", "recordings", "acceptanceArtifact", "integrity", "workspaceRelease"] },
   { g: "G8", desc: "UAT (trace regressions)", keys: ["traceability"] },

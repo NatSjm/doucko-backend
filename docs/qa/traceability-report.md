@@ -11,7 +11,7 @@ Result: PASS
 |---|---|---|---|---|---|
 | FR-1 | yes | yes | backend, frontend | 17 | - |
 | FR-2 | yes | yes | backend, frontend | 1 | - |
-| FR-3 | yes | yes | backend, frontend | 23 | - |
+| FR-3 | yes | yes | backend, frontend | 24 | - |
 | FR-4 | yes | yes | backend, frontend | 4 | - |
 | FR-5 | yes | yes | backend | 3 | - |
 | FR-6 | yes | yes | backend, frontend | 33 | - |
@@ -53,7 +53,7 @@ Result: PASS
 | FR-39 | yes | yes | backend, frontend | 6 | - |
 | FR-58 | yes | yes | frontend | n/a | n/a |
 | FR-40 | yes | yes | backend, frontend | 42 | - |
-| FR-41 | yes | yes | backend, frontend | 41 | - |
+| FR-41 | yes | yes | backend, frontend | 42 | - |
 | FR-42 | yes | yes | backend | 1 | - |
 | FR-43 | yes | yes | backend | 52 | - |
 | FR-44 | yes | yes | backend | 10 | - |
@@ -63,15 +63,15 @@ Result: PASS
 | Req | Owner repo(s) | Test trace here |
 |---|---|---|
 | NFR-1 | backend | 19 |
-| NFR-2 | backend | 11 |
-| NFR-3 | backend, frontend | 21 |
-| NFR-4 | backend, frontend | 6 |
+| NFR-2 | backend | 12 |
+| NFR-3 | backend, frontend | 22 |
+| NFR-4 | backend, frontend | 9 |
 | NFR-5 | backend, frontend | 2 |
 | NFR-6 | frontend | n/a |
 | NFR-7 | frontend | n/a |
 | NFR-8 | frontend | n/a |
 | NFR-9 | backend, frontend | 4 |
-| NFR-10 | backend | 14 |
+| NFR-10 | backend | 20 |
 | NFR-11 | backend | 2 |
 | NFR-12 | backend, frontend | 3 |
 | NFR-13 | frontend | n/a |

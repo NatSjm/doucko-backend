@@ -22,6 +22,9 @@
     "workflow": "node scripts/run-workflow.mjs",
     "stack:up": "node tools/stack.mjs up",
     "stack:down": "node tools/stack.mjs down",
+    "e2e-stack:up": "node tools/e2e-stack.mjs up",
+    "e2e-stack:down": "node tools/e2e-stack.mjs down",
+    "e2e-stack:seed": "node tools/e2e-stack.mjs seed",
     "backup": "node tools/backup.mjs",
     "restore": "node tools/restore.mjs"
   },

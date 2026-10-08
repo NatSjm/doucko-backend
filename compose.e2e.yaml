@@ -1,0 +1,22 @@
+# Isolated end-to-end stack (Phase 5): an override of compose.yaml, used ONLY through
+# `node tools/e2e-stack.mjs up|down|seed`, which always passes `-p doucko-e2e` and
+# `--env-file tools/e2e-stack.env` (fixed, fake, committed test values; never .env).
+#
+# - Separate Compose project `doucko-e2e`: its containers, network and volumes
+#   (doucko-e2e_doucko-pgdata, doucko-e2e_doucko-storage) never touch the owner's project `doucko`.
+#   `down` removes them with `-v`; they are throwaway.
+# - Only the frontend is published, on 127.0.0.1:18082 (NFR-2: loopback; the tool also checks the
+#   rendered config). `!override` replaces the base port list instead of appending to it.
+# - The frontend build context comes from DOUCKO_FRONTEND_DIR (default ../frontend) so a frontend
+#   worktree can be tested; the tool resolves it to an absolute path.
+services:
+  db:
+    restart: "no"
+  backend:
+    restart: "no"
+  frontend:
+    build:
+      context: ${DOUCKO_FRONTEND_DIR:-../frontend}
+    ports: !override
+      - "127.0.0.1:18082:80"
+    restart: "no"

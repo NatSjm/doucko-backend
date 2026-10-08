@@ -177,6 +177,7 @@
         "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
         "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
         "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+        "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
         "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt"
       ],
       "recordings": []
@@ -1183,6 +1184,7 @@
         "src/test/kotlin/cz/doucko/practice/FlagQueueServiceTest.kt",
         "src/test/kotlin/cz/doucko/practice/FlagQueueServiceTest.kt",
         "src/test/kotlin/cz/doucko/practice/FlagQueueServiceTest.kt",
+        "src/test/kotlin/cz/doucko/practice/FlagQueueServiceTest.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeLogCaptureIT.kt",
         "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
         "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
@@ -1354,7 +1356,8 @@
         "src/test/kotlin/cz/doucko/platform/BindAddressTest.kt",
         "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt",
         "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt",
-        "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt"
+        "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt",
+        "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt"
       ]
     },
     {
@@ -1371,6 +1374,7 @@
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt",
         "src/test/kotlin/cz/doucko/platform/DockerContextTest.kt",
+        "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeLogCaptureIT.kt",
         "src/test/kotlin/cz/doucko/profile/ChildProfileEntityTest.kt",
         "src/test/kotlin/cz/doucko/profile/ChildProfileStartupIT.kt",
@@ -1396,6 +1400,9 @@
       ],
       "ownedHere": true,
       "tests": [
+        "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+        "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+        "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
         "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
         "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
         "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
@@ -1470,6 +1477,12 @@
         "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
         "src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt",
         "src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt",
+        "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+        "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+        "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+        "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+        "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+        "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
         "src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt",
         "src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt",
         "src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt",
