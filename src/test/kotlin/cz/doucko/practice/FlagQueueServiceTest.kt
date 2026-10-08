@@ -127,6 +127,18 @@ class FlagQueueServiceTest {
 
     // @trace FR-41
     @Test
+    fun `an open report without an attempt can be dismissed and is returned without one`() {
+        val t = task()
+        val r = report(t, null)
+        val view = queue.dismiss(r.id)
+        view.report.status shouldBe ReportStatus.DISMISSED
+        view.attempt.shouldBeNull()
+        view.taskPromptExcerpt shouldBe "Zadání"
+        store.report(r.id)!!.status shouldBe ReportStatus.DISMISSED
+    }
+
+    // @trace FR-41
+    @Test
     fun `a task that no longer exists is no change and lists with an empty excerpt`() {
         val t = task()
         val a = attempt(t, 1)

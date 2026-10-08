@@ -5,13 +5,13 @@ requirements/spec/test/recording change; CI runs `--check-fresh`.
 
 Repo: backend (contract: submodule).
 Scope: 48 MVP functional requirements, 47 owned by backend.
-Result: PASS
+Result: PASS, 1 warning(s)
 
 | FR | Spec | Plan | Owner repo(s) | Test trace here | Recording here |
 |---|---|---|---|---|---|
 | FR-1 | yes | yes | backend, frontend | 17 | - |
 | FR-2 | yes | yes | backend, frontend | 1 | - |
-| FR-3 | yes | yes | backend, frontend | 23 | - |
+| FR-3 | yes | yes | backend, frontend | 24 | - |
 | FR-4 | yes | yes | backend, frontend | 4 | - |
 | FR-5 | yes | yes | backend | 3 | - |
 | FR-6 | yes | yes | backend, frontend | 33 | - |
@@ -53,7 +53,7 @@ Result: PASS
 | FR-39 | yes | yes | backend, frontend | 6 | - |
 | FR-58 | yes | yes | frontend | n/a | n/a |
 | FR-40 | yes | yes | backend, frontend | 42 | - |
-| FR-41 | yes | yes | backend, frontend | 41 | - |
+| FR-41 | yes | yes | backend, frontend | 42 | - |
 | FR-42 | yes | yes | backend | 1 | - |
 | FR-43 | yes | yes | backend | 52 | - |
 | FR-44 | yes | yes | backend | 10 | - |
@@ -97,4 +97,4 @@ None.
 
 ## Warnings
 
-None.
+- **active-changes**: active change "harden-phase5-api" is not archived
