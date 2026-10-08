@@ -7,7 +7,7 @@
 
 - **Date and time:** 2026-10-08 (Europe/Prague)
 - **Current phase:** Phase 5
-- **Last completed gate:** G5
+- **Last completed gate:** G3
 - **Active change:** none. Phase 5 backend `harden-phase5-api` archived 2026-10-08 on branch `phase5-hardening` (not merged into `main` yet): isolated e2e stack `tools/e2e-stack.mjs up|down|seed|ps` (Compose project `doucko-e2e`, frontend only on `127.0.0.1:18082`, throwaway volumes, fake test values in `tools/e2e-stack.env`, idempotent PII-free seed through the admin API; `DOUCKO_FRONTEND_DIR` picks the frontend checkout) and behavioural tests that ratcheted coverage up. Before it: Slice 9 backend `implement-progress-stats-api` (the last MVP slice) archived 2026-10-08 and merged into `main` (`e40423d`) with the frontend half; real-stack smoke PASS after the merge (2026-10-08: flag queue OPEN→re-evaluate no change→fix spec→re-evaluate +4 XP FIXED, dismiss, 409/404/400/401/403 paths, stats weeks and first-try rate, both admin screens rendered from the stack, clean log; restore of the pre-smoke V5 dump restarted the V6 backend itself). Before it: slice 8 `implement-gamification-api`, merged into `main` (`9527006`) with a real-stack smoke PASS.
 - **Contract pin:** `contract/` submodule at docs `0168eba`, API 0.5.1
 - **Progress:** Spring Boot 4.1.1 / Kotlin 2.3 / JVM 21 scaffold (ADR-0003) plus slice 1 platform

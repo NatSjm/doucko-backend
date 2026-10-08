@@ -89,7 +89,7 @@
     {
       "slice": "2026-10-08-harden-phase5-api",
       "reviewEvidence": "clean",
-      "trailerCommits": 3,
+      "trailerCommits": 4,
       "libDomains": [],
       "processComplete": true
     },
