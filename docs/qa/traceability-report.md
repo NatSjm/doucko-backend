@@ -63,8 +63,8 @@ Result: PASS
 | Req | Owner repo(s) | Test trace here |
 |---|---|---|
 | NFR-1 | backend | 19 |
-| NFR-2 | backend | 11 |
-| NFR-3 | backend, frontend | 21 |
+| NFR-2 | backend | 12 |
+| NFR-3 | backend, frontend | 27 |
 | NFR-4 | backend, frontend | 6 |
 | NFR-5 | backend, frontend | 2 |
 | NFR-6 | frontend | n/a |

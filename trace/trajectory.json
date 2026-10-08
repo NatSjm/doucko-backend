@@ -89,7 +89,7 @@
     {
       "slice": "2026-10-08-implement-progress-stats-api",
       "reviewEvidence": "clean",
-      "trailerCommits": 5,
+      "trailerCommits": 6,
       "libDomains": [
         "practice",
         "content"
