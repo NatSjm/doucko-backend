@@ -19,7 +19,9 @@
 4. **Seed through the public API**, matched by source title, exact task prompt and, for the
    mission, topic + position — missions have no name in the contract (CA-D17), so "E2E Seed
    Mission" is the mission at topic Přirozená čísla, position 1. Creates/publishes only what is
-   missing; it never resets practice data (a fresh stack does).
+   missing; it never resets practice data (a fresh stack does). Anything that is not a seeded
+   state — two sources or tasks matching one seed item, or a mission at the seed position whose
+   task list differs from the seed's — is refused loudly ("run down and up") instead of adopted.
 5. **NFR-2** is checked on the rendered config (`docker compose config`) before `up`, as
    `stack.mjs` does; only the frontend may publish a port.
 
@@ -28,5 +30,10 @@ Operator tooling under `tools/` (Node, no dependencies); pure parts in `tools/li
 and `tools/lib/e2e-seed.mjs`, tested by `E2eStackToolTest` through `--dry-run`.
 
 ## Risks & mitigations
-- Two agents starting the stack at once → the shared `scratch/qa-lock` mkdir lock covers `up`..`down`.
+- Two callers using the stack at once (concurrent `seed` could duplicate items). Accepted: the
+  tool does not lock by itself, because the caller (the frontend suite) holds the workspace
+  coordination lock `scratch/qa-lock` around its whole `up`..`down` window and the tool would
+  deadlock on it; the seed refuses duplicate state afterwards, and `down` + `up` recovers.
+- Caller environment overriding the env file → `composeEnv` drops secrets and `COMPOSE_*`
+  selectors case-insensitively; `--dry-run` shows that none leak.
 - Port 18082 taken → `up` fails loudly; nothing else is affected.

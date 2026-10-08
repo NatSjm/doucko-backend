@@ -1,0 +1,7 @@
+{
+  "scope": "Phase 5 hardening backend (harden-phase5-api): isolated e2e stack tooling and coverage tests",
+  "baseRef": "f822521",
+  "headRef": "HEAD",
+  "change": "harden-phase5-api",
+  "focus": "Check against openspec/changes/harden-phase5-api (spec delta specs/platform-foundation/spec.md and design.md). Pay attention to: any way tools/e2e-stack.mjs or compose.e2e.yaml could address the owner's Compose project 'doucko' or its volumes (doucko_doucko-pgdata, doucko_doucko-storage) — project name from env, COMPOSE_* variables, relative -f paths, down -v scope; values from .env or the process environment leaking into the e2e stack; ports published on anything but 127.0.0.1 or services other than the frontend (NFR-2); the seed not being idempotent (duplicates on re-run, races, matching by excerpt), sending workbook content or PII (NFR-3, NFR-4); the generated PDF being invalid; secrets or real values committed in tools/e2e-stack.env; the new tests asserting real behaviour rather than padding coverage; Windows path handling."
+}

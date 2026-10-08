@@ -36,31 +36,40 @@ export function parseCommand(argv) {
 
 /** Absolute frontend build context: DOUCKO_FRONTEND_DIR (relative to the backend root) or ../frontend. */
 export function frontendDir(env) {
-  const raw = (env.DOUCKO_FRONTEND_DIR ?? "").trim() || "../frontend";
+  const key = Object.keys(env).find((k) => k.toUpperCase() === "DOUCKO_FRONTEND_DIR");
+  const raw = ((key && env[key]) ?? "").trim() || "../frontend";
   return isAbsolute(raw) ? resolve(raw) : resolve(ROOT, raw);
 }
 
+/** Variables the process environment must not pass to compose (it would win over --env-file). */
+export const BLOCKED_ENV = [
+  "COMPOSE_PROJECT_NAME",
+  "COMPOSE_FILE",
+  "COMPOSE_ENV_FILES",
+  "COMPOSE_PROFILES",
+  "COMPOSE_PATH_SEPARATOR",
+  "DOUCKO_DB_PASSWORD",
+  "ADMIN_PASSWORD",
+  "DOUCKO_CHILD_DISPLAY_NAME",
+  "DOUCKO_BIND_ADDRESS",
+];
+
 /**
- * Environment for `docker compose`: the process environment would win over --env-file, so every
- * value the e2e env file sets (and the project / file selectors) is removed; the frontend dir is
- * passed resolved.
+ * Environment for `docker compose`: every value the e2e env file sets and the project / file selectors
+ * are removed (case-insensitively: Windows variable names are), the frontend dir is passed resolved.
  */
 export function composeEnv(env) {
   const out = { ...env };
-  for (const key of [
-    "COMPOSE_PROJECT_NAME",
-    "COMPOSE_FILE",
-    "COMPOSE_ENV_FILES",
-    "COMPOSE_PROFILES",
-    "DOUCKO_DB_PASSWORD",
-    "ADMIN_PASSWORD",
-    "DOUCKO_CHILD_DISPLAY_NAME",
-    "DOUCKO_BIND_ADDRESS",
-  ]) {
-    delete out[key];
+  for (const key of Object.keys(out)) {
+    if (BLOCKED_ENV.includes(key.toUpperCase()) || key.toUpperCase() === "DOUCKO_FRONTEND_DIR") delete out[key];
   }
   out.DOUCKO_FRONTEND_DIR = frontendDir(env);
   return out;
+}
+
+/** Names of blocked variables that would still reach compose (always empty; shown by --dry-run). */
+export function leakedEnv(env) {
+  return Object.keys(env).filter((k) => BLOCKED_ENV.includes(k.toUpperCase()));
 }
 
 /** `docker` argv prefix: always the e2e project, both compose files and the committed test env file. */

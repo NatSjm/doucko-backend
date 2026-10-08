@@ -16,11 +16,12 @@ import { ROOT, bindAddressProblem } from "./lib/compose.mjs";
 import {
   E2E_BASE_URL,
   E2E_ENV_FILE,
+  E2E_PORT,
   composeEnv,
   dockerArgsFor,
   e2eAdminPassword,
   e2eComposeArgs,
-  frontendDir,
+  leakedEnv,
   parseCommand,
 } from "./lib/e2e-stack.mjs";
 import { AdminClient, seed } from "./lib/e2e-seed.mjs";
@@ -34,13 +35,21 @@ const { command, dryRun } = parsed;
 const env = composeEnv(process.env);
 
 if (dryRun) {
-  console.log(JSON.stringify({ command, docker: dockerArgsFor(command), frontendDir: env.DOUCKO_FRONTEND_DIR, baseUrl: E2E_BASE_URL }));
+  console.log(
+    JSON.stringify({
+      command,
+      docker: dockerArgsFor(command),
+      frontendDir: env.DOUCKO_FRONTEND_DIR,
+      baseUrl: E2E_BASE_URL,
+      leakedEnv: leakedEnv(env),
+    }),
+  );
   process.exit(0);
 }
 
 const run = (args) => spawnSync("docker", args, { cwd: ROOT, env, stdio: "inherit" }).status ?? 1;
 
-/** NFR-2 on what compose will really publish for this project. */
+/** NFR-2 on what compose will really publish: only the frontend, only on 127.0.0.1:18082. */
 function portProblems() {
   const r = spawnSync("docker", [...e2eComposeArgs(), "config", "--format", "json"], { cwd: ROOT, env, encoding: "utf8", windowsHide: true });
   if (r.status !== 0) return [`docker compose config failed: ${(r.stderr || r.error?.message || "").trim()}`];
@@ -50,6 +59,9 @@ function portProblems() {
       const problem = bindAddressProblem(port.host_ip || "0.0.0.0");
       if (problem) problems.push(`${service} port ${port.published}: ${problem}`);
       if (service !== "frontend") problems.push(`${service} must not be published (port ${port.published})`);
+      else if (port.host_ip !== "127.0.0.1" || String(port.published) !== String(E2E_PORT)) {
+        problems.push(`frontend must publish only 127.0.0.1:${E2E_PORT}, not ${port.host_ip || "*"}:${port.published}`);
+      }
     }
   }
   return problems;

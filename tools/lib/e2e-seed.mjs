@@ -51,7 +51,7 @@ export function blankPdf(pages) {
   const kids = Array.from({ length: pages }, (_, i) => `${3 + i} 0 R`).join(" ");
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
-    `<< /Type /Pages /Kids [${kids}] /Count ${pages} >>`,
+    `<< /Type /Pages /Kids [${kids}] /Count ${pages} /Resources << >> >>`,
     ...Array.from({ length: pages }, () => "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] >>"),
   ];
   let body = "%PDF-1.4\n";
@@ -108,8 +108,9 @@ export class AdminClient {
 
 /** Applies the seed; returns what it found or created. Running it twice leaves the same state. */
 export async function seed(client, log = () => {}) {
-  const sources = await client.request("GET", "/api/admin/sources");
-  let source = sources.find((s) => s.title === SEED_SOURCE.title);
+  const sources = (await client.request("GET", "/api/admin/sources")).filter((s) => s.title === SEED_SOURCE.title);
+  if (sources.length > 1) throw new Error(`${sources.length} sources titled "${SEED_SOURCE.title}" — not a seeded state; run down and up`);
+  let source = sources[0];
   if (source) {
     log(`source "${SEED_SOURCE.title}" exists`);
   } else {
@@ -125,11 +126,13 @@ export async function seed(client, log = () => {}) {
   const summaries = await client.request("GET", "/api/admin/tasks");
   const taskIds = [];
   for (const def of SEED_TASKS) {
-    let task = null;
+    const matches = [];
     for (const s of summaries.filter((t) => t.promptExcerpt.startsWith("E2E Seed"))) {
       const full = await client.request("GET", `/api/admin/tasks/${s.taskId}`);
-      if (full.prompt === def.prompt) task = full;
+      if (full.prompt === def.prompt) matches.push(full);
     }
+    if (matches.length > 1) throw new Error(`${matches.length} tasks with prompt "${def.prompt}" — not a seeded state; run down and up`);
+    let task = matches[0] ?? null;
     if (task) {
       log(`task "${def.prompt}" exists (${task.status})`);
     } else {
@@ -160,6 +163,12 @@ export async function seed(client, log = () => {}) {
   const missions = await client.request("GET", "/api/admin/missions");
   let mission = missions.find((m) => m.topicId === SEED_MISSION.topicId && m.position === SEED_MISSION.position);
   if (mission) {
+    // Topic + position is the mission's only identity (CA-D17); refuse one that is not the seed's.
+    if (JSON.stringify(mission.taskIds) !== JSON.stringify(taskIds)) {
+      throw new Error(
+        `the mission at topic ${SEED_MISSION.topicId} position ${SEED_MISSION.position} holds other tasks than the seed — not a seeded state; run down and up`,
+      );
+    }
     log(`mission "${SEED_MISSION.label}" exists (${mission.status})`);
   } else {
     mission = await client.request(
@@ -174,5 +183,5 @@ export async function seed(client, log = () => {}) {
     await client.request("PUT", `/api/admin/missions/${mission.missionId}/status`, { status: "PUBLISHED" });
     log(`mission "${SEED_MISSION.label}" published`);
   }
-  return { sourceId: source.sourceId, taskIds, missionId: mission.missionId };
+  return { sourceId: source.sourceId, taskIds: mission.taskIds, missionId: mission.missionId };
 }

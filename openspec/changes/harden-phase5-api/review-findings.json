@@ -1,0 +1,243 @@
+{
+  "generatedBy": "review-gate",
+  "scope": "Phase 5 hardening backend (harden-phase5-api): isolated e2e stack tooling and coverage tests",
+  "change": "harden-phase5-api",
+  "baseRef": "f822521",
+  "headRef": "HEAD",
+  "dimensions": {
+    "correctness": {
+      "confirmed": 4,
+      "contested": 1,
+      "rejected": 3
+    },
+    "security": {
+      "confirmed": 3,
+      "contested": 1,
+      "rejected": 0
+    },
+    "spec-compliance": {
+      "confirmed": 12,
+      "contested": 0,
+      "rejected": 0
+    },
+    "visual": {
+      "confirmed": 0,
+      "contested": 0,
+      "rejected": 0
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "major",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Seed adopts any mission at topic+position 1 without checking or fixing its taskIds, so re-runs can fail or report tasks the mission doesn't contain",
+      "file": "tools/lib/e2e-seed.mjs",
+      "line": 161,
+      "status": "open"
+    },
+    {
+      "id": "F02",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "Seed tooling (blankPdf, idempotent matching, AdminClient) has no automated test",
+      "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "line": 19,
+      "status": "open"
+    },
+    {
+      "id": "F03",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "composeEnv stripping is untested; the dry-run test only proves the -p argument",
+      "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "line": 47,
+      "status": "open"
+    },
+    {
+      "id": "F04",
+      "severity": "minor",
+      "dimension": "correctness",
+      "verdict": "confirmed",
+      "title": "New TaskRules test repeats an existing page-range assertion",
+      "file": "src/test/kotlin/cz/doucko/content/TaskRulesTest.kt",
+      "line": 163,
+      "status": "open"
+    },
+    {
+      "id": "F05",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "Design promises a qa-lock around up..seed..down that is not implemented; concurrent seeds create duplicates",
+      "file": "tools/e2e-stack.mjs",
+      "line": 72,
+      "status": "open"
+    },
+    {
+      "id": "F06",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "Env-stripping guard (composeEnv) is not covered by any test; the 'environment names doucko' test only checks the static argv",
+      "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "line": 46,
+      "status": "open"
+    },
+    {
+      "id": "F07",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "confirmed",
+      "title": "tasks.md marks review-gate and archive as done before this review and without evidence",
+      "file": "openspec/changes/harden-phase5-api/tasks.md",
+      "line": 152,
+      "status": "open"
+    },
+    {
+      "id": "F08",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Coverage summary: 2 scenarios — 1 implemented, 1 partial, 0 missing, 0 contradicted",
+      "file": "openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md",
+      "line": 17,
+      "status": "open"
+    },
+    {
+      "id": "F09",
+      "severity": "critical",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Most tasks are ticked but their artifacts don't exist (4.4 current-state, 4.3 review-findings.json, 4.5 archive, 4.1/2.2 evidence)",
+      "file": "openspec/changes/harden-phase5-api/tasks.md",
+      "line": 14,
+      "status": "open"
+    },
+    {
+      "id": "F10",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Task 2.2 coverage ratchet `--update` is ticked but the baseline didn't change, and nothing shows coverage is restored",
+      "file": "quality/coverage-baseline.json",
+      "line": 1,
+      "status": "open"
+    },
+    {
+      "id": "F11",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Seed idempotency scenario has no automated test and no committed proof (task 1.5 ticked without evidence)",
+      "file": "tools/lib/e2e-seed.mjs",
+      "line": 110,
+      "status": "open"
+    },
+    {
+      "id": "F12",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "The mission is matched by topic+position only, so a foreign mission at position 1 counts as the seed mission",
+      "file": "tools/lib/e2e-seed.mjs",
+      "line": 161,
+      "status": "open"
+    },
+    {
+      "id": "F13",
+      "severity": "major",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Design promises a qa-lock for concurrent up..down/seed, but nothing implements it (concurrent seeds would duplicate)",
+      "file": "tools/e2e-stack.mjs",
+      "line": 87,
+      "status": "open"
+    },
+    {
+      "id": "F14",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Case-variant environment variables survive composeEnv on Windows",
+      "file": "tools/lib/e2e-stack.mjs",
+      "line": 159,
+      "status": "open"
+    },
+    {
+      "id": "F15",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "The dry-run scenario never checks the child environment, so the env scrubbing (and the never-.env rule) is untested",
+      "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "line": 45,
+      "status": "open"
+    },
+    {
+      "id": "F16",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "The NFR-2 port check accepts any private LAN address, not only 127.0.0.1:18082",
+      "file": "tools/e2e-stack.mjs",
+      "line": 79,
+      "status": "open"
+    },
+    {
+      "id": "F17",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "The frontendDir test fails when the developer's own DOUCKO_FRONTEND_DIR is set; tests also carry NFR-3 traces that don't fit",
+      "file": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
+      "line": 89,
+      "status": "open"
+    },
+    {
+      "id": "F18",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "Scope drift: `ps` command and DOUCKO_FRONTEND_DIR are not in the spec requirement",
+      "file": "tools/lib/e2e-stack.mjs",
+      "line": 123,
+      "status": "open"
+    },
+    {
+      "id": "F19",
+      "severity": "minor",
+      "dimension": "spec-compliance",
+      "verdict": "confirmed",
+      "title": "The generated blank PDF pages have no /Resources entry",
+      "file": "tools/lib/e2e-seed.mjs",
+      "line": 55,
+      "status": "open"
+    },
+    {
+      "id": "F20",
+      "severity": "major",
+      "dimension": "correctness",
+      "verdict": "contested",
+      "title": "Design names a scratch/qa-lock mutex for up..down that does not exist",
+      "file": "openspec/changes/harden-phase5-api/design.md",
+      "line": 31,
+      "status": "open"
+    },
+    {
+      "id": "F21",
+      "severity": "minor",
+      "dimension": "security",
+      "verdict": "contested",
+      "title": "Seed treats any mission at topic+position 1 as the seed mission and never checks its task list",
+      "file": "tools/lib/e2e-seed.mjs",
+      "line": 161,
+      "status": "open"
+    }
+  ],
+  "clean": false,
+  "generatedAt": "2026-10-08T05:21:03Z"
+}

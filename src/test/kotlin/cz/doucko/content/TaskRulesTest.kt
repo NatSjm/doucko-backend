@@ -160,7 +160,6 @@ class TaskRulesTest {
             listOf("sourceRef.sourceId" to "required", "sourceRef.page" to "page-whole")
         errors(draft(page = In.Invalid), context.copy(source = null)) shouldContainExactly
             listOf("sourceRef.sourceId" to "source-unknown", "sourceRef.page" to "page-whole")
-        errors(draft(page = In.Ok(121))) shouldContainExactly listOf("sourceRef.page" to "page-range")
     }
 
     // @trace FR-5

@@ -64,14 +64,14 @@ Result: PASS, 1 warning(s)
 |---|---|---|
 | NFR-1 | backend | 19 |
 | NFR-2 | backend | 12 |
-| NFR-3 | backend, frontend | 27 |
-| NFR-4 | backend, frontend | 6 |
+| NFR-3 | backend, frontend | 22 |
+| NFR-4 | backend, frontend | 9 |
 | NFR-5 | backend, frontend | 2 |
 | NFR-6 | frontend | n/a |
 | NFR-7 | frontend | n/a |
 | NFR-8 | frontend | n/a |
 | NFR-9 | backend, frontend | 4 |
-| NFR-10 | backend | 14 |
+| NFR-10 | backend | 20 |
 | NFR-11 | backend | 2 |
 | NFR-12 | backend, frontend | 3 |
 | NFR-13 | frontend | n/a |
