@@ -1,0 +1,1017 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-09T18:17:10.426Z",
+  "finishedAt": "2026-10-09T18:22:59.629Z",
+  "args": {
+    "scope": "Phase 7 global release review of the backend (release-review-api), part c: practice module",
+    "baseRef": "38b56c8",
+    "headRef": "HEAD -- src/main/kotlin/cz/doucko/practice",
+    "change": "release-review-api",
+    "focus": "This is the once-per-release whole-history review; slice reviews already happened per slice, so prioritise CROSS-MODULE and cross-slice defects. This run covers ONLY: src/main/kotlin/cz/doucko/practice (read other modules only for context at call sites). Requirements: contract/docs/requirements.md; ownership table in contract/docs/mvp-capability-plan.md; API in contract/api/openapi.yaml. Check especially: answer keys leaking to child endpoints before reveal (FR-27, NFR-1); admin endpoints reachable without the admin; any user input producing a raw 500 or driver internals (RFC 7807 required); UNPARSEABLE consuming an attempt (FR-22); attempts persisted immediately (FR-31); XP ledger never reduced (FR-38); Europe/Prague week boundaries in stats; module boundaries (Spring Modulith); migrations append-only and consistent with entities; concurrency (double submit, races on attempts/XP); path traversal / upload limits in storage; no secrets committed; tools never addressing the owner's compose project 'doucko'. Skip tests unless they mask a defect."
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": "sonnet",
+    "budgetPerAgentUsd": 1.2,
+    "maxTotalUsd": 3.75,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": "--max-total-usd 3.75 reached ($3.87)",
+  "error": null,
+  "totalCostUsd": 4.0511,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 1570,
+      "durationMs": 161721,
+      "sessionId": "1538f00a-c39c-46eb-bfec-9e4916b04268",
+      "costUsd": 0.6469482000000001,
+      "numTurns": 38,
+      "result": {
+        "findings": [
+          {
+            "title": "Login-free problem-report endpoint has no dedupe or rate limit, so the report queue can grow without bound",
+            "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+            "line": 200,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`report()` inserts a new `problem_report` row on every call (`store.insertReport(ReportRecord(UUID.randomUUID(), ...))`). Child endpoints need no login, and the table is append-only: there is no unique constraint on (task, attempt, status) and no throttle. Repeated POSTs, whether from a buggy client retry or from a hostile LAN client, grow the table forever and flood the admin flag queue. `listReports` returns everything unpaginated.",
+            "suggestion": "Collapse duplicate OPEN reports for the same task and attempt (idempotent insert, or a partial unique index on (task_id, attempt_id, reason) WHERE status='OPEN'). Consider paging `listReports`, or add a simple per-IP/per-task rate limit."
+          },
+          {
+            "title": "Statistics read the entire attempt and hint history on every request",
+            "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+            "line": 67,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`stats()` calls `store.allAttempts()` and `store.allHints()`, which load every row (including the parsed JSONB `parts` and the re-evaluation join). It then groups them in memory, even though only the last `weeks` weeks are returned. `metricMet` additionally needs only the last 5 weeks. The cost grows linearly with total history for each admin page load.",
+            "suggestion": "Add a store query bounded by `created_at >= start of the oldest requested week` (at least the last 5 weeks for the metric). Session splitting needs a small look-back before that boundary. The per-topic first-try counts can be computed in SQL or from primary-scope attempts only."
+          },
+          {
+            "title": "Replay attempts count toward sessions, the weekly metric and reveal counts",
+            "file": "src/main/kotlin/cz/doucko/practice/domain/Stats.kt",
+            "line": 70,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`sessions()` and `weeks()` take `store.allAttempts()` of every scope. A replay attempt (`replay=true`, which earns no XP) therefore counts as an answered task in a session. It can also push a session past `QUALIFYING_TASKS`, which feeds `metricMet`. The reveal tally `attemptNo == MAX_ATTEMPTS && !it.correct` counts replay reveals too. The KDoc states 'all scopes' deliberately, so this may be intended. The success metric is about practice habit rather than new content, so re-playing solved missions could satisfy the 4-weeks x 3-qualifying-sessions metric without new learning.",
+            "suggestion": "Confirm against the progress-stats spec's session definition. If replays should not count toward the metric, filter `!it.replay` in `metricMet`, or at least in the qualifying-session count. If they should, document it next to the metric."
+          },
+          {
+            "title": "Duplicated RFC 7807 advice code in the child and admin practice advices",
+            "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/AdminStatsProblemAdvice.kt",
+            "line": 70,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`AdminStatsProblemAdvice` and `PracticeProblemAdvice` each define identical private `invalid(request, errors)` and `respond(request, status, key, customize)` helpers. They also repeat the same handlers for `PracticeNotFound`, `PracticeConflict`, `InvalidPracticeInput` and `MethodArgumentTypeMismatchException`. A fix to one, such as a missing message key or a changed `errors` shape, can silently diverge from the other.",
+            "suggestion": "Extract a shared package-private helper (a small class or extension taking `ProblemResponses` and `MessageSource`) that builds the field-error problem. Keep only the per-controller title keys in the two advices."
+          },
+          {
+            "title": "Conflict-detail lookup throws NoSuchMessageException (raw 500) if a PracticeConflict code has no catalog entry",
+            "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+            "line": 40,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "The handler builds the detail with `messages.getMessage(\"practice.conflict.${exception.code}\", null, request.locale)`, with no default message. The key is derived from a free-form string passed to `PracticeConflict(\"...\")`. All six codes in use currently exist in `messages.properties`, which I verified. A new code added without a matching property line, or a typo, would turn a 409 into a 500 inside the advice itself. The same applies to `practice.error.${it.code}` in `invalid()`.",
+            "suggestion": "Use the `getMessage(code, args, defaultMessage, locale)` overload with the generic problem detail as default. Alternatively make the conflict code an enum so the set of keys is closed and covered by a test."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 1598,
+      "durationMs": 113222,
+      "sessionId": "0dd149d1-ca98-4876-837b-4eb1bb28ec26",
+      "costUsd": 0.4419119999999999,
+      "numTurns": 26,
+      "result": {
+        "findings": [
+          {
+            "title": "NUL (\\u0000) in a child report note or answer can reach Postgres and cause a raw 500",
+            "file": "src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+            "line": 214,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "The child can send `{\"reason\":\"OTHER\",\"note\":\"a\\u0000b\"}` to POST /api/child/missions/{m}/tasks/{t}/reports. ReportRules.validate only trims and counts code points, and the note is bound into the `problem_report.note` text column (JdbcPracticeStore.insertReport:123). Postgres rejects NUL in text with SQLSTATE 22021. Answers have the same risk: raw strings, including a choice key like \"\\u0000\", are written into the jsonb `parts` array in insertAttempt:103, and jsonb rejects \\u0000. Neither the checker nor the readers filter control characters (no isISOControl check found in src/main). The only practice advices handle NotFound, Conflict, Invalid, Unreadable and TooLarge, so the DataAccessException falls through to the generic handler as a 500. That breaks the AGENTS.md rule that no user input may produce a raw 500. I did not confirm that the checker returns WRONG rather than UNPARSEABLE for an answer containing NUL, so the answer path is unverified.",
+            "suggestion": "Reject or strip U+0000 in PracticeReaders.answers (strings and array elements) and ReportRules.note, and return a 400 with a catalog message. Also add a fallback DataAccessException handler that returns RFC 7807. Add a regression test with `\\u0000` in a note and in an answer."
+          },
+          {
+            "title": "Unthrottled child problem-report inserts: no rate limit or cap on rows per task",
+            "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+            "line": 201,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The child POST /reports endpoint is unauthenticated and the child chain has CSRF disabled. Each call inserts a new OPEN `problem_report` row (up to 1000 code points of note) with no per-task or per-attempt dedupe and no cap. Any LAN host can script thousands of requests, bloating the flag queue and the table. `usedTasks` also treats every report as usage, so the task's FR-56 delete guard blocks deletion for good. Neither the schema nor the service has a uniqueness or count limit. Impact is limited by the LAN-only exposure.",
+            "suggestion": "Allow at most one OPEN report per (task, attempt) in the service, or add a unique partial index on that pair. Optionally add a small global cap or rate limit on child writes."
+          },
+          {
+            "title": "Checklist areas reviewed in the practice module with no defect found",
+            "file": "src/main/kotlin/cz/doucko/practice",
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "Clean areas: (1) FR-27/NFR-1: revealed answers are produced only by DeterministicTutor when the state is REVEALED. PartView carries no answer spec, and the choice options expose only key and text. (2) FR-22: the Grade.Unreadable branch returns before store.insertAttempt, so nothing is stored. (3) FR-31: attempts are inserted inside the submit transaction under the pg advisory lock. The unique index (task_id, scope, attempt_no) also guards against a double submit. (4) FR-38: `xp_award` has a trigger refusing UPDATE and DELETE, and reevaluation XP is clamped with maxOf(0, …). (5) Europe/Prague: PragueWeeks uses ZoneId Europe/Prague with previousOrSame(MONDAY). (6) SQL: all values are bound parameters and there is no string interpolation of input; the only concatenated fragments are constants. (7) Admin endpoints (/api/admin/stats and /api/admin/reports/**) fall under the /api/admin/ admin chain. (8) Child bodies are capped at 16 KB and only `answers`, `reason`, `note` and `rankIndex` are read, so there is no mass assignment. (9) Problem responses never quote submitted values. (10) Migrations V4–V6 are append-only and consistent with the JDBC columns. (11) No secrets or PII found in the module. Dependencies and compose exposure were out of scope for this part.",
+            "suggestion": "None."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 1541,
+      "durationMs": 105015,
+      "sessionId": "824959b1-07a1-4def-9df2-7d946bf85b4b",
+      "costUsd": 0.3703276,
+      "numTurns": 21,
+      "result": {
+        "findings": [
+          {
+            "title": "Published-mission bonus is paid by a synchronous listener inside the content publisher's transaction",
+            "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+            "line": 118,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`onPublishedMissionChanged` uses plain `@EventListener` with `@Transactional`, so it joins the publisher's transaction. It calls `store.lock()` and then inserts into the XP ledger. A ledger failure, such as a unique-index race on `xp_award_bonus_once_uq`, would roll back the admin's publish or edit of the mission and surface through the content module's error handling. I read only the practice module, not the publishing call site.",
+            "suggestion": "Confirm with an integration test that a ledger failure cannot turn an admin publish into a raw 500. If it can, handle the failure or switch to `@TransactionalEventListener(AFTER_COMMIT)` with a new transaction. The startup `reconcile()` already repairs missed bonuses."
+          },
+          {
+            "title": "Startup reconcile and the publish listener back-date nothing: bonus rows are stamped with Instant.now()",
+            "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+            "line": 159,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`reconcile()` and `onPublishedMissionChanged` insert `MISSION_BONUS` rows with `Instant.now()`, and `reconcile()` inserts no celebration. A rank crossed this way is surfaced only through `HqView.pendingRankUp`. This is documented in the KDoc and does not break FR-38, because the ledger is append-only and the DB trigger refuses update and delete. The 'XP earned' figure on a mission summary is computed from `ledger.awards()` filtered by the run's attempt ids. Bonuses with a null `attempt_id` are therefore probably left out of the summary's `xpEarned`.",
+            "suggestion": "Add an IT that publishes a complete mission, then fetches `getMissionSummary`, and asserts the summary's XP against the ledger. If the bonus is missing from `xpEarned`, amend the spec or `RunXp.summarize`."
+          },
+          {
+            "title": "Retry limit and reveal logic exist in more than one place (service, tutor, stats)",
+            "file": "src/main/kotlin/cz/doucko/practice/domain/Stats.kt",
+            "line": 100,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "The reveal count in `StatsRules.weeks` uses `attemptNo == TaskProgress.MAX_ATTEMPTS && !it.correct`. `DeterministicTutor` reveals on `state == REVEALED`. `Gamification.summary` also uses `TaskProgress.MAX_ATTEMPTS`. The contract's `maxAttempts` is mapped separately as the constant `TaskView.MaxAttempts._2`. They agree today (2), but nothing ties them together.",
+            "suggestion": "Derive `maxAttempts` in `PracticeMapping.task` from `TaskProgress.MAX_ATTEMPTS`, or add a test asserting they are equal."
+          },
+          {
+            "title": "Verified clean: the checklist items I audited showed no defect",
+            "file": "src/main/kotlin/cz/doucko/practice",
+            "line": 0,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "- **Answer keys (FR-27, NFR-1):** keys appear only through `DeterministicTutor`, and only when the state is `REVEALED`. The reload path (`screen` → `outcome`) goes through the same tutor.\n- **UNPARSEABLE (FR-22):** `PracticeService.submit` returns `Grade.Unreadable` without calling `store.insertAttempt`, so no attempt is consumed.\n- **FR-31:** `insertAttempt` runs inside the transaction, after `store.lock()` (an advisory transaction lock).\n- **Double submit:** state is re-read under the lock, and `attempt_task_scope_no_uq` backs it up.\n- **FR-38:** V5 has a trigger that refuses UPDATE and DELETE on `xp_award`. `onReevaluation` clamps with `maxOf(0, …)`. Unique indexes cover once-per-task, once-per-mission bonus and once-per-report.\n- **Admin access:** `/api/admin/**` is covered by the admin security chain (`AdminSecurityConfiguration`). Only the sign-in POST is `permitAll`, and `AdminStatsController` has no auth bypass.\n- **Week boundaries:** `PragueWeeks` uses `ZoneId Europe/Prague` with Monday as week start.\n- **Problem responses:** `PracticeProblemAdvice` and `AdminStatsProblemAdvice` return RFC 7807 problems with catalog messages and never quote submitted values.\n- **SQL:** all values are bound parameters.\nI did not verify the spec scenarios one by one, `tasks.md` ticks, the OpenAPI field match, or the Modulith `verify()` boundary. I ran out of budget and did not run the tests.",
+            "suggestion": "No action. Run `npm run qa:verify` and `npx openspec doctor` to confirm the unaudited items."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1810,
+      "durationMs": 133080,
+      "sessionId": "fd179655-7686-4a25-8992-7bbe3f5b1716",
+      "costUsd": 0.5417754,
+      "numTurns": 34,
+      "result": {
+        "findings": [
+          {
+            "title": "Mission summary first-try count ignores tasks first resolved through another mission",
+            "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+            "line": 263,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`firstTry = attempts.count { it.attemptNo == 1 && it.effectiveCorrect && it.missionId == mission.missionId }` is divided by `mission.taskIds.size`. In the primary scope a task is shared by every mission that contains it (OQ-15). A task first answered correctly through mission A has an attempt with missionId=A. Mission B's summary then leaves it out of the numerator but keeps it in the denominator, so the child sees e.g. 2/5 although all 5 were first-try. I read the code only and did not run it against a scenario.",
+            "suggestion": "Check the spec for `MissionSummary.firstTryCount`. If it means first-try tasks of this mission's task list, drop the `missionId` filter for the primary scope. If the per-run semantics are intended, document that and make `taskCount` consistent."
+          },
+          {
+            "title": "Client-supplied answer keys are echoed in problem `errors[].field`",
+            "file": "src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+            "line": 95,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`FieldError(\"answers.$key\", \"unknown-part\")` uses the raw JSON property name from the request. `PracticeProblemAdvice` writes it into `errors[].field`. The advice's KDoc says problems 'never quote a submitted value (NFR-3)'. Keys can be up to about 16 KB of arbitrary text. Only the requester sees it, so the risk is low, but the NFR-3 claim does not hold.",
+            "suggestion": "Report unknown keys as a generic `answers` field. Or truncate and escape the key, and only echo keys that match the task's part-key pattern."
+          },
+          {
+            "title": "Unauthenticated child report endpoint has no volume or attempt-count limit",
+            "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+            "line": 201,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`report()` inserts a `problem_report` row on every call, up to 1000 code points of note each. Child endpoints are login-free by design and there is no dedupe or cap per task or attempt. A script or a stuck client retry loop can flood the admin flag queue. `FlagQueue.list` loads and maps the whole queue with no paging.",
+            "suggestion": "Dedupe an identical OPEN report per (task, attempt, reason), or cap OPEN reports per task. Page the admin queue."
+          }
+        ]
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1356,
+      "durationMs": 29896,
+      "sessionId": "0af56c23-06b0-4239-90f3-4a50edb42cb0",
+      "costUsd": 0.0476708,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The literal facts are right. `PracticeService.report()` inserts a new `problem_report` row on every call (PracticeService.kt:211), and I found no dedupe or rate limit in the code I searched. But this is a hardening wish, not a correctness defect. FR-30 says a problem report is stored with the latest attempt attached, and the code does that. Nothing in the code or the project rules requires collapsing duplicate reports. This is a single-family tutoring app on a LAN, and the child endpoints are deliberately login-free. A repeat report can be a legitimate new signal, for example a different reason or note on the same task, so collapsing on (task, attempt) could lose information. The claimed harm needs a hostile LAN client or a buggy retry loop, and the finding offers no evidence of either. A grown queue is an operational annoyance, not wrong behaviour. The finding itself rates its confidence as low. I did not check the unpaginated `listReports` claim or FR-30's exact wording. I can't positively confirm a wrong mechanism, so I'm defaulting to refuted.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1389,
+      "durationMs": 27157,
+      "sessionId": "e8a437c0-add7-4be9-8d6c-0665ac34f37d",
+      "costUsd": 0.0576648,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is confirmed. `PracticeService.report()` inserts a new `problem_report` row on every call. The V4 migration has no unique constraint beyond the `id` primary key. The only other index on the table is the non-unique `problem_report_task_idx` on `task_id`, and V6 adds the non-unique queue index `problem_report_queue_idx`. I found no dedupe or rate limit in the code I read. I did not open the web layer or the security config, and I did not check `listReports` for pagination. An unauthenticated caller who has a valid mission id and task id can therefore repeat the POST and add rows each time. The practical impact is small. This is a single-family LAN app with login-free child endpoints by design, and the caller needs valid UUIDs. The worst case is a noisy admin queue and some table growth, not data exposure or corruption. The finding is real but low-impact, so the existing \"minor\" severity and low confidence are about right.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1277,
+      "durationMs": 30164,
+      "sessionId": "b0be5c99-ce41-45df-95a7-dbcc925c9652",
+      "costUsd": 0.0621602,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding says. `stats()` calls `allAttempts()` and `allHints()`, and both are unbounded SELECTs (JdbcPracticeStore.kt:181-191). But this is a scalability concern, not a correctness defect, and the finding is filed under the correctness dimension. The results are correct, and the class doc states the whole-log design on purpose: \"weekly figures from the whole attempt log\". The per-topic first-try counts need the full primary-scope history anyway, because they come from the first play-through. So the suggested time bound would not work for that part without a separate query. The app serves one child plus an admin page, so linear growth in history is negligible in practice. I can't confirm a wrong mechanism, so I'm refuting it as a correctness finding. At most it is an optional optimization note.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1310,
+      "durationMs": 29783,
+      "sessionId": "00ed9982-b105-412a-82a3-aab8d7d45f32",
+      "costUsd": 0.0548716,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. stats() calls the unbounded store.allAttempts() and store.allHints() (ProgressStats.kt:67,78; JdbcPracticeStore.kt:181,187) and groups them in memory, so cost grows linearly with history on each admin stats load. The impact is negligible: the app has a single child user, the endpoint is admin-only and read-only, an attacker can't trigger it, and the design deliberately computes stats from the whole log. The per-topic first-try counts also genuinely need full primary-scope history, so part of the suggestion is invalid. Only the weekly and metric computations could be bounded. I didn't measure row counts.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Stats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1452,
+      "durationMs": 26323,
+      "sessionId": "38d256c8-97b0-4202-822b-2299bd6367a8",
+      "costUsd": 0.08266,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The behavior is exactly what the spec requires, so it is not a defect. The progress-stats spec (openspec/specs/progress-stats/spec.md:11-13) says sessions \"SHALL be built from every logged attempt of every run (replays included)\". `revealed` counts \"the second wrong attempts by their week\", with no replay exclusion. `Stats.kt` `sessions()`, `weeks()` and the reveal filter match this. The KDoc \"all scopes\" is deliberate. The finding itself says it may be intended and only speculates about the metric. It names no spec deviation. The suggested fix, filtering `!it.replay`, would contradict the spec. The remaining point, documenting the choice next to `metricMet`, is a style nit and not a correctness bug.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Stats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1485,
+      "durationMs": 32247,
+      "sessionId": "8788ad35-7c3b-451d-bcc7-e2b1d1322ab9",
+      "costUsd": 0.11145379999999999,
+      "numTurns": 9,
+      "result": {
+        "refuted": true,
+        "reasoning": "Counting replay attempts toward sessions, weekly figures and reveals is deliberate. design.md for implement-progress-stats-api (line 39) states sessions use every logged attempt of every scope, including replay runs. StatsRulesTest pins it (`replay attempts count towards sessions and answered tasks`, line 163; `replay hints and reveals count in their week`, line 279). OQ-14 defines a session as answered tasks with no gap over 30 minutes and does not exclude replays. OQ-17 and FR-33 withhold only XP and the bonus from replays. Replaying is still practice, which is what the success metric measures. No attacker or real-user harm exists: it's a LAN-only family app and the metric is parent-facing. The finding's confidence is low and it concedes the behaviour may be intended. I couldn't run `openspec show` for the store spec text because Bash was disabled, so the conclusion rests on the design doc, the tests and the requirements.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/AdminStatsProblemAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1292,
+      "durationMs": 23002,
+      "sessionId": "d4414281-840c-4a72-bffc-9fb0cec31c10",
+      "costUsd": 0.062041,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "Verified in code: AdminStatsProblemAdvice (lines 70-98) and PracticeProblemAdvice (lines 61-89) contain byte-identical private invalid() and respond() helpers, plus repeated handlers for PracticeNotFound, PracticeConflict, InvalidPracticeInput and MethodArgumentTypeMismatchException (differing only in title keys). The advices are scoped to different controllers via assignableTypes, so neither covers or delegates to the other. The duplication and drift risk are real, but it is a maintainability concern with no current behavioral bug, which fits the minor severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/AdminStatsProblemAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1325,
+      "durationMs": 23116,
+      "sessionId": "61b2b9f9-3da1-47b7-a304-3fdca7261fb4",
+      "costUsd": 0.0600712,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The duplication is real. `AdminStatsProblemAdvice.kt:70-98` and `PracticeProblemAdvice.kt:61-89` have byte-identical private `invalid` and `respond` helpers. Both advices handle `PracticeNotFound`, `PracticeConflict`, `InvalidPracticeInput` and `MethodArgumentTypeMismatchException` the same way. The only differences are the problem keys (`report-not-found` vs `practice-not-found`, `report-conflict` vs `practice-conflict`). The admin advice also adds a `ConstraintViolationException` handler, and the child advice adds unreadable-body and too-large handlers. This is not a runtime defect. No user or attacker can trigger anything: both advices currently behave correctly and consistently. The only risk is that a later edit to one copy drifts from the other, which is a maintainability concern, not a correctness bug. The claim is accurate as a code-smell note, but it has no exploitable or reproducible effect, so I'd downgrade it to a nit.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1388,
+      "durationMs": 19240,
+      "sessionId": "9e31423f-fe8a-4c7a-beb6-0176b9da811c",
+      "costUsd": 0.0675664,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The cited code matches the finding. Line 40 of PracticeProblemAdvice.kt calls `messages.getMessage(\"practice.conflict.${code}\", null, locale)` with no default, and `invalid()` does the same for `practice.error.${code}`. Spring would throw NoSuchMessageException on a missing key, and nothing sets `useCodeAsDefaultMessage`. However, every PracticeConflict code in use has a catalog entry in messages.properties: resolved, no-hint, replay-not-complete, summary-not-complete, report-not-open and report-no-attempt. All practice.error codes in the practice module are also present. I found no reachable input that produces an unknown code, because the codes are developer-chosen literals and not user input. The finding itself says all six codes exist and offers only a hypothetical future typo or new code. So there is no present defect and no wrong mechanism at runtime. It is a robustness nit about a possible later regression, and the AGENTS.md rule it leans on (\"no user input may produce a raw 500\") is not violated today. I did not check whether a test already covers catalog completeness, so that part is unverified. I'm treating it as refuted: it names no actual bug."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1421,
+      "durationMs": 15615,
+      "sessionId": "b4205148-6634-4fea-a443-bb82f2aafc22",
+      "costUsd": 0.051380999999999996,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding doesn't hold up as an exploitable or reproducible problem. The lookup key `practice.conflict.${exception.code}` is built only from hard-coded string literals at the six `PracticeConflict(...)` call sites: resolved, no-hint, replay-not-complete, summary-not-complete, report-not-open and report-no-attempt. All six have matching lines in messages.properties (lines 169-172 and 181-182), as the finding itself concedes. No request data can reach the code, so a real user or attacker can't trigger the missing-key path. The `practice.error.*` keys in `invalid()` have the same property: the codes are server-side literals, and the property file has an entry for each code I checked, such as not-uuid, required and too-long. The only way to hit the failure is for a future developer to add a code without a property line. That is a hypothetical maintainability concern, not a current defect. It is also the kind of mistake that any test exercising the new code would catch immediately.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1897,
+      "durationMs": 20547,
+      "sessionId": "696361e1-10ea-48dd-ac9f-0a956e3a2ff5",
+      "costUsd": 0.0758528,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could not refute the note path. I did not test the answer path.\n\n- `ReportRules.validate` (Rules.kt:214) only trims the note and counts code points. A `\\u0000` in the note passes through unchanged.\n- The note is bound as a VARCHAR parameter in `JdbcPracticeStore.insertReport` (line 123). Postgres rejects NUL in text columns, which surfaces as a Spring DataAccessException.\n- I searched `src/main` for any NUL or control-character filtering. The only hit is `DisplayNamePolicy` in the profile module, which is unrelated.\n- No advice in the practice module handles DataAccessException. `PracticeProblemAdvice` covers only the type-mismatch and unreadable-body cases, and `PracticeBodyAdvice` catches only JacksonException.\n- Only `ContentProblemAdvice` handles DataIntegrityViolationException, and it is scoped to content controllers.\n- There is no catch-all `Exception` or `Throwable` handler, so the exception becomes a 500. That violates the AGENTS.md rule that user input must not produce a raw 500.\n\nThe answer-path claim about jsonb is plausible but unverified. The reviewer also said they hadn't checked it.\n\nConfidence is medium because I did not run the endpoint.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1930,
+      "durationMs": 28800,
+      "sessionId": "a32e7dc5-4717-4478-b3b8-fae42bbc8d62",
+      "costUsd": 0.14906260000000002,
+      "numTurns": 11,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed for the report note path. Jackson decodes \\u0000 into a real NUL char. PracticeBodyAdvice only enforces size and \"one JSON object\". PracticeReaders.report and ReportRules.validate (Rules.kt:214) only trim and count code points. There is no control-character filtering anywhere in the practice module. insertReport (JdbcPracticeStore.kt:123) binds the note as VARCHAR into a text column, and Postgres rejects NUL there (SQLSTATE 22021). No handler converts DataAccessException for the child practice endpoints: ContentProblemAdvice handles DataIntegrityViolationException but only for content endpoints, and the error controller renders the leftover exception as a 500. Any caller of the child report endpoint can trigger it with a single request, which violates the AGENTS.md rule that no user input may produce a raw 500. The answer path (jsonb parts in insertAttempt) is plausible but unverified: I did not trace the checker, and an UNPARSEABLE grade would avoid the insert. The impact is a 500 with no data corruption, so major severity is right.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1357,
+      "durationMs": 18132,
+      "sessionId": "8c8c9033-e13b-4e48-8dfd-d1b3f270adbe",
+      "costUsd": 0.0668012,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The code matches the claim. `PracticeService.report` (line 201) inserts a new `problem_report` row on every call. There is no dedupe, count check or rate limit in the service. The `problem_report` table (V4) has no unique constraint beyond the primary key. The only index on the table's task_id is non-unique. The child chain in `SecurityConfiguration` is `permitAll` with CSRF disabled, by design. I found no rate-limiting library or filter anywhere in `src/main`. Any LAN client can therefore script unbounded inserts. `usedTasks` also counts `problem_report` rows, so a report blocks task deletion, though that holds after a single report and is intended behaviour. Impact is low: the app is a single-family, login-free LAN tool, and the note length is capped. \"Minor\" severity is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1390,
+      "durationMs": 15143,
+      "sessionId": "acd96780-e5c2-443e-89fb-fec157e783a6",
+      "costUsd": 0.0617348,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. `PracticeService.report` (line 201) inserts a new row on every call. There is no dedupe or count check in the service. The only problem_report indexes are the queue index (V6) and the task index (V4), and neither is unique. The security chain uses `permitAll` with `csrf { disable() }` on the child side, so any LAN host can POST repeatedly without a session. Reports also count as task usage for the FR-56 delete guard. The finding is therefore reproducible. Its impact is small: the app is login-free and LAN-only by design, the note is capped at 1000 code points, and child attempts are equally unthrottled. Severity stays minor.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1882,
+      "durationMs": 17796,
+      "sessionId": "c3604285-ee2f-4c0a-81a7-541e72733a29",
+      "costUsd": 0.088114,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "This finding is a \"no defect found\" summary, so I checked the claims it makes. All of the ones I checked hold in the code.\n\n- **FR-22:** `PracticeService.kt:142` handles `Grade.Unreadable` and returns an `AttemptOutcome` before `store.insertAttempt` at line 169, so nothing is stored.\n- **FR-31 / double submit:** `submit` is `@Transactional` (line 127) and calls `store.lock()` (line 137), which runs `pg_advisory_xact_lock`. `V4__practice.sql:31` has `UNIQUE (task_id, scope, attempt_no)`.\n- **FR-38:** `V5__gamification.sql` creates the `xp_award_append_only_trg` trigger on `xp_award`, which fires on UPDATE or DELETE and raises. `Gamification.kt:95` clamps the reevaluation amount with `maxOf(0, …)`.\n- **Body handling:** `PracticeBodyAdvice` rejects bodies that are not a single JSON object and enforces the 16 KB cap (`PracticeBodyTooLarge`). The problem advice returns fixed problem types and does not echo submitted values.\n\nI did not independently re-read the following claims: the Europe/Prague week logic, the admin security chain, the SQL parameter binding, the reveal path, and the V4–V6 consistency with the JDBC columns. I found nothing that contradicts them.\n\nI found no positive evidence against the finding, so it stands as a clean-area note.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1915,
+      "durationMs": 21795,
+      "sessionId": "804d4f22-8a95-49f8-b47a-b9dbaac056c3",
+      "costUsd": 0.0739948,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "This is a \"no defect found\" finding, so there's no exploit to reproduce. I spot-checked the main claims and they match the code. (1) FR-22: in `PracticeService.submit`, the `Grade.Unreadable` branch returns an outcome without calling `store.insertAttempt`; only the `Graded` branch inserts. (2) FR-31: `submit` is `@Transactional`, calls `store.lock()` (which runs `pg_advisory_xact_lock`) before inserting, and `V4__practice.sql` has `UNIQUE (task_id, scope, attempt_no)`. (3) FR-38: `V5__gamification.sql` creates the `xp_award_append_only` trigger, which refuses UPDATE and DELETE. `Gamification.kt` clamps the re-evaluation amount with `maxOf(0, …)`. (4) `Stats.kt` uses `ZoneId.of(\"Europe/Prague\")` with `previousOrSame(MONDAY)`. (5) `AdminSecurityConfiguration` uses `securityMatcher(\"/api/admin/**\")`, and `PracticeModule` documents the stats and reports endpoints as living under `/api/admin/stats` and `/api/admin/reports` (admin chain). I didn't re-verify the SQL parameter binding, the 16 KB body cap or the PII claim in detail. Nothing I checked contradicts the finding, and a \"no defect\" statement is harmless even if one of those minor points is slightly off.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1379,
+      "durationMs": 26284,
+      "sessionId": "57244fda-f05d-4f8a-9717-42c5cedd06a2",
+      "costUsd": 0.07352,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The listener is synchronous and joins the publisher's transaction. That is a real property of the code, but it is deliberate, and the claimed failure does not occur. `onPublishedMissionChanged` calls `store.lock()` first, which is `pg_advisory_xact_lock` on a fixed key (JdbcPracticeStore:36). `reconcile()` takes the same lock, and `onReevaluation` documents that its caller holds it. Every bonus writer therefore runs one at a time. The \"already paid?\" check (`bonusesPaid`) and the insert happen under the lock. Postgres READ COMMITTED gives each statement a fresh snapshot, so after the lock is acquired the check sees any bonus committed by a concurrent writer. A competing insert can't slip in between the check and the insert, so `xp_award_bonus_once_uq` can't be hit. The unique index is a backstop only. The publisher also holds `lock.exclusive()`, a separate advisory lock, but that doesn't change this. The only remaining way for the ledger insert to fail is a general database fault, and that would break the publish transaction anyway. Same-transaction behavior is also the intended design (OQ-28: the bonus is earned \"now\", atomic with the publish). Switching to AFTER_COMMIT would risk a missed bonus on publish. The finding's own confidence is low, and it admits it did not read the call site.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1412,
+      "durationMs": 27346,
+      "sessionId": "08049e19-5fa2-444a-8d90-610c03bbd3b6",
+      "costUsd": 0.058906400000000005,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The synchronous, transaction-joining listener is real. MissionService publishes PublishedMissionChanged inline and Gamification uses a plain @EventListener with @Transactional. But the failure the finding describes can't be reproduced. The listener first takes a transaction-scoped Postgres advisory lock (`pg_advisory_xact_lock`, JdbcPracticeStore.lock). Only then does it check `bonusesPaid` and insert. A concurrent writer therefore waits until the other transaction commits and then sees the bonus as paid. That is the same serialization the attempt path uses, so the `xp_award_bonus_once_uq` race is guarded. The remaining failures are infrastructure errors such as a DB outage, which would fail the publish regardless. The coupling is also deliberate: OQ-28 says the bonus is credited at publish time. The suggested AFTER_COMMIT alternative would add a different failure mode, where the bonus is missed until the next startup reconcile. This is not an exploitable bug, and there is no path for an attacker or user to trigger it.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1440,
+      "durationMs": 27136,
+      "sessionId": "c63e7848-a042-4d75-9028-a3370af1b3e1",
+      "costUsd": 0.054562599999999996,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding doesn't show a defect. It only says null-attempt bonuses are \"probably\" missing from `xpEarned`, and it admits the KDoc documents the behavior and that FR-38 isn't broken. `RunXp.summarize` does filter on `attemptId != null && in runAttempts` (domain/Gamification.kt:122), so the mechanism is real. But it is by design. A bonus earned by a run's completing attempt carries that attempt's id (application/Gamification.kt:76) and is counted in `xpEarned`. The null-attempt bonuses at lines 125 and 159 come from publish and reconcile, when content changed and a mission became complete without any run. That XP wasn't earned in the run, so leaving it out of the run summary is correct. The back-dating claim is also not a bug: the ledger is append-only and the bonus is surfaced through `pendingRankUp`. The finding is low-confidence and speculative, so I could not confirm a defect."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1473,
+      "durationMs": 26056,
+      "sessionId": "63579883-da3a-4586-af56-f276b68f04cb",
+      "costUsd": 0.05667119999999999,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding doesn't describe a defect a real user or attacker could hit. Its title claims a problem with `Instant.now()` stamps, but the finding itself admits that this is documented and doesn't break FR-38. The ledger is append-only, so a current timestamp on a reconcile-created bonus is harmless.\n\nThe one concrete concern is that the summary's `xpEarned` may leave out bonuses with a null `attempt_id`. The finding only says \"probably\". I checked the code. `RunXp.summarize` (domain/Gamification.kt:122) counts only ledger rows whose `attemptId` is in the run's attempt set. That is by design.\n\nThe normal completion path, at application/Gamification.kt:76, gives the bonus the completing attempt's id, so it is counted. Only the publish-listener and reconcile bonuses have a null attempt id. Those bonuses come from content changes that complete a mission without any run. They are not part of any run's XP, so leaving them out of \"XP earned in this run\" is consistent with the design.\n\nThe finding cites no spec requirement that the bonus must appear in that figure. Its suggestion is a speculative test to write, not a confirmed mechanism. I can't positively confirm a violation, so I'm treating it as refuted."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Stats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1128,
+      "durationMs": 23704,
+      "sessionId": "c520b4ee-3c0a-411c-807d-aa89626065e8",
+      "costUsd": 0.0421008,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The retry limit is defined once, as TaskProgress.MAX_ATTEMPTS = 2 in Rules.kt:51. attemptsLeft, StatsRules.weeks and Gamification all use that constant. DeterministicTutor relies on the derived state (REVEALED), not its own count. The only separate value is the contract's generated enum TaskView.MaxAttempts._2, which is the OpenAPI single-value enum. It can't be derived from an Int, and generated code is never edited. The claimed duplication of logic doesn't exist, and the optional equality test is a hardening suggestion, not a defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Stats.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1161,
+      "durationMs": 21245,
+      "sessionId": "264fd18d-d3f6-410f-800a-b4612c33b98b",
+      "costUsd": 0.036556599999999995,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "Stats.kt and Gamification.kt both reference the single constant TaskProgress.MAX_ATTEMPTS (Rules.kt:51), and attemptsLeft uses it too. The only separate value is the generated contract enum TaskView.MaxAttempts._2, which the OpenAPI schema fixes to 2. The generated enum can only change through a contract bump, not through user input or runtime behavior. No real user or attacker can trigger a divergence. This is a hypothetical future-maintenance note with no reproducible failure.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 2117,
+      "durationMs": 21957,
+      "sessionId": "3ec0cc71-fa8d-45bc-90e3-5b8ceb9eaf30",
+      "costUsd": 0.0325116,
+      "numTurns": 2,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding reports no defect. It is a \"verified clean\" note with \"No action\" as its suggestion, and it cites a directory at line 0. It also admits that the spec scenarios, tasks.md ticks, OpenAPI match, Modulith verify() and the tests were not checked. There is no incorrect mechanism to confirm, and I did not independently verify its list of clean areas. It should be dropped as a non-finding.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 2150,
+      "durationMs": 23591,
+      "sessionId": "4d643ebc-2dd6-4827-b6b5-12255832888b",
+      "costUsd": 0.0328996,
+      "numTurns": 2,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding is a \"verified clean\" note, not a defect. It describes no vulnerable path, input or failing scenario, so there is nothing to exploit or reproduce. It cites a directory at line 0 and admits the reviewer ran out of budget and ran no tests. I did not re-read the code. The call rests on the finding's own content and the default to refute when no mechanism can be confirmed. The unchecked items are better covered by running `npm run qa:verify` and `npx openspec doctor`.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1417,
+      "durationMs": 30733,
+      "sessionId": "b2a22c47-3da3-4c28-85f1-d71169bd50d5",
+      "costUsd": 0.07799940000000001,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The behavior the finding describes is real, but it is intentional and covered by a test, so it isn't a defect. At PracticeService.kt:263-264, firstTry filters on `missionId == mission.missionId` and is divided by `mission.taskIds.size`. A task first resolved through another mission is left out of the numerator but kept in the denominator. The test `a task resolved in another mission adds nothing to the summary` (GamificationIT.kt:654-666, `@trace FR-32`) asserts exactly this. Task 0 is solved via the other mission, the remaining 9 tasks are solved via mission m, and the expected firstTryCount is 9 out of 10 tasks, not 10. The summary is per-mission and XP-consistent: the same test expects xpEarned 110, and a task resolved elsewhere contributes nothing (GamificationRulesTest:142). The finding's own suggestion to drop the missionId filter would contradict this FR-32 test. I found no spec text making the finding's reading correct, and its confidence was already low, so I'm treating it as refuted.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1450,
+      "durationMs": 41344,
+      "sessionId": "6122450f-030b-4287-8f71-acc66a4fc85f",
+      "costUsd": 0.147067,
+      "numTurns": 9,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real, from reading the code and specs; I did not run it. PracticeService.summary (lines 262-264) counts only attempts with missionId == this mission, but divides by mission.taskIds.size. Tasks are shared across missions (practice-flow spec OQ-15, gamification \"Shared task completes another mission\" scenario). If task T was first answered correctly in mission A, that attempt carries missionId=A. Mission B can become complete in the primary scope via that attempt, so summary(B) is reachable, and T is then missing from B's numerator but present in its denominator. Nothing elsewhere guards against this. No existing test covers a shared task in summary, and the contract (MissionSummary.firstTryCount) has no description that fixes the intended meaning. Limits: the impact is cosmetic, because it affects only a displayed count on the completion screen and nothing persisted or XP. The per-run filter may be intentional, and the spec is ambiguous. So this is a minor, low-confidence spec-clarification finding that is reproducible with shared tasks.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1121,
+      "durationMs": 28511,
+      "sessionId": "95ac7b29-05dc-4670-a4c7-d9752f1c82c4",
+      "costUsd": 0.0797958,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism holds. In Rules.kt:95, `Grading.shapeErrors` builds `FieldError(\"answers.$key\", \"unknown-part\")` from the raw JSON property name. PracticeReaders.kt:28 does the same for shape errors. Nothing upstream filters the key: PracticeReaders only checks that `answers` is an object. PracticeService.kt:136 throws InvalidPracticeInput with those errors. PracticeProblemAdvice.kt:69 writes `it.field` into `errors[].field`. The advice's KDoc (line 23) says messages \"never quote a submitted value (NFR-3)\", so the client-supplied key is echoed and the claim is false. The impact is low, as the finding says. Only the requester sees the key, and the body is capped at 16 KB. A similar echo exists in TaskService.kt:254 (admin side). The finding is a real but minor inconsistency, so I'm keeping the severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1154,
+      "durationMs": 23142,
+      "sessionId": "af3b7338-c7ea-4cf5-8062-558bfbff3230",
+      "costUsd": 0.0755718,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is confirmed, but the impact is very small. `Grading.shapeErrors` (Rules.kt:95) builds `FieldError(\"answers.$key\", \"unknown-part\")` from the raw request map key. `PracticeService.kt:136` throws it as `InvalidPracticeInput` for any submitted key that matches no task part. `PracticeProblemAdvice.invalid` (lines 67-69) then writes `it.field` unchanged into `errors[].field` of the 400 response. Nothing sanitizes or truncates the key between those points. The only size limit is the 16 KB body cap (413), so any client can send a key of up to roughly 16 KB and get it echoed back. The advice's KDoc says messages 'never quote a submitted value (NFR-3)'. That claim is imprecise here, since a submitted key is echoed. The echo goes only to the requester inside a JSON-encoded field, so there is no XSS, no cross-user leak and no PII. The impact is cosmetic: an inaccurate doc claim and a reflected arbitrary string. The finding's own rating of minor severity with low confidence fits.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1076,
+      "durationMs": 19172,
+      "sessionId": "0f32b0d8-28df-4e6e-9431-111fb4227c4e",
+      "costUsd": 0.06257599999999999,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. `report()` (PracticeService.kt:201-212) inserts a `problem_report` row on every call. It has no dedupe or cap per task, attempt or reason, and I found no rate limit elsewhere. `FlagQueue.list` (ProgressStats.kt:95) loads every report with no paging, though it batches the prompt and attempt lookups. The practical impact is limited: this is a private single-family app, so the risk is a stuck client retry loop or a script, not hostile abuse. The finding is a minor hardening gap with low confidence, so it holds as written.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1109,
+      "durationMs": 16176,
+      "sessionId": "831a1a26-fa2e-4457-b61d-ccfb1972885c",
+      "costUsd": 0.046261399999999994,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. `PracticeService.report()` (lines 200-212) validates that the mission and task are served. It then calls `store.insertReport` with a fresh `UUID.randomUUID()` on every call. There is no dedupe by task, attempt or reason, and no cap on open reports. `FlagQueue.list(status)` returns a `List<ReportView>`, so it is not paged. A retry loop or a script can therefore add unbounded rows to the admin queue. I did not read the web layer, so I did not check for rate limiting or the 1000-code-point note cap there.\n\nExploitability is limited. This is a single-family app where the child endpoints are login-free by design. An attacker would need network access to it, and the result is nuisance and queue bloat, not data exposure or a raw 500. Minor severity with low confidence looks right. The \"visual\" dimension label is also wrong, because this is an availability and abuse concern.",
+        "severityAdjustment": "keep"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "15 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 6, contested: 3, rejected: 6"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/release-review-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "Phase 7 global release review of the backend (release-review-api), part c: practice module",
+    "summary": "Review gate for Phase 7 global release review of the backend (release-review-api), part c: practice module: 6 confirmed, 3 contested (treat as confirmed unless trivially wrong), 6 rejected.",
+    "confirmed": [
+      {
+        "title": "Duplicated RFC 7807 advice code in the child and admin practice advices",
+        "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/AdminStatsProblemAdvice.kt",
+        "line": 70,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`AdminStatsProblemAdvice` and `PracticeProblemAdvice` each define identical private `invalid(request, errors)` and `respond(request, status, key, customize)` helpers. They also repeat the same handlers for `PracticeNotFound`, `PracticeConflict`, `InvalidPracticeInput` and `MethodArgumentTypeMismatchException`. A fix to one, such as a missing message key or a changed `errors` shape, can silently diverge from the other.",
+        "suggestion": "Extract a shared package-private helper (a small class or extension taking `ProblemResponses` and `MessageSource`) that builds the field-error problem. Keep only the per-controller title keys in the two advices.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Verified in code: AdminStatsProblemAdvice (lines 70-98) and PracticeProblemAdvice (lines 61-89) contain byte-identical private invalid() and respond() helpers, plus repeated handlers for PracticeNotFound, PracticeConflict, InvalidPracticeInput and MethodArgumentTypeMismatchException (differing only in title keys). The advices are scoped to different controllers via assignableTypes, so neither covers or delegates to the other. The duplication and drift risk are real, but it is a maintainability concern with no current behavioral bug, which fits the minor severity.",
+          "The duplication is real. `AdminStatsProblemAdvice.kt:70-98` and `PracticeProblemAdvice.kt:61-89` have byte-identical private `invalid` and `respond` helpers. Both advices handle `PracticeNotFound`, `PracticeConflict`, `InvalidPracticeInput` and `MethodArgumentTypeMismatchException` the same way. The only differences are the problem keys (`report-not-found` vs `practice-not-found`, `report-conflict` vs `practice-conflict`). The admin advice also adds a `ConstraintViolationException` handler, and the child advice adds unreadable-body and too-large handlers. This is not a runtime defect. No user or attacker can trigger anything: both advices currently behave correctly and consistently. The only risk is that a later edit to one copy drifts from the other, which is a maintainability concern, not a correctness bug. The claim is accurate as a code-smell note, but it has no exploitable or reproducible effect, so I'd downgrade it to a nit."
+        ]
+      },
+      {
+        "title": "NUL (\\u0000) in a child report note or answer can reach Postgres and cause a raw 500",
+        "file": "src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+        "line": 214,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "The child can send `{\"reason\":\"OTHER\",\"note\":\"a\\u0000b\"}` to POST /api/child/missions/{m}/tasks/{t}/reports. ReportRules.validate only trims and counts code points, and the note is bound into the `problem_report.note` text column (JdbcPracticeStore.insertReport:123). Postgres rejects NUL in text with SQLSTATE 22021. Answers have the same risk: raw strings, including a choice key like \"\\u0000\", are written into the jsonb `parts` array in insertAttempt:103, and jsonb rejects \\u0000. Neither the checker nor the readers filter control characters (no isISOControl check found in src/main). The only practice advices handle NotFound, Conflict, Invalid, Unreadable and TooLarge, so the DataAccessException falls through to the generic handler as a 500. That breaks the AGENTS.md rule that no user input may produce a raw 500. I did not confirm that the checker returns WRONG rather than UNPARSEABLE for an answer containing NUL, so the answer path is unverified.",
+        "suggestion": "Reject or strip U+0000 in PracticeReaders.answers (strings and array elements) and ReportRules.note, and return a 400 with a catalog message. Also add a fallback DataAccessException handler that returns RFC 7807. Add a regression test with `\\u0000` in a note and in an answer.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I could not refute the note path. I did not test the answer path.\n\n- `ReportRules.validate` (Rules.kt:214) only trims the note and counts code points. A `\\u0000` in the note passes through unchanged.\n- The note is bound as a VARCHAR parameter in `JdbcPracticeStore.insertReport` (line 123). Postgres rejects NUL in text columns, which surfaces as a Spring DataAccessException.\n- I searched `src/main` for any NUL or control-character filtering. The only hit is `DisplayNamePolicy` in the profile module, which is unrelated.\n- No advice in the practice module handles DataAccessException. `PracticeProblemAdvice` covers only the type-mismatch and unreadable-body cases, and `PracticeBodyAdvice` catches only JacksonException.\n- Only `ContentProblemAdvice` handles DataIntegrityViolationException, and it is scoped to content controllers.\n- There is no catch-all `Exception` or `Throwable` handler, so the exception becomes a 500. That violates the AGENTS.md rule that user input must not produce a raw 500.\n\nThe answer-path claim about jsonb is plausible but unverified. The reviewer also said they hadn't checked it.\n\nConfidence is medium because I did not run the endpoint.",
+          "Confirmed for the report note path. Jackson decodes \\u0000 into a real NUL char. PracticeBodyAdvice only enforces size and \"one JSON object\". PracticeReaders.report and ReportRules.validate (Rules.kt:214) only trim and count code points. There is no control-character filtering anywhere in the practice module. insertReport (JdbcPracticeStore.kt:123) binds the note as VARCHAR into a text column, and Postgres rejects NUL there (SQLSTATE 22021). No handler converts DataAccessException for the child practice endpoints: ContentProblemAdvice handles DataIntegrityViolationException but only for content endpoints, and the error controller renders the leftover exception as a 500. Any caller of the child report endpoint can trigger it with a single request, which violates the AGENTS.md rule that no user input may produce a raw 500. The answer path (jsonb parts in insertAttempt) is plausible but unverified: I did not trace the checker, and an UNPARSEABLE grade would avoid the insert. The impact is a 500 with no data corruption, so major severity is right."
+        ]
+      },
+      {
+        "title": "Unthrottled child problem-report inserts: no rate limit or cap on rows per task",
+        "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+        "line": 201,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The child POST /reports endpoint is unauthenticated and the child chain has CSRF disabled. Each call inserts a new OPEN `problem_report` row (up to 1000 code points of note) with no per-task or per-attempt dedupe and no cap. Any LAN host can script thousands of requests, bloating the flag queue and the table. `usedTasks` also treats every report as usage, so the task's FR-56 delete guard blocks deletion for good. Neither the schema nor the service has a uniqueness or count limit. Impact is limited by the LAN-only exposure.",
+        "suggestion": "Allow at most one OPEN report per (task, attempt) in the service, or add a unique partial index on that pair. Optionally add a small global cap or rate limit on child writes.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The code matches the claim. `PracticeService.report` (line 201) inserts a new `problem_report` row on every call. There is no dedupe, count check or rate limit in the service. The `problem_report` table (V4) has no unique constraint beyond the primary key. The only index on the table's task_id is non-unique. The child chain in `SecurityConfiguration` is `permitAll` with CSRF disabled, by design. I found no rate-limiting library or filter anywhere in `src/main`. Any LAN client can therefore script unbounded inserts. `usedTasks` also counts `problem_report` rows, so a report blocks task deletion, though that holds after a single report and is intended behaviour. Impact is low: the app is a single-family, login-free LAN tool, and the note length is capped. \"Minor\" severity is appropriate.",
+          "The mechanism is real. `PracticeService.report` (line 201) inserts a new row on every call. There is no dedupe or count check in the service. The only problem_report indexes are the queue index (V6) and the task index (V4), and neither is unique. The security chain uses `permitAll` with `csrf { disable() }` on the child side, so any LAN host can POST repeatedly without a session. Reports also count as task usage for the FR-56 delete guard. The finding is therefore reproducible. Its impact is small: the app is login-free and LAN-only by design, the note is capped at 1000 code points, and child attempts are equally unthrottled. Severity stays minor."
+        ]
+      },
+      {
+        "title": "Checklist areas reviewed in the practice module with no defect found",
+        "file": "src/main/kotlin/cz/doucko/practice",
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "Clean areas: (1) FR-27/NFR-1: revealed answers are produced only by DeterministicTutor when the state is REVEALED. PartView carries no answer spec, and the choice options expose only key and text. (2) FR-22: the Grade.Unreadable branch returns before store.insertAttempt, so nothing is stored. (3) FR-31: attempts are inserted inside the submit transaction under the pg advisory lock. The unique index (task_id, scope, attempt_no) also guards against a double submit. (4) FR-38: `xp_award` has a trigger refusing UPDATE and DELETE, and reevaluation XP is clamped with maxOf(0, …). (5) Europe/Prague: PragueWeeks uses ZoneId Europe/Prague with previousOrSame(MONDAY). (6) SQL: all values are bound parameters and there is no string interpolation of input; the only concatenated fragments are constants. (7) Admin endpoints (/api/admin/stats and /api/admin/reports/**) fall under the /api/admin/ admin chain. (8) Child bodies are capped at 16 KB and only `answers`, `reason`, `note` and `rankIndex` are read, so there is no mass assignment. (9) Problem responses never quote submitted values. (10) Migrations V4–V6 are append-only and consistent with the JDBC columns. (11) No secrets or PII found in the module. Dependencies and compose exposure were out of scope for this part.",
+        "suggestion": "None.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "This finding is a \"no defect found\" summary, so I checked the claims it makes. All of the ones I checked hold in the code.\n\n- **FR-22:** `PracticeService.kt:142` handles `Grade.Unreadable` and returns an `AttemptOutcome` before `store.insertAttempt` at line 169, so nothing is stored.\n- **FR-31 / double submit:** `submit` is `@Transactional` (line 127) and calls `store.lock()` (line 137), which runs `pg_advisory_xact_lock`. `V4__practice.sql:31` has `UNIQUE (task_id, scope, attempt_no)`.\n- **FR-38:** `V5__gamification.sql` creates the `xp_award_append_only_trg` trigger on `xp_award`, which fires on UPDATE or DELETE and raises. `Gamification.kt:95` clamps the reevaluation amount with `maxOf(0, …)`.\n- **Body handling:** `PracticeBodyAdvice` rejects bodies that are not a single JSON object and enforces the 16 KB cap (`PracticeBodyTooLarge`). The problem advice returns fixed problem types and does not echo submitted values.\n\nI did not independently re-read the following claims: the Europe/Prague week logic, the admin security chain, the SQL parameter binding, the reveal path, and the V4–V6 consistency with the JDBC columns. I found nothing that contradicts them.\n\nI found no positive evidence against the finding, so it stands as a clean-area note.",
+          "This is a \"no defect found\" finding, so there's no exploit to reproduce. I spot-checked the main claims and they match the code. (1) FR-22: in `PracticeService.submit`, the `Grade.Unreadable` branch returns an outcome without calling `store.insertAttempt`; only the `Graded` branch inserts. (2) FR-31: `submit` is `@Transactional`, calls `store.lock()` (which runs `pg_advisory_xact_lock`) before inserting, and `V4__practice.sql` has `UNIQUE (task_id, scope, attempt_no)`. (3) FR-38: `V5__gamification.sql` creates the `xp_award_append_only` trigger, which refuses UPDATE and DELETE. `Gamification.kt` clamps the re-evaluation amount with `maxOf(0, …)`. (4) `Stats.kt` uses `ZoneId.of(\"Europe/Prague\")` with `previousOrSame(MONDAY)`. (5) `AdminSecurityConfiguration` uses `securityMatcher(\"/api/admin/**\")`, and `PracticeModule` documents the stats and reports endpoints as living under `/api/admin/stats` and `/api/admin/reports` (admin chain). I didn't re-verify the SQL parameter binding, the 16 KB body cap or the PII claim in detail. Nothing I checked contradicts the finding, and a \"no defect\" statement is harmless even if one of those minor points is slightly off."
+        ]
+      },
+      {
+        "title": "Client-supplied answer keys are echoed in problem `errors[].field`",
+        "file": "src/main/kotlin/cz/doucko/practice/domain/Rules.kt",
+        "line": 95,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`FieldError(\"answers.$key\", \"unknown-part\")` uses the raw JSON property name from the request. `PracticeProblemAdvice` writes it into `errors[].field`. The advice's KDoc says problems 'never quote a submitted value (NFR-3)'. Keys can be up to about 16 KB of arbitrary text. Only the requester sees it, so the risk is low, but the NFR-3 claim does not hold.",
+        "suggestion": "Report unknown keys as a generic `answers` field. Or truncate and escape the key, and only echo keys that match the task's part-key pattern.",
+        "dimension": "visual",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism holds. In Rules.kt:95, `Grading.shapeErrors` builds `FieldError(\"answers.$key\", \"unknown-part\")` from the raw JSON property name. PracticeReaders.kt:28 does the same for shape errors. Nothing upstream filters the key: PracticeReaders only checks that `answers` is an object. PracticeService.kt:136 throws InvalidPracticeInput with those errors. PracticeProblemAdvice.kt:69 writes `it.field` into `errors[].field`. The advice's KDoc (line 23) says messages \"never quote a submitted value (NFR-3)\", so the client-supplied key is echoed and the claim is false. The impact is low, as the finding says. Only the requester sees the key, and the body is capped at 16 KB. A similar echo exists in TaskService.kt:254 (admin side). The finding is a real but minor inconsistency, so I'm keeping the severity.",
+          "The mechanism is confirmed, but the impact is very small. `Grading.shapeErrors` (Rules.kt:95) builds `FieldError(\"answers.$key\", \"unknown-part\")` from the raw request map key. `PracticeService.kt:136` throws it as `InvalidPracticeInput` for any submitted key that matches no task part. `PracticeProblemAdvice.invalid` (lines 67-69) then writes `it.field` unchanged into `errors[].field` of the 400 response. Nothing sanitizes or truncates the key between those points. The only size limit is the 16 KB body cap (413), so any client can send a key of up to roughly 16 KB and get it echoed back. The advice's KDoc says messages 'never quote a submitted value (NFR-3)'. That claim is imprecise here, since a submitted key is echoed. The echo goes only to the requester inside a JSON-encoded field, so there is no XSS, no cross-user leak and no PII. The impact is cosmetic: an inaccurate doc claim and a reflected arbitrary string. The finding's own rating of minor severity with low confidence fits."
+        ]
+      },
+      {
+        "title": "Unauthenticated child report endpoint has no volume or attempt-count limit",
+        "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+        "line": 201,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`report()` inserts a `problem_report` row on every call, up to 1000 code points of note each. Child endpoints are login-free by design and there is no dedupe or cap per task or attempt. A script or a stuck client retry loop can flood the admin flag queue. `FlagQueue.list` loads and maps the whole queue with no paging.",
+        "suggestion": "Dedupe an identical OPEN report per (task, attempt, reason), or cap OPEN reports per task. Page the admin queue.",
+        "dimension": "visual",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is real. `report()` (PracticeService.kt:201-212) inserts a `problem_report` row on every call. It has no dedupe or cap per task, attempt or reason, and I found no rate limit elsewhere. `FlagQueue.list` (ProgressStats.kt:95) loads every report with no paging, though it batches the prompt and attempt lookups. The practical impact is limited: this is a private single-family app, so the risk is a stuck client retry loop or a script, not hostile abuse. The finding is a minor hardening gap with low confidence, so it holds as written.",
+          "The mechanism is real. `PracticeService.report()` (lines 200-212) validates that the mission and task are served. It then calls `store.insertReport` with a fresh `UUID.randomUUID()` on every call. There is no dedupe by task, attempt or reason, and no cap on open reports. `FlagQueue.list(status)` returns a `List<ReportView>`, so it is not paged. A retry loop or a script can therefore add unbounded rows to the admin queue. I did not read the web layer, so I did not check for rate limiting or the 1000-code-point note cap there.\n\nExploitability is limited. This is a single-family app where the child endpoints are login-free by design. An attacker would need network access to it, and the result is nuisance and queue bloat, not data exposure or a raw 500. Minor severity with low confidence looks right. The \"visual\" dimension label is also wrong, because this is an availability and abuse concern."
+        ]
+      }
+    ],
+    "contested": [
+      {
+        "title": "Login-free problem-report endpoint has no dedupe or rate limit, so the report queue can grow without bound",
+        "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+        "line": 200,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`report()` inserts a new `problem_report` row on every call (`store.insertReport(ReportRecord(UUID.randomUUID(), ...))`). Child endpoints need no login, and the table is append-only: there is no unique constraint on (task, attempt, status) and no throttle. Repeated POSTs, whether from a buggy client retry or from a hostile LAN client, grow the table forever and flood the admin flag queue. `listReports` returns everything unpaginated.",
+        "suggestion": "Collapse duplicate OPEN reports for the same task and attempt (idempotent insert, or a partial unique index on (task_id, attempt_id, reason) WHERE status='OPEN'). Consider paging `listReports`, or add a simple per-IP/per-task rate limit.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The literal facts are right. `PracticeService.report()` inserts a new `problem_report` row on every call (PracticeService.kt:211), and I found no dedupe or rate limit in the code I searched. But this is a hardening wish, not a correctness defect. FR-30 says a problem report is stored with the latest attempt attached, and the code does that. Nothing in the code or the project rules requires collapsing duplicate reports. This is a single-family tutoring app on a LAN, and the child endpoints are deliberately login-free. A repeat report can be a legitimate new signal, for example a different reason or note on the same task, so collapsing on (task, attempt) could lose information. The claimed harm needs a hostile LAN client or a buggy retry loop, and the finding offers no evidence of either. A grown queue is an operational annoyance, not wrong behaviour. The finding itself rates its confidence as low. I did not check the unpaginated `listReports` claim or FR-30's exact wording. I can't positively confirm a wrong mechanism, so I'm defaulting to refuted.",
+          "The mechanism is confirmed. `PracticeService.report()` inserts a new `problem_report` row on every call. The V4 migration has no unique constraint beyond the `id` primary key. The only other index on the table is the non-unique `problem_report_task_idx` on `task_id`, and V6 adds the non-unique queue index `problem_report_queue_idx`. I found no dedupe or rate limit in the code I read. I did not open the web layer or the security config, and I did not check `listReports` for pagination. An unauthenticated caller who has a valid mission id and task id can therefore repeat the POST and add rows each time. The practical impact is small. This is a single-family LAN app with login-free child endpoints by design, and the caller needs valid UUIDs. The worst case is a noisy admin queue and some table growth, not data exposure or corruption. The finding is real but low-impact, so the existing \"minor\" severity and low confidence are about right."
+        ]
+      },
+      {
+        "title": "Statistics read the entire attempt and hint history on every request",
+        "file": "src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt",
+        "line": 67,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`stats()` calls `store.allAttempts()` and `store.allHints()`, which load every row (including the parsed JSONB `parts` and the re-evaluation join). It then groups them in memory, even though only the last `weeks` weeks are returned. `metricMet` additionally needs only the last 5 weeks. The cost grows linearly with total history for each admin page load.",
+        "suggestion": "Add a store query bounded by `created_at >= start of the oldest requested week` (at least the last 5 weeks for the metric). Session splitting needs a small look-back before that boundary. The per-topic first-try counts can be computed in SQL or from primary-scope attempts only.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The code does what the finding says. `stats()` calls `allAttempts()` and `allHints()`, and both are unbounded SELECTs (JdbcPracticeStore.kt:181-191). But this is a scalability concern, not a correctness defect, and the finding is filed under the correctness dimension. The results are correct, and the class doc states the whole-log design on purpose: \"weekly figures from the whole attempt log\". The per-topic first-try counts need the full primary-scope history anyway, because they come from the first play-through. So the suggested time bound would not work for that part without a separate query. The app serves one child plus an admin page, so linear growth in history is negligible in practice. I can't confirm a wrong mechanism, so I'm refuting it as a correctness finding. At most it is an optional optimization note.",
+          "The mechanism is real. stats() calls the unbounded store.allAttempts() and store.allHints() (ProgressStats.kt:67,78; JdbcPracticeStore.kt:181,187) and groups them in memory, so cost grows linearly with history on each admin stats load. The impact is negligible: the app has a single child user, the endpoint is admin-only and read-only, an attacker can't trigger it, and the design deliberately computes stats from the whole log. The per-topic first-try counts also genuinely need full primary-scope history, so part of the suggestion is invalid. Only the weekly and metric computations could be bounded. I didn't measure row counts."
+        ]
+      },
+      {
+        "title": "Mission summary first-try count ignores tasks first resolved through another mission",
+        "file": "src/main/kotlin/cz/doucko/practice/application/PracticeService.kt",
+        "line": 263,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`firstTry = attempts.count { it.attemptNo == 1 && it.effectiveCorrect && it.missionId == mission.missionId }` is divided by `mission.taskIds.size`. In the primary scope a task is shared by every mission that contains it (OQ-15). A task first answered correctly through mission A has an attempt with missionId=A. Mission B's summary then leaves it out of the numerator but keeps it in the denominator, so the child sees e.g. 2/5 although all 5 were first-try. I read the code only and did not run it against a scenario.",
+        "suggestion": "Check the spec for `MissionSummary.firstTryCount`. If it means first-try tasks of this mission's task list, drop the `missionId` filter for the primary scope. If the per-run semantics are intended, document that and make `taskCount` consistent.",
+        "dimension": "visual",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The behavior the finding describes is real, but it is intentional and covered by a test, so it isn't a defect. At PracticeService.kt:263-264, firstTry filters on `missionId == mission.missionId` and is divided by `mission.taskIds.size`. A task first resolved through another mission is left out of the numerator but kept in the denominator. The test `a task resolved in another mission adds nothing to the summary` (GamificationIT.kt:654-666, `@trace FR-32`) asserts exactly this. Task 0 is solved via the other mission, the remaining 9 tasks are solved via mission m, and the expected firstTryCount is 9 out of 10 tasks, not 10. The summary is per-mission and XP-consistent: the same test expects xpEarned 110, and a task resolved elsewhere contributes nothing (GamificationRulesTest:142). The finding's own suggestion to drop the missionId filter would contradict this FR-32 test. I found no spec text making the finding's reading correct, and its confidence was already low, so I'm treating it as refuted.",
+          "The mechanism is real, from reading the code and specs; I did not run it. PracticeService.summary (lines 262-264) counts only attempts with missionId == this mission, but divides by mission.taskIds.size. Tasks are shared across missions (practice-flow spec OQ-15, gamification \"Shared task completes another mission\" scenario). If task T was first answered correctly in mission A, that attempt carries missionId=A. Mission B can become complete in the primary scope via that attempt, so summary(B) is reachable, and T is then missing from B's numerator but present in its denominator. Nothing elsewhere guards against this. No existing test covers a shared task in summary, and the contract (MissionSummary.firstTryCount) has no description that fixes the intended meaning. Limits: the impact is cosmetic, because it affects only a displayed count on the completion screen and nothing persisted or XP. The per-run filter may be intentional, and the spec is ambiguous. So this is a minor, low-confidence spec-clarification finding that is reproducible with shared tasks."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "Replay attempts count toward sessions, the weekly metric and reveal counts",
+        "file": "src/main/kotlin/cz/doucko/practice/domain/Stats.kt",
+        "line": 70,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`sessions()` and `weeks()` take `store.allAttempts()` of every scope. A replay attempt (`replay=true`, which earns no XP) therefore counts as an answered task in a session. It can also push a session past `QUALIFYING_TASKS`, which feeds `metricMet`. The reveal tally `attemptNo == MAX_ATTEMPTS && !it.correct` counts replay reveals too. The KDoc states 'all scopes' deliberately, so this may be intended. The success metric is about practice habit rather than new content, so re-playing solved missions could satisfy the 4-weeks x 3-qualifying-sessions metric without new learning.",
+        "suggestion": "Confirm against the progress-stats spec's session definition. If replays should not count toward the metric, filter `!it.replay` in `metricMet`, or at least in the qualifying-session count. If they should, document it next to the metric.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The behavior is exactly what the spec requires, so it is not a defect. The progress-stats spec (openspec/specs/progress-stats/spec.md:11-13) says sessions \"SHALL be built from every logged attempt of every run (replays included)\". `revealed` counts \"the second wrong attempts by their week\", with no replay exclusion. `Stats.kt` `sessions()`, `weeks()` and the reveal filter match this. The KDoc \"all scopes\" is deliberate. The finding itself says it may be intended and only speculates about the metric. It names no spec deviation. The suggested fix, filtering `!it.replay`, would contradict the spec. The remaining point, documenting the choice next to `metricMet`, is a style nit and not a correctness bug.",
+          "Counting replay attempts toward sessions, weekly figures and reveals is deliberate. design.md for implement-progress-stats-api (line 39) states sessions use every logged attempt of every scope, including replay runs. StatsRulesTest pins it (`replay attempts count towards sessions and answered tasks`, line 163; `replay hints and reveals count in their week`, line 279). OQ-14 defines a session as answered tasks with no gap over 30 minutes and does not exclude replays. OQ-17 and FR-33 withhold only XP and the bonus from replays. Replaying is still practice, which is what the success metric measures. No attacker or real-user harm exists: it's a LAN-only family app and the metric is parent-facing. The finding's confidence is low and it concedes the behaviour may be intended. I couldn't run `openspec show` for the store spec text because Bash was disabled, so the conclusion rests on the design doc, the tests and the requirements."
+        ]
+      },
+      {
+        "title": "Conflict-detail lookup throws NoSuchMessageException (raw 500) if a PracticeConflict code has no catalog entry",
+        "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+        "line": 40,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "The handler builds the detail with `messages.getMessage(\"practice.conflict.${exception.code}\", null, request.locale)`, with no default message. The key is derived from a free-form string passed to `PracticeConflict(\"...\")`. All six codes in use currently exist in `messages.properties`, which I verified. A new code added without a matching property line, or a typo, would turn a 409 into a 500 inside the advice itself. The same applies to `practice.error.${it.code}` in `invalid()`.",
+        "suggestion": "Use the `getMessage(code, args, defaultMessage, locale)` overload with the generic problem detail as default. Alternatively make the conflict code an enum so the set of keys is closed and covered by a test.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The cited code matches the finding. Line 40 of PracticeProblemAdvice.kt calls `messages.getMessage(\"practice.conflict.${code}\", null, locale)` with no default, and `invalid()` does the same for `practice.error.${code}`. Spring would throw NoSuchMessageException on a missing key, and nothing sets `useCodeAsDefaultMessage`. However, every PracticeConflict code in use has a catalog entry in messages.properties: resolved, no-hint, replay-not-complete, summary-not-complete, report-not-open and report-no-attempt. All practice.error codes in the practice module are also present. I found no reachable input that produces an unknown code, because the codes are developer-chosen literals and not user input. The finding itself says all six codes exist and offers only a hypothetical future typo or new code. So there is no present defect and no wrong mechanism at runtime. It is a robustness nit about a possible later regression, and the AGENTS.md rule it leans on (\"no user input may produce a raw 500\") is not violated today. I did not check whether a test already covers catalog completeness, so that part is unverified. I'm treating it as refuted: it names no actual bug.",
+          "The finding doesn't hold up as an exploitable or reproducible problem. The lookup key `practice.conflict.${exception.code}` is built only from hard-coded string literals at the six `PracticeConflict(...)` call sites: resolved, no-hint, replay-not-complete, summary-not-complete, report-not-open and report-no-attempt. All six have matching lines in messages.properties (lines 169-172 and 181-182), as the finding itself concedes. No request data can reach the code, so a real user or attacker can't trigger the missing-key path. The `practice.error.*` keys in `invalid()` have the same property: the codes are server-side literals, and the property file has an entry for each code I checked, such as not-uuid, required and too-long. The only way to hit the failure is for a future developer to add a code without a property line. That is a hypothetical maintainability concern, not a current defect. It is also the kind of mistake that any test exercising the new code would catch immediately."
+        ]
+      },
+      {
+        "title": "Published-mission bonus is paid by a synchronous listener inside the content publisher's transaction",
+        "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+        "line": 118,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`onPublishedMissionChanged` uses plain `@EventListener` with `@Transactional`, so it joins the publisher's transaction. It calls `store.lock()` and then inserts into the XP ledger. A ledger failure, such as a unique-index race on `xp_award_bonus_once_uq`, would roll back the admin's publish or edit of the mission and surface through the content module's error handling. I read only the practice module, not the publishing call site.",
+        "suggestion": "Confirm with an integration test that a ledger failure cannot turn an admin publish into a raw 500. If it can, handle the failure or switch to `@TransactionalEventListener(AFTER_COMMIT)` with a new transaction. The startup `reconcile()` already repairs missed bonuses.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The listener is synchronous and joins the publisher's transaction. That is a real property of the code, but it is deliberate, and the claimed failure does not occur. `onPublishedMissionChanged` calls `store.lock()` first, which is `pg_advisory_xact_lock` on a fixed key (JdbcPracticeStore:36). `reconcile()` takes the same lock, and `onReevaluation` documents that its caller holds it. Every bonus writer therefore runs one at a time. The \"already paid?\" check (`bonusesPaid`) and the insert happen under the lock. Postgres READ COMMITTED gives each statement a fresh snapshot, so after the lock is acquired the check sees any bonus committed by a concurrent writer. A competing insert can't slip in between the check and the insert, so `xp_award_bonus_once_uq` can't be hit. The unique index is a backstop only. The publisher also holds `lock.exclusive()`, a separate advisory lock, but that doesn't change this. The only remaining way for the ledger insert to fail is a general database fault, and that would break the publish transaction anyway. Same-transaction behavior is also the intended design (OQ-28: the bonus is earned \"now\", atomic with the publish). Switching to AFTER_COMMIT would risk a missed bonus on publish. The finding's own confidence is low, and it admits it did not read the call site.",
+          "The synchronous, transaction-joining listener is real. MissionService publishes PublishedMissionChanged inline and Gamification uses a plain @EventListener with @Transactional. But the failure the finding describes can't be reproduced. The listener first takes a transaction-scoped Postgres advisory lock (`pg_advisory_xact_lock`, JdbcPracticeStore.lock). Only then does it check `bonusesPaid` and insert. A concurrent writer therefore waits until the other transaction commits and then sees the bonus as paid. That is the same serialization the attempt path uses, so the `xp_award_bonus_once_uq` race is guarded. The remaining failures are infrastructure errors such as a DB outage, which would fail the publish regardless. The coupling is also deliberate: OQ-28 says the bonus is credited at publish time. The suggested AFTER_COMMIT alternative would add a different failure mode, where the bonus is missed until the next startup reconcile. This is not an exploitable bug, and there is no path for an attacker or user to trigger it."
+        ]
+      },
+      {
+        "title": "Startup reconcile and the publish listener back-date nothing: bonus rows are stamped with Instant.now()",
+        "file": "src/main/kotlin/cz/doucko/practice/application/Gamification.kt",
+        "line": 159,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`reconcile()` and `onPublishedMissionChanged` insert `MISSION_BONUS` rows with `Instant.now()`, and `reconcile()` inserts no celebration. A rank crossed this way is surfaced only through `HqView.pendingRankUp`. This is documented in the KDoc and does not break FR-38, because the ledger is append-only and the DB trigger refuses update and delete. The 'XP earned' figure on a mission summary is computed from `ledger.awards()` filtered by the run's attempt ids. Bonuses with a null `attempt_id` are therefore probably left out of the summary's `xpEarned`.",
+        "suggestion": "Add an IT that publishes a complete mission, then fetches `getMissionSummary`, and asserts the summary's XP against the ledger. If the bonus is missing from `xpEarned`, amend the spec or `RunXp.summarize`.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding doesn't show a defect. It only says null-attempt bonuses are \"probably\" missing from `xpEarned`, and it admits the KDoc documents the behavior and that FR-38 isn't broken. `RunXp.summarize` does filter on `attemptId != null && in runAttempts` (domain/Gamification.kt:122), so the mechanism is real. But it is by design. A bonus earned by a run's completing attempt carries that attempt's id (application/Gamification.kt:76) and is counted in `xpEarned`. The null-attempt bonuses at lines 125 and 159 come from publish and reconcile, when content changed and a mission became complete without any run. That XP wasn't earned in the run, so leaving it out of the run summary is correct. The back-dating claim is also not a bug: the ledger is append-only and the bonus is surfaced through `pendingRankUp`. The finding is low-confidence and speculative, so I could not confirm a defect.",
+          "The finding doesn't describe a defect a real user or attacker could hit. Its title claims a problem with `Instant.now()` stamps, but the finding itself admits that this is documented and doesn't break FR-38. The ledger is append-only, so a current timestamp on a reconcile-created bonus is harmless.\n\nThe one concrete concern is that the summary's `xpEarned` may leave out bonuses with a null `attempt_id`. The finding only says \"probably\". I checked the code. `RunXp.summarize` (domain/Gamification.kt:122) counts only ledger rows whose `attemptId` is in the run's attempt set. That is by design.\n\nThe normal completion path, at application/Gamification.kt:76, gives the bonus the completing attempt's id, so it is counted. Only the publish-listener and reconcile bonuses have a null attempt id. Those bonuses come from content changes that complete a mission without any run. They are not part of any run's XP, so leaving them out of \"XP earned in this run\" is consistent with the design.\n\nThe finding cites no spec requirement that the bonus must appear in that figure. Its suggestion is a speculative test to write, not a confirmed mechanism. I can't positively confirm a violation, so I'm treating it as refuted."
+        ]
+      },
+      {
+        "title": "Retry limit and reveal logic exist in more than one place (service, tutor, stats)",
+        "file": "src/main/kotlin/cz/doucko/practice/domain/Stats.kt",
+        "line": 100,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "The reveal count in `StatsRules.weeks` uses `attemptNo == TaskProgress.MAX_ATTEMPTS && !it.correct`. `DeterministicTutor` reveals on `state == REVEALED`. `Gamification.summary` also uses `TaskProgress.MAX_ATTEMPTS`. The contract's `maxAttempts` is mapped separately as the constant `TaskView.MaxAttempts._2`. They agree today (2), but nothing ties them together.",
+        "suggestion": "Derive `maxAttempts` in `PracticeMapping.task` from `TaskProgress.MAX_ATTEMPTS`, or add a test asserting they are equal.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The retry limit is defined once, as TaskProgress.MAX_ATTEMPTS = 2 in Rules.kt:51. attemptsLeft, StatsRules.weeks and Gamification all use that constant. DeterministicTutor relies on the derived state (REVEALED), not its own count. The only separate value is the contract's generated enum TaskView.MaxAttempts._2, which is the OpenAPI single-value enum. It can't be derived from an Int, and generated code is never edited. The claimed duplication of logic doesn't exist, and the optional equality test is a hardening suggestion, not a defect.",
+          "Stats.kt and Gamification.kt both reference the single constant TaskProgress.MAX_ATTEMPTS (Rules.kt:51), and attemptsLeft uses it too. The only separate value is the generated contract enum TaskView.MaxAttempts._2, which the OpenAPI schema fixes to 2. The generated enum can only change through a contract bump, not through user input or runtime behavior. No real user or attacker can trigger a divergence. This is a hypothetical future-maintenance note with no reproducible failure."
+        ]
+      },
+      {
+        "title": "Verified clean: the checklist items I audited showed no defect",
+        "file": "src/main/kotlin/cz/doucko/practice",
+        "line": 0,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "- **Answer keys (FR-27, NFR-1):** keys appear only through `DeterministicTutor`, and only when the state is `REVEALED`. The reload path (`screen` → `outcome`) goes through the same tutor.\n- **UNPARSEABLE (FR-22):** `PracticeService.submit` returns `Grade.Unreadable` without calling `store.insertAttempt`, so no attempt is consumed.\n- **FR-31:** `insertAttempt` runs inside the transaction, after `store.lock()` (an advisory transaction lock).\n- **Double submit:** state is re-read under the lock, and `attempt_task_scope_no_uq` backs it up.\n- **FR-38:** V5 has a trigger that refuses UPDATE and DELETE on `xp_award`. `onReevaluation` clamps with `maxOf(0, …)`. Unique indexes cover once-per-task, once-per-mission bonus and once-per-report.\n- **Admin access:** `/api/admin/**` is covered by the admin security chain (`AdminSecurityConfiguration`). Only the sign-in POST is `permitAll`, and `AdminStatsController` has no auth bypass.\n- **Week boundaries:** `PragueWeeks` uses `ZoneId Europe/Prague` with Monday as week start.\n- **Problem responses:** `PracticeProblemAdvice` and `AdminStatsProblemAdvice` return RFC 7807 problems with catalog messages and never quote submitted values.\n- **SQL:** all values are bound parameters.\nI did not verify the spec scenarios one by one, `tasks.md` ticks, the OpenAPI field match, or the Modulith `verify()` boundary. I ran out of budget and did not run the tests.",
+        "suggestion": "No action. Run `npm run qa:verify` and `npx openspec doctor` to confirm the unaudited items.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding reports no defect. It is a \"verified clean\" note with \"No action\" as its suggestion, and it cites a directory at line 0. It also admits that the spec scenarios, tasks.md ticks, OpenAPI match, Modulith verify() and the tests were not checked. There is no incorrect mechanism to confirm, and I did not independently verify its list of clean areas. It should be dropped as a non-finding.",
+          "The finding is a \"verified clean\" note, not a defect. It describes no vulnerable path, input or failing scenario, so there is nothing to exploit or reproduce. It cites a directory at line 0 and admits the reviewer ran out of budget and ran no tests. I did not re-read the code. The call rests on the finding's own content and the default to refute when no mechanism can be confirmed. The unchecked items are better covered by running `npm run qa:verify` and `npx openspec doctor`."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/release-review-api/review-findings.json"
+  }
+}

@@ -15,5 +15,5 @@ global pass. Store spec: `platform-foundation`.
 
 ## Impact
 - Store spec: platform-foundation · Contract pin: `8908669` (API unchanged)
-- Modules: only where a review finding is fixed (listed in `tasks.md`).
+- Modules: `practice` (PracticeReaders, ReportRules: NUL refused as 400) and `content` (ContentProblemAdvice: SQLSTATE class 22 → 400); `messages.properties` gains two keys. No endpoint, migration or contract change.
 - Dependencies: none new.

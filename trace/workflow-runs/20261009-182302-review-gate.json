@@ -1,0 +1,1249 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-09T18:23:02.136Z",
+  "finishedAt": "2026-10-09T18:27:29.478Z",
+  "args": {
+    "scope": "Phase 7 global release review of the backend (release-review-api), part d: tools/, Flyway migrations and resources, compose files, pom.xml",
+    "baseRef": "38b56c8",
+    "headRef": "HEAD -- tools src/main/resources compose.yaml compose.e2e.yaml pom.xml",
+    "change": "release-review-api",
+    "focus": "This is the once-per-release whole-history review; slice reviews already happened per slice, so prioritise CROSS-MODULE and cross-slice defects. This run covers ONLY: tools, src/main/resources, compose.yaml, compose.e2e.yaml, pom.xml (read other modules only for context at call sites). Requirements: contract/docs/requirements.md; ownership table in contract/docs/mvp-capability-plan.md; API in contract/api/openapi.yaml. Check especially: answer keys leaking to child endpoints before reveal (FR-27, NFR-1); admin endpoints reachable without the admin; any user input producing a raw 500 or driver internals (RFC 7807 required); UNPARSEABLE consuming an attempt (FR-22); attempts persisted immediately (FR-31); XP ledger never reduced (FR-38); Europe/Prague week boundaries in stats; module boundaries (Spring Modulith); migrations append-only and consistent with entities; concurrency (double submit, races on attempts/XP); path traversal / upload limits in storage; no secrets committed; tools never addressing the owner's compose project 'doucko'. Skip tests unless they mask a defect."
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": "sonnet",
+    "budgetPerAgentUsd": 1.2,
+    "maxTotalUsd": 3.75,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 3.3443,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 1678,
+      "durationMs": 94162,
+      "sessionId": "ed8a5ec0-0ca7-4441-a0ed-b09a109423e3",
+      "costUsd": 0.330559,
+      "numTurns": 12,
+      "result": {
+        "findings": [
+          {
+            "title": "Attempt log and problem reports are 'append-only' only by comment; no DB guard unlike xp_award",
+            "file": "src/main/resources/db/migration/V4__practice.sql",
+            "line": 3,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "The header says 'Rows are only ever inserted: the attempt log is append-only (FR-42, OQ-20)', but attempt, opened_hint and problem_report get no UPDATE/DELETE trigger. V5 and V6 add such a trigger for xp_award and attempt_reevaluation. The attempt table is the FR-31/FR-42 evidence base, so any stray UPDATE would rewrite history without the database objecting.",
+            "suggestion": "Add a new migration with a BEFORE UPDATE OR DELETE refusal trigger for attempt (and opened_hint), and a statement-level BEFORE TRUNCATE trigger for xp_award, attempt and attempt_reevaluation. Do not edit V4 itself."
+          },
+          {
+            "title": "xp_award append-only trigger does not block TRUNCATE",
+            "file": "src/main/resources/db/migration/V5__gamification.sql",
+            "line": 38,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The trigger is declared 'BEFORE UPDATE OR DELETE ... FOR EACH ROW'. Row-level triggers do not fire on TRUNCATE, so 'TRUNCATE xp_award' wipes the whole ledger and bypasses the FR-38 'XP is never lost' guard. The same applies to attempt_reevaluation in V6.",
+            "suggestion": "Add a statement-level BEFORE TRUNCATE trigger using the same refusal function, in a new migration."
+          },
+          {
+            "title": "Backup/restore cover only the database, so uploaded PDFs and images can be lost or orphaned (NFR-10)",
+            "file": "tools/backup.mjs",
+            "line": 59,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "pg_dump captures source.storage_key and task_image.storage_key, but the files live on the doucko-storage volume, which neither backup nor restore touches (restore.mjs only prints a notice). After a restore onto a fresh volume, rows point at missing files. The task images and source PDFs of an authored workbook would then fail to load, and the operator has no tool to recover them.",
+            "suggestion": "Archive the storage volume alongside the dump (tar from inside the backend container, or a volume copy) and restore it together. Or add a startup/admin consistency check that reports storage keys with no file."
+          },
+          {
+            "title": "Restore replaces the schema while the backend keeps serving and writing",
+            "file": "tools/restore.mjs",
+            "line": 98,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The restore runs 'DROP SCHEMA public CASCADE' and replays the dump in one transaction without stopping the backend. A child attempt or XP award committed between the safety backup and the schema swap is silently discarded. Requests during the swap block on locks or hit a briefly empty schema. This is the data-loss window FR-31 and FR-38 forbid.",
+            "suggestion": "Stop the backend container before the swap ('docker compose stop backend') and start it afterwards, which also gives Flyway its migration run. Alternatively document and enforce that the stack is idle."
+          },
+          {
+            "title": "practice_run cascade-deletes with a mission while attempt/opened_hint intentionally have no mission FK",
+            "file": "src/main/resources/db/migration/V4__practice.sql",
+            "line": 10,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "'mission_id uuid NOT NULL REFERENCES mission (id) ON DELETE CASCADE' on practice_run removes run history when a mission is deleted. The same file says the log 'outlives later mission edits' and gives attempt.mission_id no FK. After a mission delete, replay-scope attempts remain whose scope (the run id) no longer resolves to any practice_run row.",
+            "suggestion": "Make the behaviour consistent: either RESTRICT the mission delete once runs exist (as done for task_id), or have stats treat scopes with no run as orphaned. Do this in a new migration."
+          },
+          {
+            "title": "Plain 'docker compose up' bypasses the NFR-2 bind guard; DOUCKO_BIND_ADDRESS is not validated by compose",
+            "file": "compose.yaml",
+            "line": 71,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The port mapping is '${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80'. An empty value (the .env.example placeholder) or 0.0.0.0 publishes the app on all interfaces if the operator runs 'docker compose up' directly. The header comment admits the guard lives only in tools/stack.mjs. The backend and its admin API are then reachable from outside the LAN, with only the admin password between them.",
+            "suggestion": "Add a compose-level guard, for example a required form '${DOUCKO_BIND_ADDRESS:?...}' with a documented 127.0.0.1 default in .env.example. Or add a backend startup warning/refusal, so the guard does not depend on the wrapper script."
+          },
+          {
+            "title": "Session timeout/idle and backend healthcheck rely on image tooling not verified (wget in jre-alpine)",
+            "file": "compose.yaml",
+            "line": 50,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "The backend healthcheck runs 'wget -qO- http://localhost:8080/actuator/health | grep -q UP'. The runtime image is eclipse-temurin:21-jre-alpine, where wget is the busybox applet and 'localhost' may resolve to ::1 first. If it fails, 'up --wait' and the frontend's depends_on service_healthy never succeed, and restore.mjs reports the backend as unhealthy.",
+            "suggestion": "Use 127.0.0.1 explicitly in the healthcheck URL, and verify it against the built image in an IT or in the e2e-stack proof."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 1706,
+      "durationMs": 69295,
+      "sessionId": "ab1f0e6b-28b5-497a-8da4-1d75c61a2af0",
+      "costUsd": 0.2627678,
+      "numTurns": 9,
+      "result": {
+        "findings": [
+          {
+            "title": "NFR-2 bind guard is bypassable with plain `docker compose up`",
+            "file": "compose.yaml",
+            "line": 60,
+            "severity": "minor",
+            "evidence": "The frontend port is `${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80`. The only check that the address is loopback or RFC 1918 lives in `tools/stack.mjs` (`npm run stack:up`). If the owner or a script sets `DOUCKO_BIND_ADDRESS=0.0.0.0` in .env and runs `docker compose up` directly, the child surface and the admin login are published on every interface. Anyone on the network, or on the internet behind a port-forward, could then reach the admin login. compose.yaml says so in a comment, but nothing enforces it.",
+            "suggestion": "Make the safe default hard to override. For example, reject non-private values with a compose interpolation pattern, or add a startup check in the nginx or backend image that refuses a public Host. Alternatively, document that `stack:up` is the only supported entry point and make `down`, `ps` and `restore` use the same guarded path."
+          },
+          {
+            "title": "Restore runs against a live backend with no write quiesce",
+            "file": "tools/restore.mjs",
+            "line": 99,
+            "severity": "minor",
+            "evidence": "The restore does `DROP SCHEMA public CASCADE` inside the db container while the backend keeps serving. The backend is only restarted afterwards, and only when the schema is behind. A child attempt or XP write that lands between the safety backup and the drop is lost silently, since the append-only ledger never records it. Open pool connections and Hibernate state also point at a replaced schema until a restart. In the common case where the restored schema equals the target, no restart happens at all.",
+            "suggestion": "Stop the backend before the drop (`compose stop backend`) and start it again afterwards, always. That also makes Flyway run unconditionally and clears the pool state. Alternatively, refuse to restore while the backend container is running."
+          },
+          {
+            "title": "Storage volume is not covered by backup although DB rows reference it by storage_key",
+            "file": "compose.yaml",
+            "line": 10,
+            "severity": "minor",
+            "evidence": "`source.storage_key` and `task_image.storage_key` (V2) point at files on the `doucko-storage` volume. `tools/backup.mjs` dumps only the database, and `restore.mjs` prints a warning about this. After a disk loss or a restore on a fresh volume, published tasks keep their rows but their PDFs and images are gone. This is a data-integrity gap, not an exploit.",
+            "suggestion": "Have backup also archive the storage volume (for example `tar` through `docker compose exec`, into the same owner-only directory). Alternatively, add a startup or admin consistency check that reports rows whose files are missing."
+          },
+          {
+            "title": "DB-level append-only guard on xp_award and attempt_reevaluation does not cover TRUNCATE; attempt and opened_hint have no guard",
+            "file": "src/main/resources/db/migration/V5__gamification.sql",
+            "line": 31,
+            "severity": "minor",
+            "evidence": "The triggers are `BEFORE UPDATE OR DELETE ... FOR EACH ROW`. `TRUNCATE xp_award` and `TRUNCATE attempt_reevaluation` bypass them. The `attempt` log (FR-31, FR-42) is described as append-only, but V4 has no trigger, so an UPDATE or DELETE of `attempt` rows passes at the DB level. The app role is also the table owner. No concrete code path was found, so this is defense-in-depth only. The FR-38 guarantee 'XP is never reduced' rests on application code for TRUNCATE and on application code alone for the attempt log.",
+            "suggestion": "In a new migration (not an edit to V4 or V5), add a `BEFORE TRUNCATE` statement-level trigger for the ledger tables. Add the same UPDATE/DELETE trigger to `attempt`. Optionally add an `amount` check or trigger so that a REEVALUATION row can never reduce a task's total."
+          },
+          {
+            "title": "Unpinned, floating base images and builder in Dockerfile and compose",
+            "file": "compose.yaml",
+            "line": 19,
+            "severity": "minor",
+            "evidence": "`postgres:16-alpine`, `maven:3.9-eclipse-temurin-21` and `eclipse-temurin:21-jre-alpine` are floating tags. A rebuild on the home laptop pulls whatever those tags point to at that moment, so builds are not reproducible. Accidental drift can also change the Postgres minor version used for the data volume. No dependency advisory scan was run (no network access in this review), so PDFBox 3.0.5 and the Spring Boot 4.1.1 transitives are unaudited.",
+            "suggestion": "Pin images by digest or at least by minor version. Run `mvn org.owasp:dependency-check-maven:check` or `npm audit` in CI and record the result before release."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 1649,
+      "durationMs": 63005,
+      "sessionId": "32819b72-be8f-4e46-8e47-3ef1352c435d",
+      "costUsd": 0.286889,
+      "numTurns": 14,
+      "result": {
+        "findings": [
+          {
+            "title": "Practice/progress advice has no DataIntegrityViolationException handler (possible raw 500)",
+            "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+            "line": 32,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "V4/V5 add unique and foreign-key rules (attempt_task_scope_no_uq, xp_award_task_once_uq, xp_award_bonus_once_uq, ON DELETE RESTRICT on task_id). Only ContentProblemAdvice maps DataIntegrityViolationException (-> 409), and it is scoped to the content controllers. PracticeProblemAdvice and AdminStatsProblemAdvice map no integrity violation. Attempt races are serialised by pg_advisory_xact_lock in JdbcPracticeStore.kt:38, so the unique constraints should not be hit in practice. I did not trace the report/re-evaluation paths (xp_award_reevaluation_once_uq, attempt_reevaluation PK) or a task deleted concurrently with a play-through. If a constraint does fire there, the generic handler returns 500 or a non-contract problem.",
+            "suggestion": "Add a DataIntegrityViolationException -> 409/problem+json handler to the practice and stats advices. Or confirm that every write path that can hit these constraints takes the advisory lock. Add an IT for a concurrent double submit and a concurrent re-evaluation."
+          },
+          {
+            "title": "V6 MISSION_BONUS shape check is loose (report_id/attempt_id)",
+            "file": "src/main/resources/db/migration/V6__progress_stats.sql",
+            "line": 27,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The check is `kind = 'MISSION_BONUS' AND task_id IS NULL AND (report_id IS NULL OR attempt_id IS NULL)`. It also allows a bonus with both report_id and attempt_id NULL. V5 documents that case only for a bonus credited when a mission is published already complete (OQ-28). The ledger rules therefore rest on application code, not the schema. The REEVALUATION and TASK shapes are strict.",
+            "suggestion": "Keep it if intended. Otherwise document the allowed combinations in a comment or the spec, or tighten them in a new migration (never edit V6)."
+          },
+          {
+            "title": "Operator backup excludes the doucko-storage volume",
+            "file": "tools/backup.mjs",
+            "line": 1,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`npm run backup` runs pg_dump only. Uploaded PDFs and task images live on the doucko-storage volume (compose.yaml). After a restore, task_image/source rows can point at files that no longer exist. restore.mjs prints a notice about this. compose.yaml says the same: 'npm run backup dumps only the database'. If NFR-10 requires the whole app data to be recoverable, this is partial.",
+            "suggestion": "Confirm NFR-10 covers only the database. If it covers uploads too, add a storage-volume archive step to backup/restore. Otherwise record the exclusion in the spec."
+          },
+          {
+            "title": "pom 'no-sibling-contract' profile can silently skip codegen when ../docs is absent",
+            "file": "pom.xml",
+            "line": 360,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "The profile sets codegen.skip=true when ../docs/api/openapi.yaml is missing. Its comment says it is for 'Phase 0/1 only'. The pinned-contract profile re-enables codegen only when contract/api/openapi.yaml exists. A checkout whose contract submodule is not initialised, in a directory without a sibling ../docs (CI or a worktree), will skip generation. The build then fails on missing *Api interfaces. It does not fail with a message pointing at the cause.",
+            "suggestion": "Remove the Phase 0/1 profile now that the contract is pinned. Or fail fast with an enforcer rule when contract/api/openapi.yaml is absent."
+          },
+          {
+            "title": "Tools address only project doucko-e2e; owner project guard verified (no defect)",
+            "file": "tools/lib/e2e-stack.mjs",
+            "line": 16,
+            "severity": "minor",
+            "confidence": "high",
+            "evidence": "assertE2eProject refuses every project name except 'doucko-e2e'. e2eComposeArgs always passes -p, both compose files and the committed fake env file. COMPOSE_PROJECT_NAME, COMPOSE_FILE and the credentials are blocked from the process environment. `down -v` is therefore confined to the throwaway project. compose.e2e.yaml publishes only 127.0.0.1:18082 via !override, and e2e-stack.mjs re-checks the rendered ports. Committed secrets in tools/e2e-stack.env are labelled fake test values. Compose and migrations raised no cross-module or answer-key issue. The default `name: doucko` in compose.yaml is correct for the owner stack. backup.mjs and restore.mjs deliberately address the owner project (restore requires --yes and takes a safety backup first).",
+            "suggestion": "No action. Retain the OperatorToolGuardTest coverage."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1918,
+      "durationMs": 55620,
+      "sessionId": "399fea79-1f2d-40b2-bd23-060bf7db211b",
+      "costUsd": 0.2761908,
+      "numTurns": 24,
+      "result": {
+        "findings": [
+          {
+            "title": "Attempt log has no database-level append-only guard, unlike xp_award and attempt_reevaluation",
+            "file": "src/main/resources/db/migration/V4__practice.sql",
+            "line": 19,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The V4 header says the attempt log is append-only (FR-42, OQ-20) and 'Rows are only ever inserted'. Nothing enforces it in the database. V5 gives xp_award a BEFORE UPDATE OR DELETE trigger and V6 gives attempt_reevaluation the same. `attempt` only has the (task_id, scope, attempt_no) unique constraint, so the guarantee depends on application code alone. The attempt table is also the evidence for XP and re-evaluation. The `attempt_id` foreign keys use ON DELETE RESTRICT, which blocks deletes of referenced rows but not UPDATEs, so `correct` or `parts` can still be changed in place. I could not run `git diff` because Bash is disabled, so I read the files directly. I did not check whether any application code updates `attempt`.",
+            "suggestion": "Add a new migration (V7, never edit V4) with a BEFORE UPDATE OR DELETE trigger on `attempt`, modelled on `xp_award_append_only`. Optionally add BEFORE TRUNCATE statement triggers on attempt, xp_award and attempt_reevaluation, because row-level triggers do not fire on TRUNCATE."
+          },
+          {
+            "title": "Deleting a mission cascades to practice_run while attempt, xp_award and opened_hint keep the mission id with no foreign key",
+            "file": "src/main/resources/db/migration/V4__practice.sql",
+            "line": 10,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`practice_run.mission_id` is `REFERENCES mission(id) ON DELETE CASCADE`, but `attempt`, `opened_hint`, `problem_report` and `xp_award` carry `mission_id` with no foreign key by design, so the log outlives the mission. Deleting a mission therefore silently removes its replay-run rows and leaves the attempts, hints and XP rows pointing at it. The V4 header says 'the log outlives later mission edits'. Whether the application ever deletes missions, rather than unpublishing them, is not visible from these files.",
+            "suggestion": "Confirm that missions are never hard-deleted once practice data exists. If they can be, change the FK to ON DELETE RESTRICT or drop it, as is done for the other tables, in a new migration."
+          }
+        ]
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V4__practice.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1226,
+      "durationMs": 30298,
+      "sessionId": "844090a2-cd89-4bd1-a7a1-9e7f2fb14fe7",
+      "costUsd": 0.055153,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The factual claim holds. V4__practice.sql line 4 says \"Rows are only ever inserted: the attempt log is append-only (FR-42, OQ-20)\", but it defines no trigger. V5 (xp_award) and V6 (attempt_reevaluation) do add refusal triggers. No other migration guards attempt or opened_hint. A grep of src found no production code that runs UPDATE or DELETE on attempt or opened_hint, so nothing is broken today. The gap is a missing defense-in-depth guard, not a live bug. Two parts of the finding are wrong or incomplete. Its title lumps in problem_report, but that table's status column (OPEN/FIXED/DISMISSED) has to be updatable, so it can't be made append-only. Also, ContentAuthoringIT.kt:53-54 runs `DELETE FROM attempt` and `DELETE FROM opened_hint` for test cleanup, so the suggested trigger would break those tests unless they switch to TRUNCATE or the migration allows for them. Keep it as a minor, low-confidence hardening suggestion, scoped to attempt and opened_hint.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V4__practice.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1259,
+      "durationMs": 31139,
+      "sessionId": "78bcab29-2512-4fdd-b49e-01dae5b8d0ed",
+      "costUsd": 0.057921600000000004,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The factual part holds. V4 has no trigger on attempt, opened_hint or problem_report, while V5 and V6 add one for xp_award and attempt_reevaluation. But nothing is exploitable or reproducible. In the practice module, the only UPDATE statements are `practice_run SET finished_at` and `problem_report SET status`, both in JdbcPracticeStore.kt. No code path updates or deletes attempt or opened_hint. No child or admin endpoint can reach such a statement, and my search covered only the practice module's Kotlin code, not other modules or the test sources. The finding's own evidence needs a \"stray UPDATE\" from some future bug or manual SQL, which is a defense-in-depth wish, not a defect a user or attacker can trigger. It also wrongly lumps in problem_report, which is mutable by design (status changes OPEN to something else). I found no requirement that mandates a DB-level guard for attempt (the V4 header only says rows are only inserted). A hardening suggestion with low confidence and no reproducible trigger does not count as a real problem.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V5__gamification.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 969,
+      "durationMs": 26096,
+      "sessionId": "5d10a098-b3ac-4330-9cb0-7bb07e2f59aa",
+      "costUsd": 0.046544199999999994,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding holds. V5__gamification.sql:37-39 declares `BEFORE UPDATE OR DELETE ON xp_award FOR EACH ROW`. PostgreSQL does not fire row-level triggers on TRUNCATE, and there is no `BEFORE TRUNCATE` statement trigger or REVOKE TRUNCATE on this table in the code I read. The repo's own tests show the gap: PracticeTestSupport.kt:164-167, GamificationIT.kt:707 and ContentAuthoringIT.kt:51 run `TRUNCATE xp_award, rank_celebration, attempt_reevaluation`. PracticeTestSupport.kt:164 says the tables \"refuse DELETE ... so they are truncated\", so TRUNCATE succeeds on both xp_award and attempt_reevaluation. I did not open V6, but those tests cover attempt_reevaluation too. Severity \"minor\" fits: TRUNCATE needs DB-level privileges, and no application code path issues it, so user input cannot reach it. It is still a gap in the FR-38 guard.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V5__gamification.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1002,
+      "durationMs": 30924,
+      "sessionId": "962de1c5-9338-4204-81c2-18f9d662733d",
+      "costUsd": 0.0529908,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real: the trigger at V5__gamification.sql:37-39 is a row-level BEFORE UPDATE OR DELETE trigger, and Postgres doesn't fire row-level triggers on TRUNCATE. Tests already run \"TRUNCATE xp_award, rank_celebration, attempt_reevaluation\" without the trigger refusing (ContentAuthoringIT.kt:51, PracticeTestSupport.kt:167, GamificationIT.kt:707). But there is no real-user or attacker path. No production code issues TRUNCATE, and running it needs table-owner or TRUNCATE privilege, so that actor could also drop the trigger. The gap only weakens defense-in-depth against operator or migration mistakes. Adding a BEFORE TRUNCATE trigger would break the existing test cleanups, so they would need rework. I did not read V6; the attempt_reevaluation claim is probably the same.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/backup.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1220,
+      "durationMs": 27195,
+      "sessionId": "7db2694c-92ef-40c6-8bd4-868b4184d1ab",
+      "costUsd": 0.0872478,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The mechanism is real: backup.mjs only runs pg_dump and does not touch the doucko-storage volume, and restore.mjs:113-114 prints a notice that files are not restored. But it is not a correctness defect. NFR-10 (contract/docs/requirements.md:171) requires only a pg_dump-based `npm run backup` and Postgres data surviving container restarts. It does not mention file storage. The limitation is a deliberate, documented scope decision, recorded in docs/qa/evidence/fix-restore-schema-drift.md and docs/current-state.md:106, and restore explicitly warns the operator. The claim that the operator gets no notice is false. This would be a requirements extension, not a bug in the code.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/backup.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1253,
+      "durationMs": 23050,
+      "sessionId": "59597d9a-b55c-4d7c-b3cf-9035ea70010c",
+      "costUsd": 0.0652434,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. backup.mjs runs only pg_dump. restore.mjs prints that files on the doucko-storage volume are not restored. The storage keys in the DB would then point at missing files if the volume is lost. NFR-10 as written only requires a pg_dump-based backup of Postgres data, so this is not a spec violation. The gap is known and documented. It only bites when the storage volume is lost while the DB dump is restored, and it is operator-triggered, so it is not attacker-exploitable. It is a real limitation, but minor, as the finding says.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1148,
+      "durationMs": 22544,
+      "sessionId": "ce1f1755-6830-4977-b707-fe0fed1549a9",
+      "costUsd": 0.0587754,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "The core mechanism is real. tools/restore.mjs never stops the backend. After the safety backup (lines 88-97), it runs DROP SCHEMA public CASCADE and the replay in one transaction (lines 99-106). The backend is only restarted afterwards, and only if the restored schema is behind the expected migration version (lines 194-216). So a write committed between the safety backup and the swap is in neither the safety backup nor the restored data. Requests during the swap also contend with the DROP's exclusive locks. Pooled backend connections can hit a schema that has just been recreated, so that part of the claim holds.\n\nThe finding overstates the harm. A restore deliberately replaces all current data with the dump, so anything written after the dump is discarded by design, not by a race. Only the few seconds between the safety backup and the swap are actually unprotected. That window is narrow for a single-family tutor app, and the operator chose to run the restore. Calling it the data loss FR-31/FR-38 forbid is too strong, because those requirements cover normal operation, not an explicit destructive restore. The fix, stopping the backend or documenting an idle stack, is reasonable hardening.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1181,
+      "durationMs": 25759,
+      "sessionId": "c5155a9f-38dd-4c65-bcd3-8f726c8ac51b",
+      "costUsd": 0.06261,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "tools/restore.mjs does not stop the backend before the swap. The safety backup (lines 89-93) runs first, then DROP SCHEMA public CASCADE and the replay run in one transaction (lines 99-106). A write the running backend commits between the safety backup and the swap is in neither the safety backup nor the dump, and requests during the swap block on ACCESS EXCLUSIVE locks or hit the new schema. The impact is narrow: restore intentionally discards all current data, so only the seconds-wide gap is an unintended loss. The tool is manual, operator-run, on a small single-family stack, and the failures are transient. Not reproduced by running it. Confirmed as a minor gap; keep minor.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V4__practice.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1191,
+      "durationMs": 21885,
+      "sessionId": "0fa51c42-2e71-4afe-8759-a6d92886e13b",
+      "costUsd": 0.0930724,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The mechanism isn't reachable in practice. `MissionService.delete` (MissionService.kt:94-99) calls `MissionRules.missionDelete(usage.usedTasks(stored.content.taskIds))`. It refuses the delete with a Used conflict if any of the mission's tasks has an attempt, opened_hint or problem_report row (see `JdbcPracticeStore.usedTasks`). The `ON DELETE CASCADE` on `practice_run.mission_id` therefore only fires for missions whose tasks have no practice data. A replay run can only start after the primary play-through, which leaves attempts, so such runs belong to missions that can't be deleted. Any run the cascade does remove has no attempts or hints that could be orphaned. `practice_run` also holds no history of its own beyond mission_id, started_at and finished_at. The claimed state, replay-scope attempts whose run row no longer exists, would need a used task to be detached from the mission and the mission then deleted. That is an exotic edge the finding doesn't show and I didn't trace. There is a minor inconsistency in the comment: the header says \"No foreign key on mission_id\", yet `practice_run` has one. It has no runtime consequence, and the delete guard already enforces the intended behaviour at the application level.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V4__practice.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1224,
+      "durationMs": 20567,
+      "sessionId": "91569ac8-d600-467c-95a3-ce297e55a68d",
+      "costUsd": 0.0789328,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The orphaning scenario can't happen through normal use. `MissionService.delete` (MissionService.kt:94-99) calls `MissionRules.missionDelete(usage.usedTasks(...))` and refuses with a conflict if any of the mission's tasks has an attempt, opened hint or problem report. `JdbcPracticeStore.usedTasks` (line 167) checks exactly those three tables. A replay run only produces attempts for tasks in the mission, so a mission with run history is blocked from deletion. The cascade therefore only removes runs that have no attempts, which orphans nothing. The mission-delete guard in the application layer is the reason the `ON DELETE CASCADE` on `practice_run` is harmless. A leftover edge case remains: an admin removes a used task from a mission, then deletes the mission. That is narrow and speculative, and the finding doesn't claim it. The finding is a consistency nit and not a reproducible defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:compose.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1249,
+      "durationMs": 16551,
+      "sessionId": "680675b7-1851-4ff3-87f8-b3f592c8ce03",
+      "costUsd": 0.0448668,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding's claimed mechanism is wrong. .env.example sets DOUCKO_BIND_ADDRESS=127.0.0.1, not empty. Compose's ${VAR:-default} also substitutes the default when the variable is set but empty, so empty gives 127.0.0.1. The cited line is wrong (the port mapping is at compose.yaml:68). The only exposure path is an operator explicitly setting 0.0.0.0 and then bypassing the documented wrapper (documented in compose.yaml and .env.example). The suggested ':?' form only forces the variable to be set and does not block 0.0.0.0, so it adds no protection.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:compose.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1282,
+      "durationMs": 18187,
+      "sessionId": "c352e690-171b-45b7-a4cf-7d72d67ea6f1",
+      "costUsd": 0.0443048,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "compose.yaml uses ${DOUCKO_BIND_ADDRESS:-127.0.0.1}. The ':-' form defaults when the variable is unset OR empty, so an empty value binds loopback. .env.example sets 127.0.0.1, not empty. The only bypass is an operator explicitly writing 0.0.0.0 into .env and running plain 'docker compose up', and that gap is already documented in compose.yaml and .env.example. Only the frontend 8081 is published; the backend and DB stay on the Compose network. The claimed empty-placeholder exposure does not occur.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:compose.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1099,
+      "durationMs": 14458,
+      "sessionId": "7a217229-6cf0-4ea9-92a4-dac130e29aa5",
+      "costUsd": 0.041711,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding is speculative and I couldn't confirm a failure mechanism. compose.yaml:56 does use `wget -qO- http://localhost:8080/actuator/health | grep -q UP`, and the Dockerfile's runtime stage is `eclipse-temurin:21-jre-alpine`. But Alpine ships busybox wget by default, so the tool exists. Tomcat binds the wildcard address, which is dual-stack on a JVM, so it accepts connections on both 127.0.0.1 and ::1. Whichever address `localhost` resolves to first, the healthcheck connects. This `wget localhost:8080/actuator/health` pattern is a common one for Spring Boot on Alpine. The finding itself says \"may\" and \"if it fails\", gives no evidence of an actual failure, and is rated low confidence. The suggestion to use 127.0.0.1 is harmless hardening, not a correctness defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:compose.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1132,
+      "durationMs": 13385,
+      "sessionId": "084cea19-4a93-4242-be97-317de7740dea",
+      "costUsd": 0.0383636,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The healthcheck at compose.yaml:56 does use `wget -qO- http://localhost:8080/actuator/health | grep -q UP` on eclipse-temurin:21-jre-alpine (Dockerfile:11). The finding gives no mechanism for how it fails. Alpine ships the busybox wget applet, so the tool exists. Spring Boot's embedded Tomcat binds the wildcard address, which accepts both IPv4 and IPv6 loopback, so `localhost` resolves and connects whichever address is tried first. The known `localhost`/`::1` failure affects services that bind IPv4 only, such as nginx, and not this backend. The finding only says it \"may\" resolve to ::1 first and \"if it fails\". I could not confirm a real failure, and the evidence is speculative. At most this is a hardening suggestion, not a reproducible defect."
+      }
+    },
+    {
+      "label": "verify:compose.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1403,
+      "durationMs": 17865,
+      "sessionId": "20f190c2-c2a2-43f9-9eff-ff4b393577f2",
+      "costUsd": 0.0575666,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. compose.yaml:68 publishes `${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80` with no interpolation guard. The loopback/RFC 1918 check runs only in `npm run stack:up`, and the compose.yaml header comment (lines 1-3) says a plain `docker compose up` skips it. The backend doesn't close the gap. The Host allowlist in SecurityConfiguration.kt:50 accepts localhost, `backend`, or any IPv4 literal, so a request to a public IP would pass it. Exploiting this takes a deliberate misconfiguration: the owner has to set 0.0.0.0 or a public address in .env and bypass the wrapper. The admin login is also still password-protected. This is a documented defense-in-depth gap, so I'm keeping the severity at minor.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:compose.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1436,
+      "durationMs": 15000,
+      "sessionId": "ab964e00-a886-4444-8cad-1b405a12bcdc",
+      "costUsd": 0.0492208,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real, but it needs the owner to set the value. The frontend port is `${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80` (compose.yaml:68; the finding cites line 60, which is the backend `restart` line). A plain `docker compose up` does not run the loopback/RFC 1918 check in tools/stack.mjs. Compose has no interpolation validation for this value, so 0.0.0.0 would be published. The backend and db publish no ports. An outside attacker cannot trigger this. The default is loopback, and the owner has to put a public address in .env and bypass `stack:up`. Even then the exposure is only the admin login, which is still password-protected (ADMIN_PASSWORD of at least 12 characters, NFR-16). The comment in compose.yaml documents the gap, and earlier review runs already raised it. It is a defense-in-depth gap against owner misconfiguration, not an exploitable vulnerability, so I downgrade it.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1306,
+      "durationMs": 15955,
+      "sessionId": "0cecf5c0-9a39-4f66-8686-0e0b642c67ef",
+      "costUsd": 0.061149800000000004,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "tools/restore.mjs never stops the backend before the DROP SCHEMA public CASCADE (lines 99-106). It restarts the backend only when the restored Flyway version is behind the target (line 194). A write between the safety backup and the drop is therefore in neither the safety backup nor the restored dump. Pooled connections and cached statements also stay attached to the replaced schema when versions match, because no restart happens. Nothing in the file or its callers guards against this, and the header comment doesn't mention it. The practical impact is small: it is an operator-run tool for a single-family deployment, and the restore replaces all data anyway. The 'security' dimension label is also wrong, since this is a correctness and robustness issue. Minor severity is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/restore.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1339,
+      "durationMs": 16171,
+      "sessionId": "441bba58-4b17-4e00-beea-a8d6b52d0a4a",
+      "costUsd": 0.0601134,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The mechanism is real, but the impact is smaller than the finding claims. In tools/restore.mjs the only `compose` calls before the drop are read-only queries (`exec psql`, `ps`). Nothing stops or pauses the backend. Line 104 runs `DROP SCHEMA public CASCADE` in a single psql transaction while the backend can still serve. A restart (line 203) happens only when the restored schema version is behind the target and the backend is running. When the versions match, which is the common case, there is no restart and no quiesce. So the stale-pool and stale-Hibernate-state concern is real. The next requests after a drop-and-recreate could hit transient errors such as stale prepared-statement plans or missing relations, and these would persist until a restart.\n\nSeveral parts of the claim don't hold up:\n- The \"lost write\" is not a distinct harm. Restore replaces the whole database by design and requires `--yes`. Any write made before the restore commits is overwritten whether or not it falls between the safety backup and the drop. The window only means that write is missing from the safety backup. That window is seconds wide.\n- Postgres takes ACCESS EXCLUSIVE locks for the drop, so concurrent writes either block or fail cleanly. They do not corrupt anything.\n- This is a manually run operator tool on a single-family tutoring app. An attacker or child cannot trigger it.\n- The dimension is mislabelled. There is no security impact, only an operational-robustness gap.\n\nI downgrade it to a nit or low-severity improvement. Stopping the backend before the restore and always starting it afterwards would be a reasonable hardening step."
+      }
+    },
+    {
+      "label": "verify:compose.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1169,
+      "durationMs": 12491,
+      "sessionId": "604c629f-48c8-4b9c-88b9-b987beb98562",
+      "costUsd": 0.0498658,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed: backup.mjs only runs pg_dump via docker compose exec on the db service. compose.yaml mounts doucko-storage at /var/lib/doucko/storage for uploaded PDFs and images, and nothing backs it up. restore.mjs:113 explicitly warns the files are not restored. The gap is real, though documented. It is a durability issue, not security; minor severity is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:compose.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1202,
+      "durationMs": 12343,
+      "sessionId": "3c53e738-472b-423b-92dd-c852a67d423a",
+      "costUsd": 0.0482248,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The gap is real. compose.yaml puts uploaded PDFs and images on the separate named volume doucko-storage, and its comments say `npm run backup` dumps only the database. restore.mjs lines 113-114 warn that storage files are not in the dump and are not restored. After a disk loss or a restore onto a fresh volume, rows referencing storage_key would have no files. I did not open tools/backup.mjs or the V2 migration, so the storage_key link rests on the finding's evidence. It is not an exploit, and it is a known, documented limitation. It is a real recovery-integrity gap, but a minor one, because the source files can be re-uploaded. The \"security\" dimension label is a poor fit.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V5__gamification.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1451,
+      "durationMs": 11779,
+      "sessionId": "03dc8143-9fc5-4834-8147-4dd3934cbdcd",
+      "costUsd": 0.0441782,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "I read V5__gamification.sql and grepped all migrations for TRIGGER, TRUNCATE and REVOKE. The mechanism claim is accurate. The only triggers are `xp_award_append_only_trg` (V5:37-39) and `attempt_reevaluation_append_only_trg` (V6:22). Both are `BEFORE UPDATE OR DELETE ... FOR EACH ROW`. Row-level triggers do not fire on TRUNCATE, so TRUNCATE bypasses them. No migration has a BEFORE TRUNCATE trigger or a REVOKE. No trigger exists on `attempt` or `opened_hint`, so UPDATE/DELETE on them is not blocked at the DB level. The finding itself concedes there is no concrete code path, so it is purely defense-in-depth. Nothing elsewhere guards these tables in a way I found. I'm keeping it as a real but low-impact minor finding, and I'd treat it as a hardening suggestion, not a defect.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V5__gamification.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1484,
+      "durationMs": 11360,
+      "sessionId": "b485413e-83c4-40ad-9b06-92c6dbc78287",
+      "costUsd": 0.0399896,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. A grep of the migrations shows triggers only in V5 (`xp_award`) and V6 (`attempt_reevaluation`). I did not read their definitions, so I'm taking the finding's word that they are row-level BEFORE UPDATE OR DELETE. A grep for TRUNCATE found no TRUNCATE guard. The same grep found no trigger, REVOKE or role separation for `attempt`. Row-level triggers do not fire on TRUNCATE. But this isn't reachable by a real user or attacker. It would take direct DB access with owner privileges, or SQL injection, and the finding itself says no code path was found. I did not search the application code for injectable queries or TRUNCATE calls. So this is a defense-in-depth gap, not an exploitable bug. I'm keeping it as a finding but downgrading the severity.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:compose.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1172,
+      "durationMs": 12526,
+      "sessionId": "51eec9e7-8208-4be2-b34a-a92b2d0cca17",
+      "costUsd": 0.0396696,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "I read the cited lines and confirmed the three floating tags: compose.yaml:18 (postgres:16-alpine), Dockerfile:3 (maven:3.9-eclipse-temurin-21) and Dockerfile:11 (eclipse-temurin:21-jre-alpine). None is pinned by digest or patch version, so rebuilds are not reproducible. The data-volume claim is overstated: the Postgres major version is pinned to 16, and minor updates within a major are on-disk compatible. The finding is a real but low-impact hygiene issue for a local home deployment, not a security or correctness defect. The advisory-scan point is an unrun check, not something wrong in the code.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:compose.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1205,
+      "durationMs": 13929,
+      "sessionId": "e91320fa-d3f6-4414-93c9-8b29db97aba2",
+      "costUsd": 0.04224320000000001,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The floating tags are real (Dockerfile:3, Dockerfile:11, compose.yaml:18), but there is no exploitable or user-impacting problem. postgres:16-alpine stays on major 16, so minor drift cannot corrupt the data volume. Abusing a floating tag needs an upstream registry compromise, which is generic supply-chain risk and not specific to this repo. The app is a local home-laptop deployment. The 'unaudited dependencies' remark describes review scope and names no concrete vulnerability. Not a security defect; at most an optional hygiene improvement.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1667,
+      "durationMs": 15217,
+      "sessionId": "478df908-78d6-45e5-89df-8d1f53ceff92",
+      "costUsd": 0.0772862,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The advice lacks a DataIntegrityViolationException handler (true), but I found no reachable path to a raw 500. Every practice write path takes store.lock(), which is pg_advisory_xact_lock. That covers PracticeService (lines 137, 190, 208, 235), ProgressStats.reevaluate and dismiss (108, 135), and Gamification (121, 139, 174). The unique constraints (attempt scope, xp award once, reevaluation once) therefore can't be hit by concurrent requests on these paths. The finding admits it didn't trace the report/re-evaluation paths, and those are locked as well. The remaining scenario, a task deleted mid-play-through, is speculative. Content deletion has its own lock in JdbcMissionStore and a 409 handler in ContentProblemAdvice, and the finding gives no concrete trigger. The finding is a hypothetical hardening suggestion with no confirmed mechanism."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1700,
+      "durationMs": 15174,
+      "sessionId": "d9c37fc3-5125-43b1-8bf8-b5ad92ffefa7",
+      "costUsd": 0.07607940000000002,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The missing handler is real: PracticeProblemAdvice and AdminStatsProblemAdvice map no DataIntegrityViolationException. But I couldn't find a reachable path that triggers it. Every write path in PracticeService, Gamification and ProgressStats calls store.lock() (a pg_advisory_xact_lock) before inserting. That includes reevaluate at ProgressStats.kt:108, which runs before insertReevaluation and closeReport. So the unique constraints (attempt_task_scope_no_uq, xp_award_*_once_uq, the reevaluation PK) are serialised and should not fire on a double submit or a concurrent re-evaluation. The only remaining route is an admin deleting a task at the same moment a child attempt inserts against it. That would need an ON DELETE RESTRICT or FK race. It's a tiny window in a single-household app, and it can't be triggered by user input. The reviewer also rated it low confidence and admitted they didn't trace these paths. This is a theoretical hardening gap, not a reproducible raw 500.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V6__progress_stats.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1158,
+      "durationMs": 13552,
+      "sessionId": "6b05e703-9d89-4f17-9609-2fdd9c4899fd",
+      "costUsd": 0.052382,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The V6 constraint `(report_id IS NULL OR attempt_id IS NULL)` allows exactly the three legitimate MISSION_BONUS shapes and rejects only \"both set\". The code creates all three. Attempt-only: Gamification.kt:76. Report-only (re-evaluation bonus): :103. Both null (mission published already complete, OQ-28): :125 and :159. Requiring exactly one of the two would break lines 125 and 159. The \"once per mission\" invariant is still enforced by the unique index xp_award_bonus_once_uq (V5:28). The finding is a stylistic nit with no incorrect mechanism, and it admits the loose case is intended.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V6__progress_stats.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1191,
+      "durationMs": 9480,
+      "sessionId": "26259296-ae47-4afb-a23f-5f137e034382",
+      "costUsd": 0.0470068,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The looseness is deliberate, and the constraint matches the three shapes the code writes. Nothing here is exploitable. In `Gamification.kt`, `MISSION_BONUS` rows are written in three ways. Line 76 sets an attempt id with no report. Line 103 sets a report id with no attempt. Lines 125 and 159 set neither, for a mission published already complete (OQ-28, which V5 documents). The check `(report_id IS NULL OR attempt_id IS NULL)` allows all three and forbids only the invalid case of both being set. A tighter check would break lines 125 and 159. No user or attacker input can reach the `xp_award` table's shape. Only server-side code inserts there, and no endpoint lets the caller choose these columns. The finding also concedes \"Keep it if intended\", and the reviewer's own suggestion is only a comment. That is a documentation nit, not a defect or a vulnerability.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/backup.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1125,
+      "durationMs": 9338,
+      "sessionId": "b2e64539-a826-42a7-8eaf-625950f2ad75",
+      "costUsd": 0.052874,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "backup.mjs does run only pg_dump, as the finding says. But NFR-10 (contract/docs/requirements.md:171) requires only that Postgres data lives in a Docker volume and that a cross-platform `npm run backup` runs pg_dump through `docker compose exec`. It does not require uploaded files to be backed up. The finding's own condition (\"if NFR-10 requires the whole app data\") is therefore not met. The database-only scope is documented in compose.yaml, and restore.mjs prints a storage note on every restore. The archived change fix-restore-schema-drift added that note on purpose, with a test (BackupRestoreIT). This is a known, documented design choice, not a spec-compliance defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:tools/backup.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1158,
+      "durationMs": 8829,
+      "sessionId": "924511fb-9c23-49cc-883c-83ec583c62d3",
+      "costUsd": 0.046751600000000004,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "NFR-10 in contract/docs/requirements.md says Postgres data lives in a Docker volume. It also requires a documented cross-platform backup command that runs pg_dump through `docker compose exec`, and that progress survives container restarts. backup.mjs does exactly that. The storage volume is covered by a separate requirement, NFR-17, and compose.yaml documents the exclusion. restore.mjs prints a notice about it. The finding itself concedes that this is only a question of what NFR-10 covers. Its premise, that NFR-10 might cover uploads, is contradicted by the spec text. The code matches the spec, so this is a documented design choice and not a defect."
+      }
+    },
+    {
+      "label": "verify:pom.xml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1197,
+      "durationMs": 12540,
+      "sessionId": "3e329a4b-724e-40f8-a438-00a8eebc8798",
+      "costUsd": 0.0422768,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "pom.xml:356-380 matches the finding. `no-sibling-contract` activates when `../docs/api/openapi.yaml` is missing and sets `codegen.skip=true`. `pinned-contract` re-enables codegen only when `contract/api/openapi.yaml` exists. If the submodule is uninitialised and there is no sibling `../docs`, such as in a fresh worktree or CI without `--recurse-submodules`, the generator is skipped. The `*Api` interfaces that `adapter/in/web` implements are then never generated, so compilation fails with unresolved references rather than a message about the missing contract. The skip is not silent in the sense of a passing build, because the build still fails. The real problem is a misleading diagnostic. The profile's own comment says it is Phase 0/1 only and is now stale. I found nothing that guards against this case, such as an enforcer rule. The finding is valid but low impact, and it matches the stated minor severity.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:pom.xml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1230,
+      "durationMs": 13279,
+      "sessionId": "4210c34f-6513-4863-961b-fa5070db8680",
+      "costUsd": 0.048788200000000004,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism holds. pom.xml:29-30 default to the sibling ../docs spec with codegen.skip=false. The no-sibling-contract profile (pom.xml:356-368) sets codegen.skip=true whenever ../docs/api/openapi.yaml is missing. The pinned-contract profile (pom.xml:369-380) re-enables codegen only if contract/api/openapi.yaml exists. In a checkout with an uninitialised contract submodule and no sibling ../docs (CI without `submodules: true`, or a fresh clone), both conditions fail. Codegen is then skipped silently, and compilation fails later on missing generated *Api interfaces, with no message naming the cause. The effect is limited to a misleading diagnostic: the build fails either way and no wrong artifact is produced. That makes it minor, as the finding says. Low confidence is appropriate. In this worktree contract/api/openapi.yaml exists, so it doesn't trigger here.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1423,
+      "durationMs": 17418,
+      "sessionId": "a78925ca-04ba-4186-99b4-70dacc0af0a2",
+      "costUsd": 0.0740612,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed by reading the code. assertE2eProject throws for any name other than \"doucko-e2e\". e2eComposeArgs always passes -p, both compose files and the committed env file, and dockerArgsFor builds up/down/ps from it. BLOCKED_ENV strips COMPOSE_PROJECT_NAME, COMPOSE_FILE and the credential variables, case-insensitively. compose.yaml's volumes are plain named volumes (no external or fixed name), so they are project-scoped and down -v cannot reach the owner's volumes; -p overrides the top-level `name: doucko`. compose.e2e.yaml uses `ports: !override` to publish only 127.0.0.1:18082. I did not read backup.mjs, restore.mjs or OperatorToolGuardTest, so the claims about them are unchecked, but the core mechanism holds. The finding reports no defect.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:tools/lib/e2e-stack.mjs",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1456,
+      "durationMs": 13962,
+      "sessionId": "8d45e47e-4991-4a8c-bafe-606fdf379c36",
+      "costUsd": 0.055511399999999995,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The finding says there is no defect, and the code supports that. In `tools/lib/e2e-stack.mjs`, `assertE2eProject` throws for any project name other than `doucko-e2e` (lines 18-23). `e2eComposeArgs` always passes `-p <that name>`, both compose files and the committed env file (lines 76-88). `dockerArgsFor(\"down\")` builds its arguments from `e2eComposeArgs()` and takes no user-supplied project name (lines 91-96). `composeEnv` removes `COMPOSE_PROJECT_NAME`, `COMPOSE_FILE` and the credential variables from the environment, matching names case-insensitively (lines 45-68). `compose.yaml` and `compose.e2e.yaml` have no `container_name` and no external volumes, so volume and container names are scoped to the project and `down -v` on `doucko-e2e` cannot reach the owner's `doucko` volumes. `compose.e2e.yaml` replaces the base port list with `ports: !override`. I did not open `e2e-stack.mjs`, `OperatorToolGuardTest` or `compose.e2e.yaml` in full, so the port re-check and the test coverage are taken from the finding. There is no exploitable problem to refute. The finding is an accurate positive verification, and no severity change is needed.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V4__practice.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1659,
+      "durationMs": 15797,
+      "sessionId": "be9bdf93-442b-4c4f-b12c-98e5e75df5bc",
+      "costUsd": 0.061287400000000006,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed by reading the migrations. V5 (xp_award) and V6 (attempt_reevaluation) have BEFORE UPDATE OR DELETE triggers, but `attempt` in V4 has none. It has only the unique constraint and CHECKs, and the header's \"Rows are only ever inserted\" is not enforced in the database. The ON DELETE RESTRICT foreign keys do not block UPDATEs. A grep of src finds no production UPDATE or DELETE on attempt, only test cleanup in ContentAuthoringIT.kt:54, so this is a defense-in-depth gap and not a live bug. Adding a trigger would require changing that test cleanup.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V4__practice.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1692,
+      "durationMs": 15831,
+      "sessionId": "3b19685e-dceb-4ab4-b223-c78009835d8a",
+      "costUsd": 0.067638,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The V4 `attempt` table has no append-only trigger, unlike xp_award (V5) and attempt_reevaluation (V6), so the claim is factually accurate. But no production code updates or deletes `attempt` (grep for UPDATE/DELETE/TRUNCATE/repository delete found only test cleanup in ContentAuthoringIT and PracticeTestSupport). No user or attacker path can mutate rows: child endpoints only insert, and anyone with direct DB access could drop a trigger anyway. This is a defence-in-depth hardening suggestion, not a reproducible defect. Adding it would also break existing tests that run DELETE FROM attempt.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V4__practice.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1376,
+      "durationMs": 19776,
+      "sessionId": "b066e82a-114f-4520-bc18-e5e677e14e66",
+      "costUsd": 0.0791132,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding is not a real defect. Mission deletion is guarded in the application layer. `MissionService.delete` (MissionService.kt:94-99) calls `MissionRules.missionDelete(usage.usedTasks(taskIds))`. That check refuses the delete with a conflict if any task in the mission has a row in `attempt`, `opened_hint` or `problem_report` (JdbcPracticeStore.kt:167-177). So a mission with practice data can't be hard-deleted, and the 'attempts left pointing at a deleted mission' case doesn't arise through the app. The guard is also stricter than needed: it blocks on a task's use in any mission, not just this one. The V4 header says the task foreign keys make the FR-56 delete guard 'a database rule too'. That means the design intentionally protects the log through the task FKs. The cascade on `practice_run` therefore only removes run shells (mission id and timestamps) for a mission whose tasks have no attempts, hints or reports. That loses no log data. The only gap is a narrow edge: a task is removed from a mission by editing it, and the mission is deleted afterwards. In that case old `attempt.mission_id` values could dangle. But that is the 'log outlives later mission edits' behaviour the header describes, and the finding doesn't claim it. The finding itself is low confidence and admits it can't see whether deletes happen.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/db/migration/V4__practice.sql",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1409,
+      "durationMs": 18469,
+      "sessionId": "c040e706-c390-4d11-9ad1-b3b94ac99aea",
+      "costUsd": 0.0868816,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding doesn't hold up as a real problem. Missions can be hard-deleted (DELETE /api/admin/missions/{id} → MissionService.delete), but a guard sits in front of it. MissionService.kt:97 refuses the delete with a conflict if any task in the mission has an attempt, opened_hint or problem_report row (JdbcPracticeStore.usedTasks, line 167). So a delete only goes through when the mission's tasks have no practice data. In that case only empty or abandoned practice_run rows cascade, and no attempt, hint or XP rows can be left pointing at the mission. The V4 header says the lack of a mission_id FK is deliberate, so the log can outlive mission edits. The only gap I could find is a narrow edge case. A used task could first be edited out of a mission, and the mission could then be deleted. The attempts would keep a mission_id with no mission, which is what the no-FK design intends, and they are still tied to their task by a RESTRICT FK. The finding itself says low confidence and minor severity. It is not exploitable by an attacker, since the endpoint is admin-only, and it has no user-visible impact.",
+        "severityAdjustment": "downgrade"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "19 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 8, contested: 4, rejected: 7"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/release-review-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "Phase 7 global release review of the backend (release-review-api), part d: tools/, Flyway migrations and resources, compose files, pom.xml",
+    "summary": "Review gate for Phase 7 global release review of the backend (release-review-api), part d: tools/, Flyway migrations and resources, compose files, pom.xml: 8 confirmed, 4 contested (treat as confirmed unless trivially wrong), 7 rejected.",
+    "confirmed": [
+      {
+        "title": "xp_award append-only trigger does not block TRUNCATE",
+        "file": "src/main/resources/db/migration/V5__gamification.sql",
+        "line": 38,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The trigger is declared 'BEFORE UPDATE OR DELETE ... FOR EACH ROW'. Row-level triggers do not fire on TRUNCATE, so 'TRUNCATE xp_award' wipes the whole ledger and bypasses the FR-38 'XP is never lost' guard. The same applies to attempt_reevaluation in V6.",
+        "suggestion": "Add a statement-level BEFORE TRUNCATE trigger using the same refusal function, in a new migration.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The finding holds. V5__gamification.sql:37-39 declares `BEFORE UPDATE OR DELETE ON xp_award FOR EACH ROW`. PostgreSQL does not fire row-level triggers on TRUNCATE, and there is no `BEFORE TRUNCATE` statement trigger or REVOKE TRUNCATE on this table in the code I read. The repo's own tests show the gap: PracticeTestSupport.kt:164-167, GamificationIT.kt:707 and ContentAuthoringIT.kt:51 run `TRUNCATE xp_award, rank_celebration, attempt_reevaluation`. PracticeTestSupport.kt:164 says the tables \"refuse DELETE ... so they are truncated\", so TRUNCATE succeeds on both xp_award and attempt_reevaluation. I did not open V6, but those tests cover attempt_reevaluation too. Severity \"minor\" fits: TRUNCATE needs DB-level privileges, and no application code path issues it, so user input cannot reach it. It is still a gap in the FR-38 guard.",
+          "The mechanism is real: the trigger at V5__gamification.sql:37-39 is a row-level BEFORE UPDATE OR DELETE trigger, and Postgres doesn't fire row-level triggers on TRUNCATE. Tests already run \"TRUNCATE xp_award, rank_celebration, attempt_reevaluation\" without the trigger refusing (ContentAuthoringIT.kt:51, PracticeTestSupport.kt:167, GamificationIT.kt:707). But there is no real-user or attacker path. No production code issues TRUNCATE, and running it needs table-owner or TRUNCATE privilege, so that actor could also drop the trigger. The gap only weakens defense-in-depth against operator or migration mistakes. Adding a BEFORE TRUNCATE trigger would break the existing test cleanups, so they would need rework. I did not read V6; the attempt_reevaluation claim is probably the same."
+        ]
+      },
+      {
+        "title": "Restore replaces the schema while the backend keeps serving and writing",
+        "file": "tools/restore.mjs",
+        "line": 98,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The restore runs 'DROP SCHEMA public CASCADE' and replays the dump in one transaction without stopping the backend. A child attempt or XP award committed between the safety backup and the schema swap is silently discarded. Requests during the swap block on locks or hit a briefly empty schema. This is the data-loss window FR-31 and FR-38 forbid.",
+        "suggestion": "Stop the backend container before the swap ('docker compose stop backend') and start it afterwards, which also gives Flyway its migration run. Alternatively document and enforce that the stack is idle.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The core mechanism is real. tools/restore.mjs never stops the backend. After the safety backup (lines 88-97), it runs DROP SCHEMA public CASCADE and the replay in one transaction (lines 99-106). The backend is only restarted afterwards, and only if the restored schema is behind the expected migration version (lines 194-216). So a write committed between the safety backup and the swap is in neither the safety backup nor the restored data. Requests during the swap also contend with the DROP's exclusive locks. Pooled backend connections can hit a schema that has just been recreated, so that part of the claim holds.\n\nThe finding overstates the harm. A restore deliberately replaces all current data with the dump, so anything written after the dump is discarded by design, not by a race. Only the few seconds between the safety backup and the swap are actually unprotected. That window is narrow for a single-family tutor app, and the operator chose to run the restore. Calling it the data loss FR-31/FR-38 forbid is too strong, because those requirements cover normal operation, not an explicit destructive restore. The fix, stopping the backend or documenting an idle stack, is reasonable hardening.",
+          "tools/restore.mjs does not stop the backend before the swap. The safety backup (lines 89-93) runs first, then DROP SCHEMA public CASCADE and the replay run in one transaction (lines 99-106). A write the running backend commits between the safety backup and the swap is in neither the safety backup nor the dump, and requests during the swap block on ACCESS EXCLUSIVE locks or hit the new schema. The impact is narrow: restore intentionally discards all current data, so only the seconds-wide gap is an unintended loss. The tool is manual, operator-run, on a small single-family stack, and the failures are transient. Not reproduced by running it. Confirmed as a minor gap; keep minor."
+        ]
+      },
+      {
+        "title": "NFR-2 bind guard is bypassable with plain `docker compose up`",
+        "file": "compose.yaml",
+        "line": 60,
+        "severity": "minor",
+        "evidence": "The frontend port is `${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80`. The only check that the address is loopback or RFC 1918 lives in `tools/stack.mjs` (`npm run stack:up`). If the owner or a script sets `DOUCKO_BIND_ADDRESS=0.0.0.0` in .env and runs `docker compose up` directly, the child surface and the admin login are published on every interface. Anyone on the network, or on the internet behind a port-forward, could then reach the admin login. compose.yaml says so in a comment, but nothing enforces it.",
+        "suggestion": "Make the safe default hard to override. For example, reject non-private values with a compose interpolation pattern, or add a startup check in the nginx or backend image that refuses a public Host. Alternatively, document that `stack:up` is the only supported entry point and make `down`, `ps` and `restore` use the same guarded path.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is real. compose.yaml:68 publishes `${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80` with no interpolation guard. The loopback/RFC 1918 check runs only in `npm run stack:up`, and the compose.yaml header comment (lines 1-3) says a plain `docker compose up` skips it. The backend doesn't close the gap. The Host allowlist in SecurityConfiguration.kt:50 accepts localhost, `backend`, or any IPv4 literal, so a request to a public IP would pass it. Exploiting this takes a deliberate misconfiguration: the owner has to set 0.0.0.0 or a public address in .env and bypass the wrapper. The admin login is also still password-protected. This is a documented defense-in-depth gap, so I'm keeping the severity at minor.",
+          "The mechanism is real, but it needs the owner to set the value. The frontend port is `${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80` (compose.yaml:68; the finding cites line 60, which is the backend `restart` line). A plain `docker compose up` does not run the loopback/RFC 1918 check in tools/stack.mjs. Compose has no interpolation validation for this value, so 0.0.0.0 would be published. The backend and db publish no ports. An outside attacker cannot trigger this. The default is loopback, and the owner has to put a public address in .env and bypass `stack:up`. Even then the exposure is only the admin login, which is still password-protected (ADMIN_PASSWORD of at least 12 characters, NFR-16). The comment in compose.yaml documents the gap, and earlier review runs already raised it. It is a defense-in-depth gap against owner misconfiguration, not an exploitable vulnerability, so I downgrade it."
+        ]
+      },
+      {
+        "title": "Restore runs against a live backend with no write quiesce",
+        "file": "tools/restore.mjs",
+        "line": 99,
+        "severity": "minor",
+        "evidence": "The restore does `DROP SCHEMA public CASCADE` inside the db container while the backend keeps serving. The backend is only restarted afterwards, and only when the schema is behind. A child attempt or XP write that lands between the safety backup and the drop is lost silently, since the append-only ledger never records it. Open pool connections and Hibernate state also point at a replaced schema until a restart. In the common case where the restored schema equals the target, no restart happens at all.",
+        "suggestion": "Stop the backend before the drop (`compose stop backend`) and start it again afterwards, always. That also makes Flyway run unconditionally and clears the pool state. Alternatively, refuse to restore while the backend container is running.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "tools/restore.mjs never stops the backend before the DROP SCHEMA public CASCADE (lines 99-106). It restarts the backend only when the restored Flyway version is behind the target (line 194). A write between the safety backup and the drop is therefore in neither the safety backup nor the restored dump. Pooled connections and cached statements also stay attached to the replaced schema when versions match, because no restart happens. Nothing in the file or its callers guards against this, and the header comment doesn't mention it. The practical impact is small: it is an operator-run tool for a single-family deployment, and the restore replaces all data anyway. The 'security' dimension label is also wrong, since this is a correctness and robustness issue. Minor severity is appropriate.",
+          "The mechanism is real, but the impact is smaller than the finding claims. In tools/restore.mjs the only `compose` calls before the drop are read-only queries (`exec psql`, `ps`). Nothing stops or pauses the backend. Line 104 runs `DROP SCHEMA public CASCADE` in a single psql transaction while the backend can still serve. A restart (line 203) happens only when the restored schema version is behind the target and the backend is running. When the versions match, which is the common case, there is no restart and no quiesce. So the stale-pool and stale-Hibernate-state concern is real. The next requests after a drop-and-recreate could hit transient errors such as stale prepared-statement plans or missing relations, and these would persist until a restart.\n\nSeveral parts of the claim don't hold up:\n- The \"lost write\" is not a distinct harm. Restore replaces the whole database by design and requires `--yes`. Any write made before the restore commits is overwritten whether or not it falls between the safety backup and the drop. The window only means that write is missing from the safety backup. That window is seconds wide.\n- Postgres takes ACCESS EXCLUSIVE locks for the drop, so concurrent writes either block or fail cleanly. They do not corrupt anything.\n- This is a manually run operator tool on a single-family tutoring app. An attacker or child cannot trigger it.\n- The dimension is mislabelled. There is no security impact, only an operational-robustness gap.\n\nI downgrade it to a nit or low-severity improvement. Stopping the backend before the restore and always starting it afterwards would be a reasonable hardening step."
+        ]
+      },
+      {
+        "title": "Storage volume is not covered by backup although DB rows reference it by storage_key",
+        "file": "compose.yaml",
+        "line": 10,
+        "severity": "minor",
+        "evidence": "`source.storage_key` and `task_image.storage_key` (V2) point at files on the `doucko-storage` volume. `tools/backup.mjs` dumps only the database, and `restore.mjs` prints a warning about this. After a disk loss or a restore on a fresh volume, published tasks keep their rows but their PDFs and images are gone. This is a data-integrity gap, not an exploit.",
+        "suggestion": "Have backup also archive the storage volume (for example `tar` through `docker compose exec`, into the same owner-only directory). Alternatively, add a startup or admin consistency check that reports rows whose files are missing.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Confirmed: backup.mjs only runs pg_dump via docker compose exec on the db service. compose.yaml mounts doucko-storage at /var/lib/doucko/storage for uploaded PDFs and images, and nothing backs it up. restore.mjs:113 explicitly warns the files are not restored. The gap is real, though documented. It is a durability issue, not security; minor severity is appropriate.",
+          "The gap is real. compose.yaml puts uploaded PDFs and images on the separate named volume doucko-storage, and its comments say `npm run backup` dumps only the database. restore.mjs lines 113-114 warn that storage files are not in the dump and are not restored. After a disk loss or a restore onto a fresh volume, rows referencing storage_key would have no files. I did not open tools/backup.mjs or the V2 migration, so the storage_key link rests on the finding's evidence. It is not an exploit, and it is a known, documented limitation. It is a real recovery-integrity gap, but a minor one, because the source files can be re-uploaded. The \"security\" dimension label is a poor fit."
+        ]
+      },
+      {
+        "title": "DB-level append-only guard on xp_award and attempt_reevaluation does not cover TRUNCATE; attempt and opened_hint have no guard",
+        "file": "src/main/resources/db/migration/V5__gamification.sql",
+        "line": 31,
+        "severity": "minor",
+        "evidence": "The triggers are `BEFORE UPDATE OR DELETE ... FOR EACH ROW`. `TRUNCATE xp_award` and `TRUNCATE attempt_reevaluation` bypass them. The `attempt` log (FR-31, FR-42) is described as append-only, but V4 has no trigger, so an UPDATE or DELETE of `attempt` rows passes at the DB level. The app role is also the table owner. No concrete code path was found, so this is defense-in-depth only. The FR-38 guarantee 'XP is never reduced' rests on application code for TRUNCATE and on application code alone for the attempt log.",
+        "suggestion": "In a new migration (not an edit to V4 or V5), add a `BEFORE TRUNCATE` statement-level trigger for the ledger tables. Add the same UPDATE/DELETE trigger to `attempt`. Optionally add an `amount` check or trigger so that a REEVALUATION row can never reduce a task's total.",
+        "dimension": "security",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "I read V5__gamification.sql and grepped all migrations for TRIGGER, TRUNCATE and REVOKE. The mechanism claim is accurate. The only triggers are `xp_award_append_only_trg` (V5:37-39) and `attempt_reevaluation_append_only_trg` (V6:22). Both are `BEFORE UPDATE OR DELETE ... FOR EACH ROW`. Row-level triggers do not fire on TRUNCATE, so TRUNCATE bypasses them. No migration has a BEFORE TRUNCATE trigger or a REVOKE. No trigger exists on `attempt` or `opened_hint`, so UPDATE/DELETE on them is not blocked at the DB level. The finding itself concedes there is no concrete code path, so it is purely defense-in-depth. Nothing elsewhere guards these tables in a way I found. I'm keeping it as a real but low-impact minor finding, and I'd treat it as a hardening suggestion, not a defect.",
+          "The mechanism is real. A grep of the migrations shows triggers only in V5 (`xp_award`) and V6 (`attempt_reevaluation`). I did not read their definitions, so I'm taking the finding's word that they are row-level BEFORE UPDATE OR DELETE. A grep for TRUNCATE found no TRUNCATE guard. The same grep found no trigger, REVOKE or role separation for `attempt`. Row-level triggers do not fire on TRUNCATE. But this isn't reachable by a real user or attacker. It would take direct DB access with owner privileges, or SQL injection, and the finding itself says no code path was found. I did not search the application code for injectable queries or TRUNCATE calls. So this is a defense-in-depth gap, not an exploitable bug. I'm keeping it as a finding but downgrading the severity."
+        ]
+      },
+      {
+        "title": "pom 'no-sibling-contract' profile can silently skip codegen when ../docs is absent",
+        "file": "pom.xml",
+        "line": 360,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "The profile sets codegen.skip=true when ../docs/api/openapi.yaml is missing. Its comment says it is for 'Phase 0/1 only'. The pinned-contract profile re-enables codegen only when contract/api/openapi.yaml exists. A checkout whose contract submodule is not initialised, in a directory without a sibling ../docs (CI or a worktree), will skip generation. The build then fails on missing *Api interfaces. It does not fail with a message pointing at the cause.",
+        "suggestion": "Remove the Phase 0/1 profile now that the contract is pinned. Or fail fast with an enforcer rule when contract/api/openapi.yaml is absent.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "pom.xml:356-380 matches the finding. `no-sibling-contract` activates when `../docs/api/openapi.yaml` is missing and sets `codegen.skip=true`. `pinned-contract` re-enables codegen only when `contract/api/openapi.yaml` exists. If the submodule is uninitialised and there is no sibling `../docs`, such as in a fresh worktree or CI without `--recurse-submodules`, the generator is skipped. The `*Api` interfaces that `adapter/in/web` implements are then never generated, so compilation fails with unresolved references rather than a message about the missing contract. The skip is not silent in the sense of a passing build, because the build still fails. The real problem is a misleading diagnostic. The profile's own comment says it is Phase 0/1 only and is now stale. I found nothing that guards against this case, such as an enforcer rule. The finding is valid but low impact, and it matches the stated minor severity.",
+          "The mechanism holds. pom.xml:29-30 default to the sibling ../docs spec with codegen.skip=false. The no-sibling-contract profile (pom.xml:356-368) sets codegen.skip=true whenever ../docs/api/openapi.yaml is missing. The pinned-contract profile (pom.xml:369-380) re-enables codegen only if contract/api/openapi.yaml exists. In a checkout with an uninitialised contract submodule and no sibling ../docs (CI without `submodules: true`, or a fresh clone), both conditions fail. Codegen is then skipped silently, and compilation fails later on missing generated *Api interfaces, with no message naming the cause. The effect is limited to a misleading diagnostic: the build fails either way and no wrong artifact is produced. That makes it minor, as the finding says. Low confidence is appropriate. In this worktree contract/api/openapi.yaml exists, so it doesn't trigger here."
+        ]
+      },
+      {
+        "title": "Tools address only project doucko-e2e; owner project guard verified (no defect)",
+        "file": "tools/lib/e2e-stack.mjs",
+        "line": 16,
+        "severity": "minor",
+        "confidence": "high",
+        "evidence": "assertE2eProject refuses every project name except 'doucko-e2e'. e2eComposeArgs always passes -p, both compose files and the committed fake env file. COMPOSE_PROJECT_NAME, COMPOSE_FILE and the credentials are blocked from the process environment. `down -v` is therefore confined to the throwaway project. compose.e2e.yaml publishes only 127.0.0.1:18082 via !override, and e2e-stack.mjs re-checks the rendered ports. Committed secrets in tools/e2e-stack.env are labelled fake test values. Compose and migrations raised no cross-module or answer-key issue. The default `name: doucko` in compose.yaml is correct for the owner stack. backup.mjs and restore.mjs deliberately address the owner project (restore requires --yes and takes a safety backup first).",
+        "suggestion": "No action. Retain the OperatorToolGuardTest coverage.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Confirmed by reading the code. assertE2eProject throws for any name other than \"doucko-e2e\". e2eComposeArgs always passes -p, both compose files and the committed env file, and dockerArgsFor builds up/down/ps from it. BLOCKED_ENV strips COMPOSE_PROJECT_NAME, COMPOSE_FILE and the credential variables, case-insensitively. compose.yaml's volumes are plain named volumes (no external or fixed name), so they are project-scoped and down -v cannot reach the owner's volumes; -p overrides the top-level `name: doucko`. compose.e2e.yaml uses `ports: !override` to publish only 127.0.0.1:18082. I did not read backup.mjs, restore.mjs or OperatorToolGuardTest, so the claims about them are unchecked, but the core mechanism holds. The finding reports no defect.",
+          "The finding says there is no defect, and the code supports that. In `tools/lib/e2e-stack.mjs`, `assertE2eProject` throws for any project name other than `doucko-e2e` (lines 18-23). `e2eComposeArgs` always passes `-p <that name>`, both compose files and the committed env file (lines 76-88). `dockerArgsFor(\"down\")` builds its arguments from `e2eComposeArgs()` and takes no user-supplied project name (lines 91-96). `composeEnv` removes `COMPOSE_PROJECT_NAME`, `COMPOSE_FILE` and the credential variables from the environment, matching names case-insensitively (lines 45-68). `compose.yaml` and `compose.e2e.yaml` have no `container_name` and no external volumes, so volume and container names are scoped to the project and `down -v` on `doucko-e2e` cannot reach the owner's `doucko` volumes. `compose.e2e.yaml` replaces the base port list with `ports: !override`. I did not open `e2e-stack.mjs`, `OperatorToolGuardTest` or `compose.e2e.yaml` in full, so the port re-check and the test coverage are taken from the finding. There is no exploitable problem to refute. The finding is an accurate positive verification, and no severity change is needed."
+        ]
+      }
+    ],
+    "contested": [
+      {
+        "title": "Attempt log and problem reports are 'append-only' only by comment; no DB guard unlike xp_award",
+        "file": "src/main/resources/db/migration/V4__practice.sql",
+        "line": 3,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "The header says 'Rows are only ever inserted: the attempt log is append-only (FR-42, OQ-20)', but attempt, opened_hint and problem_report get no UPDATE/DELETE trigger. V5 and V6 add such a trigger for xp_award and attempt_reevaluation. The attempt table is the FR-31/FR-42 evidence base, so any stray UPDATE would rewrite history without the database objecting.",
+        "suggestion": "Add a new migration with a BEFORE UPDATE OR DELETE refusal trigger for attempt (and opened_hint), and a statement-level BEFORE TRUNCATE trigger for xp_award, attempt and attempt_reevaluation. Do not edit V4 itself.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The factual claim holds. V4__practice.sql line 4 says \"Rows are only ever inserted: the attempt log is append-only (FR-42, OQ-20)\", but it defines no trigger. V5 (xp_award) and V6 (attempt_reevaluation) do add refusal triggers. No other migration guards attempt or opened_hint. A grep of src found no production code that runs UPDATE or DELETE on attempt or opened_hint, so nothing is broken today. The gap is a missing defense-in-depth guard, not a live bug. Two parts of the finding are wrong or incomplete. Its title lumps in problem_report, but that table's status column (OPEN/FIXED/DISMISSED) has to be updatable, so it can't be made append-only. Also, ContentAuthoringIT.kt:53-54 runs `DELETE FROM attempt` and `DELETE FROM opened_hint` for test cleanup, so the suggested trigger would break those tests unless they switch to TRUNCATE or the migration allows for them. Keep it as a minor, low-confidence hardening suggestion, scoped to attempt and opened_hint.",
+          "The factual part holds. V4 has no trigger on attempt, opened_hint or problem_report, while V5 and V6 add one for xp_award and attempt_reevaluation. But nothing is exploitable or reproducible. In the practice module, the only UPDATE statements are `practice_run SET finished_at` and `problem_report SET status`, both in JdbcPracticeStore.kt. No code path updates or deletes attempt or opened_hint. No child or admin endpoint can reach such a statement, and my search covered only the practice module's Kotlin code, not other modules or the test sources. The finding's own evidence needs a \"stray UPDATE\" from some future bug or manual SQL, which is a defense-in-depth wish, not a defect a user or attacker can trigger. It also wrongly lumps in problem_report, which is mutable by design (status changes OPEN to something else). I found no requirement that mandates a DB-level guard for attempt (the V4 header only says rows are only inserted). A hardening suggestion with low confidence and no reproducible trigger does not count as a real problem."
+        ]
+      },
+      {
+        "title": "Backup/restore cover only the database, so uploaded PDFs and images can be lost or orphaned (NFR-10)",
+        "file": "tools/backup.mjs",
+        "line": 59,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "pg_dump captures source.storage_key and task_image.storage_key, but the files live on the doucko-storage volume, which neither backup nor restore touches (restore.mjs only prints a notice). After a restore onto a fresh volume, rows point at missing files. The task images and source PDFs of an authored workbook would then fail to load, and the operator has no tool to recover them.",
+        "suggestion": "Archive the storage volume alongside the dump (tar from inside the backend container, or a volume copy) and restore it together. Or add a startup/admin consistency check that reports storage keys with no file.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The mechanism is real: backup.mjs only runs pg_dump and does not touch the doucko-storage volume, and restore.mjs:113-114 prints a notice that files are not restored. But it is not a correctness defect. NFR-10 (contract/docs/requirements.md:171) requires only a pg_dump-based `npm run backup` and Postgres data surviving container restarts. It does not mention file storage. The limitation is a deliberate, documented scope decision, recorded in docs/qa/evidence/fix-restore-schema-drift.md and docs/current-state.md:106, and restore explicitly warns the operator. The claim that the operator gets no notice is false. This would be a requirements extension, not a bug in the code.",
+          "The mechanism is real. backup.mjs runs only pg_dump. restore.mjs prints that files on the doucko-storage volume are not restored. The storage keys in the DB would then point at missing files if the volume is lost. NFR-10 as written only requires a pg_dump-based backup of Postgres data, so this is not a spec violation. The gap is known and documented. It only bites when the storage volume is lost while the DB dump is restored, and it is operator-triggered, so it is not attacker-exploitable. It is a real limitation, but minor, as the finding says."
+        ]
+      },
+      {
+        "title": "Unpinned, floating base images and builder in Dockerfile and compose",
+        "file": "compose.yaml",
+        "line": 19,
+        "severity": "minor",
+        "evidence": "`postgres:16-alpine`, `maven:3.9-eclipse-temurin-21` and `eclipse-temurin:21-jre-alpine` are floating tags. A rebuild on the home laptop pulls whatever those tags point to at that moment, so builds are not reproducible. Accidental drift can also change the Postgres minor version used for the data volume. No dependency advisory scan was run (no network access in this review), so PDFBox 3.0.5 and the Spring Boot 4.1.1 transitives are unaudited.",
+        "suggestion": "Pin images by digest or at least by minor version. Run `mvn org.owasp:dependency-check-maven:check` or `npm audit` in CI and record the result before release.",
+        "dimension": "security",
+        "verdict": "contested",
+        "verifierNotes": [
+          "I read the cited lines and confirmed the three floating tags: compose.yaml:18 (postgres:16-alpine), Dockerfile:3 (maven:3.9-eclipse-temurin-21) and Dockerfile:11 (eclipse-temurin:21-jre-alpine). None is pinned by digest or patch version, so rebuilds are not reproducible. The data-volume claim is overstated: the Postgres major version is pinned to 16, and minor updates within a major are on-disk compatible. The finding is a real but low-impact hygiene issue for a local home deployment, not a security or correctness defect. The advisory-scan point is an unrun check, not something wrong in the code.",
+          "The floating tags are real (Dockerfile:3, Dockerfile:11, compose.yaml:18), but there is no exploitable or user-impacting problem. postgres:16-alpine stays on major 16, so minor drift cannot corrupt the data volume. Abusing a floating tag needs an upstream registry compromise, which is generic supply-chain risk and not specific to this repo. The app is a local home-laptop deployment. The 'unaudited dependencies' remark describes review scope and names no concrete vulnerability. Not a security defect; at most an optional hygiene improvement."
+        ]
+      },
+      {
+        "title": "Attempt log has no database-level append-only guard, unlike xp_award and attempt_reevaluation",
+        "file": "src/main/resources/db/migration/V4__practice.sql",
+        "line": 19,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The V4 header says the attempt log is append-only (FR-42, OQ-20) and 'Rows are only ever inserted'. Nothing enforces it in the database. V5 gives xp_award a BEFORE UPDATE OR DELETE trigger and V6 gives attempt_reevaluation the same. `attempt` only has the (task_id, scope, attempt_no) unique constraint, so the guarantee depends on application code alone. The attempt table is also the evidence for XP and re-evaluation. The `attempt_id` foreign keys use ON DELETE RESTRICT, which blocks deletes of referenced rows but not UPDATEs, so `correct` or `parts` can still be changed in place. I could not run `git diff` because Bash is disabled, so I read the files directly. I did not check whether any application code updates `attempt`.",
+        "suggestion": "Add a new migration (V7, never edit V4) with a BEFORE UPDATE OR DELETE trigger on `attempt`, modelled on `xp_award_append_only`. Optionally add BEFORE TRUNCATE statement triggers on attempt, xp_award and attempt_reevaluation, because row-level triggers do not fire on TRUNCATE.",
+        "dimension": "visual",
+        "verdict": "contested",
+        "verifierNotes": [
+          "Confirmed by reading the migrations. V5 (xp_award) and V6 (attempt_reevaluation) have BEFORE UPDATE OR DELETE triggers, but `attempt` in V4 has none. It has only the unique constraint and CHECKs, and the header's \"Rows are only ever inserted\" is not enforced in the database. The ON DELETE RESTRICT foreign keys do not block UPDATEs. A grep of src finds no production UPDATE or DELETE on attempt, only test cleanup in ContentAuthoringIT.kt:54, so this is a defense-in-depth gap and not a live bug. Adding a trigger would require changing that test cleanup.",
+          "The V4 `attempt` table has no append-only trigger, unlike xp_award (V5) and attempt_reevaluation (V6), so the claim is factually accurate. But no production code updates or deletes `attempt` (grep for UPDATE/DELETE/TRUNCATE/repository delete found only test cleanup in ContentAuthoringIT and PracticeTestSupport). No user or attacker path can mutate rows: child endpoints only insert, and anyone with direct DB access could drop a trigger anyway. This is a defence-in-depth hardening suggestion, not a reproducible defect. Adding it would also break existing tests that run DELETE FROM attempt."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "practice_run cascade-deletes with a mission while attempt/opened_hint intentionally have no mission FK",
+        "file": "src/main/resources/db/migration/V4__practice.sql",
+        "line": 10,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "'mission_id uuid NOT NULL REFERENCES mission (id) ON DELETE CASCADE' on practice_run removes run history when a mission is deleted. The same file says the log 'outlives later mission edits' and gives attempt.mission_id no FK. After a mission delete, replay-scope attempts remain whose scope (the run id) no longer resolves to any practice_run row.",
+        "suggestion": "Make the behaviour consistent: either RESTRICT the mission delete once runs exist (as done for task_id), or have stats treat scopes with no run as orphaned. Do this in a new migration.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The mechanism isn't reachable in practice. `MissionService.delete` (MissionService.kt:94-99) calls `MissionRules.missionDelete(usage.usedTasks(stored.content.taskIds))`. It refuses the delete with a Used conflict if any of the mission's tasks has an attempt, opened_hint or problem_report row (see `JdbcPracticeStore.usedTasks`). The `ON DELETE CASCADE` on `practice_run.mission_id` therefore only fires for missions whose tasks have no practice data. A replay run can only start after the primary play-through, which leaves attempts, so such runs belong to missions that can't be deleted. Any run the cascade does remove has no attempts or hints that could be orphaned. `practice_run` also holds no history of its own beyond mission_id, started_at and finished_at. The claimed state, replay-scope attempts whose run row no longer exists, would need a used task to be detached from the mission and the mission then deleted. That is an exotic edge the finding doesn't show and I didn't trace. There is a minor inconsistency in the comment: the header says \"No foreign key on mission_id\", yet `practice_run` has one. It has no runtime consequence, and the delete guard already enforces the intended behaviour at the application level.",
+          "The orphaning scenario can't happen through normal use. `MissionService.delete` (MissionService.kt:94-99) calls `MissionRules.missionDelete(usage.usedTasks(...))` and refuses with a conflict if any of the mission's tasks has an attempt, opened hint or problem report. `JdbcPracticeStore.usedTasks` (line 167) checks exactly those three tables. A replay run only produces attempts for tasks in the mission, so a mission with run history is blocked from deletion. The cascade therefore only removes runs that have no attempts, which orphans nothing. The mission-delete guard in the application layer is the reason the `ON DELETE CASCADE` on `practice_run` is harmless. A leftover edge case remains: an admin removes a used task from a mission, then deletes the mission. That is narrow and speculative, and the finding doesn't claim it. The finding is a consistency nit and not a reproducible defect."
+        ]
+      },
+      {
+        "title": "Plain 'docker compose up' bypasses the NFR-2 bind guard; DOUCKO_BIND_ADDRESS is not validated by compose",
+        "file": "compose.yaml",
+        "line": 71,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The port mapping is '${DOUCKO_BIND_ADDRESS:-127.0.0.1}:8081:80'. An empty value (the .env.example placeholder) or 0.0.0.0 publishes the app on all interfaces if the operator runs 'docker compose up' directly. The header comment admits the guard lives only in tools/stack.mjs. The backend and its admin API are then reachable from outside the LAN, with only the admin password between them.",
+        "suggestion": "Add a compose-level guard, for example a required form '${DOUCKO_BIND_ADDRESS:?...}' with a documented 127.0.0.1 default in .env.example. Or add a backend startup warning/refusal, so the guard does not depend on the wrapper script.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding's claimed mechanism is wrong. .env.example sets DOUCKO_BIND_ADDRESS=127.0.0.1, not empty. Compose's ${VAR:-default} also substitutes the default when the variable is set but empty, so empty gives 127.0.0.1. The cited line is wrong (the port mapping is at compose.yaml:68). The only exposure path is an operator explicitly setting 0.0.0.0 and then bypassing the documented wrapper (documented in compose.yaml and .env.example). The suggested ':?' form only forces the variable to be set and does not block 0.0.0.0, so it adds no protection.",
+          "compose.yaml uses ${DOUCKO_BIND_ADDRESS:-127.0.0.1}. The ':-' form defaults when the variable is unset OR empty, so an empty value binds loopback. .env.example sets 127.0.0.1, not empty. The only bypass is an operator explicitly writing 0.0.0.0 into .env and running plain 'docker compose up', and that gap is already documented in compose.yaml and .env.example. Only the frontend 8081 is published; the backend and DB stay on the Compose network. The claimed empty-placeholder exposure does not occur."
+        ]
+      },
+      {
+        "title": "Session timeout/idle and backend healthcheck rely on image tooling not verified (wget in jre-alpine)",
+        "file": "compose.yaml",
+        "line": 50,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "The backend healthcheck runs 'wget -qO- http://localhost:8080/actuator/health | grep -q UP'. The runtime image is eclipse-temurin:21-jre-alpine, where wget is the busybox applet and 'localhost' may resolve to ::1 first. If it fails, 'up --wait' and the frontend's depends_on service_healthy never succeed, and restore.mjs reports the backend as unhealthy.",
+        "suggestion": "Use 127.0.0.1 explicitly in the healthcheck URL, and verify it against the built image in an IT or in the e2e-stack proof.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding is speculative and I couldn't confirm a failure mechanism. compose.yaml:56 does use `wget -qO- http://localhost:8080/actuator/health | grep -q UP`, and the Dockerfile's runtime stage is `eclipse-temurin:21-jre-alpine`. But Alpine ships busybox wget by default, so the tool exists. Tomcat binds the wildcard address, which is dual-stack on a JVM, so it accepts connections on both 127.0.0.1 and ::1. Whichever address `localhost` resolves to first, the healthcheck connects. This `wget localhost:8080/actuator/health` pattern is a common one for Spring Boot on Alpine. The finding itself says \"may\" and \"if it fails\", gives no evidence of an actual failure, and is rated low confidence. The suggestion to use 127.0.0.1 is harmless hardening, not a correctness defect.",
+          "The healthcheck at compose.yaml:56 does use `wget -qO- http://localhost:8080/actuator/health | grep -q UP` on eclipse-temurin:21-jre-alpine (Dockerfile:11). The finding gives no mechanism for how it fails. Alpine ships the busybox wget applet, so the tool exists. Spring Boot's embedded Tomcat binds the wildcard address, which accepts both IPv4 and IPv6 loopback, so `localhost` resolves and connects whichever address is tried first. The known `localhost`/`::1` failure affects services that bind IPv4 only, such as nginx, and not this backend. The finding only says it \"may\" resolve to ::1 first and \"if it fails\". I could not confirm a real failure, and the evidence is speculative. At most this is a hardening suggestion, not a reproducible defect."
+        ]
+      },
+      {
+        "title": "Practice/progress advice has no DataIntegrityViolationException handler (possible raw 500)",
+        "file": "src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeProblemAdvice.kt",
+        "line": 32,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "V4/V5 add unique and foreign-key rules (attempt_task_scope_no_uq, xp_award_task_once_uq, xp_award_bonus_once_uq, ON DELETE RESTRICT on task_id). Only ContentProblemAdvice maps DataIntegrityViolationException (-> 409), and it is scoped to the content controllers. PracticeProblemAdvice and AdminStatsProblemAdvice map no integrity violation. Attempt races are serialised by pg_advisory_xact_lock in JdbcPracticeStore.kt:38, so the unique constraints should not be hit in practice. I did not trace the report/re-evaluation paths (xp_award_reevaluation_once_uq, attempt_reevaluation PK) or a task deleted concurrently with a play-through. If a constraint does fire there, the generic handler returns 500 or a non-contract problem.",
+        "suggestion": "Add a DataIntegrityViolationException -> 409/problem+json handler to the practice and stats advices. Or confirm that every write path that can hit these constraints takes the advisory lock. Add an IT for a concurrent double submit and a concurrent re-evaluation.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The advice lacks a DataIntegrityViolationException handler (true), but I found no reachable path to a raw 500. Every practice write path takes store.lock(), which is pg_advisory_xact_lock. That covers PracticeService (lines 137, 190, 208, 235), ProgressStats.reevaluate and dismiss (108, 135), and Gamification (121, 139, 174). The unique constraints (attempt scope, xp award once, reevaluation once) therefore can't be hit by concurrent requests on these paths. The finding admits it didn't trace the report/re-evaluation paths, and those are locked as well. The remaining scenario, a task deleted mid-play-through, is speculative. Content deletion has its own lock in JdbcMissionStore and a 409 handler in ContentProblemAdvice, and the finding gives no concrete trigger. The finding is a hypothetical hardening suggestion with no confirmed mechanism.",
+          "The missing handler is real: PracticeProblemAdvice and AdminStatsProblemAdvice map no DataIntegrityViolationException. But I couldn't find a reachable path that triggers it. Every write path in PracticeService, Gamification and ProgressStats calls store.lock() (a pg_advisory_xact_lock) before inserting. That includes reevaluate at ProgressStats.kt:108, which runs before insertReevaluation and closeReport. So the unique constraints (attempt_task_scope_no_uq, xp_award_*_once_uq, the reevaluation PK) are serialised and should not fire on a double submit or a concurrent re-evaluation. The only remaining route is an admin deleting a task at the same moment a child attempt inserts against it. That would need an ON DELETE RESTRICT or FK race. It's a tiny window in a single-household app, and it can't be triggered by user input. The reviewer also rated it low confidence and admitted they didn't trace these paths. This is a theoretical hardening gap, not a reproducible raw 500."
+        ]
+      },
+      {
+        "title": "V6 MISSION_BONUS shape check is loose (report_id/attempt_id)",
+        "file": "src/main/resources/db/migration/V6__progress_stats.sql",
+        "line": 27,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The check is `kind = 'MISSION_BONUS' AND task_id IS NULL AND (report_id IS NULL OR attempt_id IS NULL)`. It also allows a bonus with both report_id and attempt_id NULL. V5 documents that case only for a bonus credited when a mission is published already complete (OQ-28). The ledger rules therefore rest on application code, not the schema. The REEVALUATION and TASK shapes are strict.",
+        "suggestion": "Keep it if intended. Otherwise document the allowed combinations in a comment or the spec, or tighten them in a new migration (never edit V6).",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The V6 constraint `(report_id IS NULL OR attempt_id IS NULL)` allows exactly the three legitimate MISSION_BONUS shapes and rejects only \"both set\". The code creates all three. Attempt-only: Gamification.kt:76. Report-only (re-evaluation bonus): :103. Both null (mission published already complete, OQ-28): :125 and :159. Requiring exactly one of the two would break lines 125 and 159. The \"once per mission\" invariant is still enforced by the unique index xp_award_bonus_once_uq (V5:28). The finding is a stylistic nit with no incorrect mechanism, and it admits the loose case is intended.",
+          "The looseness is deliberate, and the constraint matches the three shapes the code writes. Nothing here is exploitable. In `Gamification.kt`, `MISSION_BONUS` rows are written in three ways. Line 76 sets an attempt id with no report. Line 103 sets a report id with no attempt. Lines 125 and 159 set neither, for a mission published already complete (OQ-28, which V5 documents). The check `(report_id IS NULL OR attempt_id IS NULL)` allows all three and forbids only the invalid case of both being set. A tighter check would break lines 125 and 159. No user or attacker input can reach the `xp_award` table's shape. Only server-side code inserts there, and no endpoint lets the caller choose these columns. The finding also concedes \"Keep it if intended\", and the reviewer's own suggestion is only a comment. That is a documentation nit, not a defect or a vulnerability."
+        ]
+      },
+      {
+        "title": "Operator backup excludes the doucko-storage volume",
+        "file": "tools/backup.mjs",
+        "line": 1,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`npm run backup` runs pg_dump only. Uploaded PDFs and task images live on the doucko-storage volume (compose.yaml). After a restore, task_image/source rows can point at files that no longer exist. restore.mjs prints a notice about this. compose.yaml says the same: 'npm run backup dumps only the database'. If NFR-10 requires the whole app data to be recoverable, this is partial.",
+        "suggestion": "Confirm NFR-10 covers only the database. If it covers uploads too, add a storage-volume archive step to backup/restore. Otherwise record the exclusion in the spec.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "backup.mjs does run only pg_dump, as the finding says. But NFR-10 (contract/docs/requirements.md:171) requires only that Postgres data lives in a Docker volume and that a cross-platform `npm run backup` runs pg_dump through `docker compose exec`. It does not require uploaded files to be backed up. The finding's own condition (\"if NFR-10 requires the whole app data\") is therefore not met. The database-only scope is documented in compose.yaml, and restore.mjs prints a storage note on every restore. The archived change fix-restore-schema-drift added that note on purpose, with a test (BackupRestoreIT). This is a known, documented design choice, not a spec-compliance defect.",
+          "NFR-10 in contract/docs/requirements.md says Postgres data lives in a Docker volume. It also requires a documented cross-platform backup command that runs pg_dump through `docker compose exec`, and that progress survives container restarts. backup.mjs does exactly that. The storage volume is covered by a separate requirement, NFR-17, and compose.yaml documents the exclusion. restore.mjs prints a notice about it. The finding itself concedes that this is only a question of what NFR-10 covers. Its premise, that NFR-10 might cover uploads, is contradicted by the spec text. The code matches the spec, so this is a documented design choice and not a defect."
+        ]
+      },
+      {
+        "title": "Deleting a mission cascades to practice_run while attempt, xp_award and opened_hint keep the mission id with no foreign key",
+        "file": "src/main/resources/db/migration/V4__practice.sql",
+        "line": 10,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`practice_run.mission_id` is `REFERENCES mission(id) ON DELETE CASCADE`, but `attempt`, `opened_hint`, `problem_report` and `xp_award` carry `mission_id` with no foreign key by design, so the log outlives the mission. Deleting a mission therefore silently removes its replay-run rows and leaves the attempts, hints and XP rows pointing at it. The V4 header says 'the log outlives later mission edits'. Whether the application ever deletes missions, rather than unpublishing them, is not visible from these files.",
+        "suggestion": "Confirm that missions are never hard-deleted once practice data exists. If they can be, change the FK to ON DELETE RESTRICT or drop it, as is done for the other tables, in a new migration.",
+        "dimension": "visual",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding is not a real defect. Mission deletion is guarded in the application layer. `MissionService.delete` (MissionService.kt:94-99) calls `MissionRules.missionDelete(usage.usedTasks(taskIds))`. That check refuses the delete with a conflict if any task in the mission has a row in `attempt`, `opened_hint` or `problem_report` (JdbcPracticeStore.kt:167-177). So a mission with practice data can't be hard-deleted, and the 'attempts left pointing at a deleted mission' case doesn't arise through the app. The guard is also stricter than needed: it blocks on a task's use in any mission, not just this one. The V4 header says the task foreign keys make the FR-56 delete guard 'a database rule too'. That means the design intentionally protects the log through the task FKs. The cascade on `practice_run` therefore only removes run shells (mission id and timestamps) for a mission whose tasks have no attempts, hints or reports. That loses no log data. The only gap is a narrow edge: a task is removed from a mission by editing it, and the mission is deleted afterwards. In that case old `attempt.mission_id` values could dangle. But that is the 'log outlives later mission edits' behaviour the header describes, and the finding doesn't claim it. The finding itself is low confidence and admits it can't see whether deletes happen.",
+          "The finding doesn't hold up as a real problem. Missions can be hard-deleted (DELETE /api/admin/missions/{id} → MissionService.delete), but a guard sits in front of it. MissionService.kt:97 refuses the delete with a conflict if any task in the mission has an attempt, opened_hint or problem_report row (JdbcPracticeStore.usedTasks, line 167). So a delete only goes through when the mission's tasks have no practice data. In that case only empty or abandoned practice_run rows cascade, and no attempt, hint or XP rows can be left pointing at the mission. The V4 header says the lack of a mission_id FK is deliberate, so the log can outlive mission edits. The only gap I could find is a narrow edge case. A used task could first be edited out of a mission, and the mission could then be deleted. The attempts would keep a mission_id with no mission, which is what the no-FK design intends, and they are still tied to their task by a RESTRICT FK. The finding itself says low confidence and minor severity. It is not exploitable by an attacker, since the endpoint is admin-only, and it has no user-visible impact."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/release-review-api/review-findings.json"
+  }
+}

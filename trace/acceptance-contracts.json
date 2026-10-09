@@ -255,7 +255,7 @@
       {
         "method": "local-verifiable",
         "mechanism": "npm:test:run",
-        "artifact": "src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt",
+        "artifact": "src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt",
         "status": "artifact-ok"
       }
     ],

@@ -1,0 +1,836 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-09T18:01:51.016Z",
+  "finishedAt": "2026-10-09T18:10:35.126Z",
+  "args": {
+    "scope": "Phase 7 global release review of the backend (release-review-api), part a: admin, api, profile, shared, checking modules",
+    "baseRef": "38b56c8",
+    "headRef": "HEAD -- src/main/kotlin/cz/doucko/admin src/main/kotlin/cz/doucko/api src/main/kotlin/cz/doucko/profile src/main/kotlin/cz/doucko/shared src/main/kotlin/cz/doucko/checking src/main/kotlin/cz/doucko/DouckoBackendApplication.kt",
+    "change": "release-review-api",
+    "focus": "This is the once-per-release whole-history review; slice reviews already happened per slice, so prioritise CROSS-MODULE and cross-slice defects. This run covers ONLY: src/main/kotlin/cz/doucko/admin, src/main/kotlin/cz/doucko/api, src/main/kotlin/cz/doucko/profile, src/main/kotlin/cz/doucko/shared, src/main/kotlin/cz/doucko/checking, src/main/kotlin/cz/doucko/DouckoBackendApplication.kt (read other modules only for context at call sites). Requirements: contract/docs/requirements.md; ownership table in contract/docs/mvp-capability-plan.md; API in contract/api/openapi.yaml. Check especially: answer keys leaking to child endpoints before reveal (FR-27, NFR-1); admin endpoints reachable without the admin; any user input producing a raw 500 or driver internals (RFC 7807 required); UNPARSEABLE consuming an attempt (FR-22); attempts persisted immediately (FR-31); XP ledger never reduced (FR-38); Europe/Prague week boundaries in stats; module boundaries (Spring Modulith); migrations append-only and consistent with entities; concurrency (double submit, races on attempts/XP); path traversal / upload limits in storage; no secrets committed; tools never addressing the owner's compose project 'doucko'. Skip tests unless they mask a defect."
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": "sonnet",
+    "budgetPerAgentUsd": 1.2,
+    "maxTotalUsd": 3.75,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 3.1419,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 1971,
+      "durationMs": 130146,
+      "sessionId": "43b6f9c8-0449-48d5-98e8-7134e0b653f4",
+      "costUsd": 0.43189599999999995,
+      "numTurns": 10,
+      "result": {
+        "findings": [
+          {
+            "title": "Problem builder can throw on a malformed request URI, turning a 400/404 into a raw 500",
+            "file": "src/main/kotlin/cz/doucko/shared/adapter/in/web/ProblemResponses.kt",
+            "line": 33,
+            "severity": "major",
+            "confidence": "low",
+            "evidence": "`this.instance = URI.create(instance.replace(\" \", \"%20\"))` only escapes spaces. `instance` is the raw `request.requestURI` (from ProblemErrorController, requestRejectedHandler and the security entry points). A URI with an invalid percent escape such as `/api/x%zz` or other illegal characters makes `URI.create` throw IllegalArgumentException. That happens inside the error dispatch or the RequestRejectedHandler, where no advice catches it.",
+            "suggestion": "Build the instance defensively. Try `URI.create` in a try/catch and fall back to an encoded form (`UriComponentsBuilder.fromPath(...).build().encode()`) or a fixed `about:blank`. Add a test that sends a malformed percent escape to a child path and to `/error`."
+          },
+          {
+            "title": "Format tip example is a deterministic function of the accepted answer and can leak the key before reveal",
+            "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+            "line": 86,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "When the fixed example 4827 grades as not WRONG, the example becomes `ceil(max(|accepted|)+tolerance) + 4827` (`return ceiling + FIXED_INTEGER`). A child who sends an unparseable input gets that tip before the reveal (FR-27, NFR-1). They can subtract 4827 and recover the accepted value. The type docs claim the example 'does not act as an oracle', but this branch is an exact oracle for the narrow band of tasks whose answer lies near 4827.",
+            "suggestion": "Make the replacement example independent of the key. Use a fixed alternative such as 5913 or 7, and only fall back to `noexample` if every fixed candidate is accepted. Alternatively, derive the far value from a coarse bucket (a power of ten) instead of the exact bound."
+          },
+          {
+            "title": "Admin sign-in has no throttling or lockout",
+            "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+            "line": 37,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`signIn` calls `credentials.matches(...)` on every request with no attempt counter, delay or rate limit. The sign-in path is also CSRF-exempt and open to any LAN client. The single admin password (NFR-1) can be guessed online at BCrypt speed with no friction or audit trail.",
+            "suggestion": "Add a small in-memory failure counter with exponential back-off or a short lockout for repeated 401s. Return a Retry-After header, or a 429 problem from the catalog."
+          },
+          {
+            "title": "SignInFailureAdvice is global and bypasses the message catalog for non-sign-in unreadable-body and media-type errors",
+            "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/SignInFailureAdvice.kt",
+            "line": 41,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "The advice has HIGHEST_PRECEDENCE and handles every HttpMessageNotReadableException and HttpMediaTypeNotSupportedException app-wide. For non-sign-in paths it delegates to an anonymous `ResponseEntityExceptionHandler` (`standard.handleException`). That returns Spring's default ProblemDetail, whose title and detail do not come from `problem.title.*` / `problem.detail.*` (NFR-9). It also bypasses any more specific advice registered later.",
+            "suggestion": "Scope the advice to the sign-in controller with `assignableTypes = [AdminSessionController::class]`. Let the other paths use the catalog-backed handlers, or render them through `ProblemResponses`."
+          },
+          {
+            "title": "Display name trim ignores Unicode whitespace, so a blank-looking name passes validation",
+            "file": "src/main/kotlin/cz/doucko/profile/domain/DisplayNamePolicy.kt",
+            "line": 29,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`raw?.trim()` is Kotlin's `CharSequence.trim()` (isWhitespace). It does trim NBSP-class characters in Kotlin. But the Cc check does not cover U+200B, U+2009 or other format and space characters. The DB constraint `length(btrim(display_name)) > 0` only strips ASCII spaces. A name made only of U+200B is accepted by both and shows as blank in HQ.",
+            "suggestion": "Also reject names that contain no visible character, for example when every code point is category Cf or Zs. Add the matching violation message."
+          },
+          {
+            "title": "DNS-rebinding firewall rejects IPv6 literals and any other LAN host name",
+            "file": "src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt",
+            "line": 50,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`setAllowedHostnames { host -> host == \"localhost\" || host == \"backend\" || IPV4.matches(host) }` accepts only dotted-quad IPv4, `localhost` and `backend`. `[::1]` and an mDNS or router host name for the laptop get 400. The IPV4 regex also accepts impossible octets such as 999.1.1.1. This is not a security hole, but it can lock the child out when the LAN address is reached by name.",
+            "suggestion": "Validate octets 0-255. Make the allowed hosts configurable (for example `doucko.security.allowed-hosts`) so the owner can add the laptop's host name without a code change."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 1999,
+      "durationMs": 75026,
+      "sessionId": "91ec8d6a-2d41-4844-9d49-3e2d53a76b2d",
+      "costUsd": 0.3088268,
+      "numTurns": 10,
+      "result": {
+        "findings": [
+          {
+            "title": "No brute-force resistance on admin sign-in",
+            "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+            "line": 38,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "POST /api/admin/session is permitAll and CSRF-exempt, and a failed attempt only throws InvalidCredentialsException (401). There is no attempt counter, delay or lockout. Anyone on the home LAN, including the child, can script unlimited password guesses against the single admin account. The 12-character minimum and BCrypt cost limit the practical risk.",
+            "suggestion": "Add a small in-memory throttle: for example exponential delay or a lockout after N consecutive failures within a window, answered with a 429 or the same 401 problem. Keep it global, since there is one admin and the client IP behind nginx is not reliable."
+          },
+          {
+            "title": "Admin session cookie has no Secure flag and no absolute lifetime",
+            "file": "src/main/resources/application.yaml",
+            "line": 44,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The session cookie sets HttpOnly and SameSite=Strict but not Secure. The stack serves plain HTTP on the LAN, so with DOUCKO_BIND_ADDRESS set to a LAN address the sign-in password and session cookie cross the network in clear text. A LAN sniffer could capture them. The session is also only idle-limited (8 h, AdminIdleTimeoutFilter), so a stolen cookie that is kept active never expires.",
+            "suggestion": "Document the plain-HTTP LAN risk, or terminate TLS at nginx and set cookie.secure=true. Add an absolute session lifetime next to the idle timeout."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 1942,
+      "durationMs": 75594,
+      "sessionId": "125980d3-f17a-42fd-853c-541b7c9b99ff",
+      "costUsd": 0.31623999999999997,
+      "numTurns": 17,
+      "result": {
+        "findings": [
+          {
+            "title": "Release review part (a) covered only partly: no scenario-by-scenario audit against the store specs",
+            "file": "openspec/changes/release-review-api/tasks.md",
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "The review read the admin, shared, profile and checking sources, the archived admin-access tasks.md and V1__child_profile.sql. It did not open the store specs (admin-access, child-profile, answer-checking, platform-foundation), contract/api/openapi.yaml, or contract/docs/mvp-capability-plan.md. No requirement-to-scenario checklist was built. Coverage summary: 0 scenarios formally enumerated; no scenario was found missing or contradicted in the code that was read.",
+            "suggestion": "Re-run the audit with the store specs and openapi.yaml loaded, covering OpenAPI status codes and undocumented fields. The checking golden table (FR-23) and the property tests were not reviewed, and neither were the practice, progress and storage modules."
+          },
+          {
+            "title": "Single-row profile creation is not guarded against a concurrent first start",
+            "file": "src/main/kotlin/cz/doucko/profile/adapter/out/persistence/JpaChildProfileStore.kt",
+            "line": 15,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "ChildProfileInitializer.afterPropertiesSet() calls exists() and then create(), which is a check-then-act without a lock. The id=1 CHECK/PRIMARY KEY in V1 stops a second row, so a race would surface as a startup DataIntegrityViolation. A missing row would make updateSettings() fail on checkNotNull (IllegalStateException, which would be a raw 500 if it were ever hit). Hitting either needs two backend instances starting at once, so this is unlikely in the single-laptop deployment.",
+            "suggestion": "Make create idempotent with INSERT ... ON CONFLICT DO NOTHING. Optionally map the missing-row case to a problem response."
+          },
+          {
+            "title": "Sign-in has no throttling; this is deliberate and no spec amendment was found",
+            "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+            "line": 38,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "signIn() BCrypt-checks every attempt. The archived admin-access task 2.3 asserts '20 failures then success', so the absence of lockout looks intentional and bounded by the 72-byte check before BCrypt. I did not confirm this against the spec text.",
+            "suggestion": "Confirm that the admin-access spec states 'no lockout' explicitly. If it does not, amend the spec, since NFR-2 limits exposure to the LAN."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 2211,
+      "durationMs": 95503,
+      "sessionId": "7cf55383-07b0-4214-967d-00ad7157d105",
+      "costUsd": 0.417871,
+      "numTurns": 35,
+      "result": {
+        "findings": [
+          {
+            "title": "Unguarded URI.create on the raw request URI can turn a malformed URL into a non-problem error",
+            "file": "src/main/kotlin/cz/doucko/shared/adapter/in/web/ProblemResponses.kt",
+            "line": 33,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`this.instance = URI.create(instance.replace(\" \", \"%20\"))`. `instance` is the raw `request.requestURI` (also ERROR_REQUEST_URI). `ProblemResponses.write` is also what the firewall's RequestRejectedHandler and `ProblemErrorController` call for rejected or malformed URLs. A URL with a malformed percent escape such as `/x%zz`, or a character URI rejects, makes `URI.create` throw IllegalArgumentException inside that error path. The client then gets the container's fallback error page instead of RFC 7807. This is the case NFR-9 and the 'no raw 500' rule cover. I could not run the code to confirm which characters actually reach this code.",
+            "suggestion": "Build the instance defensively: wrap URI.create in a try/catch and fall back to omitting `instance` or to a re-encoded path (e.g. `UriComponentsBuilder.fromPath(...).build().encode()`). Add a test that sends `/x%zz` and `/a|b` and asserts problem+json."
+          }
+        ]
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/adapter/in/web/ProblemResponses.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1368,
+      "durationMs": 25674,
+      "sessionId": "a4e7eb9a-7cef-4079-a92a-62af155143be",
+      "costUsd": 0.1054276,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "I couldn't confirm that a malformed request URI reaches `URI.create` in `ProblemResponses.problem` (line 33). The code does what the finding says: the only escaping is `replace(\" \", \"%20\")`, and every caller passes the raw `request.requestURI`. The trigger inputs named in the finding, though, are very likely refused before any of this code runs. I haven't run a request to check, and I didn't read the Tomcat or Spring Security sources.\n\n- **Invalid percent escapes such as `/api/x%zz`:** by default Tomcat should reject these during request-path decoding and return its own 400 at the connector level.\n- **Illegal characters such as `{ } | \\ ^ < > \"` and backticks:** Tomcat's request-target parser should reject these by default.\n- **Other unusual paths:** Spring Security's `StrictHttpFirewall` rejects encoded slashes, `%25`, semicolons and similar. That rejection goes through `requestRejectedHandler`, which uses `ProblemResponses` with a path the firewall has already accepted.\n- **Spaces:** these are already escaped by the existing `replace`.\n\nThe only inputs I can think of that might get through are high-byte or control-character paths. I could not confirm any concrete one. The finding is also marked low confidence and offers no reproducing request, so I'm treating it as unconfirmed."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/adapter/in/web/ProblemResponses.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1401,
+      "durationMs": 35090,
+      "sessionId": "144930fc-e954-443f-af67-7d659ca62b19",
+      "costUsd": 0.1200108,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The cited example (/api/x%zz) never reaches ProblemResponses. Tomcat rejects malformed percent escapes and the URI-illegal path characters with its own 400 during request parsing, before Spring Security, the advices or the error controller run. The only remaining gap is raw C1 control bytes (0x80–0x9F) in the path, which would need a hand-crafted request. I could not confirm that Tomcat accepts them. Even if it did, the result would be a bodiless 500, not a data leak or a child-facing failure. I could not positively confirm an exploitable path.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1379,
+      "durationMs": 25039,
+      "sessionId": "4c351511-73fe-4a07-ae77-aaddb6b89003",
+      "costUsd": 0.1037382,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real in the code. `tipFor` is called from `AnswerChecker` when a part is UNPARSEABLE, and the tip is returned to the child before the reveal. `example()` tries the fixed 4827 first. If 4827 is not graded WRONG, it falls back to `farInteger(spec)`. That function returns `ceil(max(|accepted| + tolerance)) + 4827`, which is a deterministic function of the accepted value. Take a task whose accepted answer is 4827 and whose tolerance is 0. The child sends garbage and gets an example of 9654. Subtracting 4827 gives exactly 4827, which is the key. Even when the child can't subtract, the missing 4827 example already signals that the answer is near 4827. Nothing guards this elsewhere: the `FormatTips.kt` docs only claim the example is not an oracle \"over a set of values\". The impact is narrow, since it only applies to answers within the tolerance of 4827 (or whichever band makes the fixed example non-WRONG). Severity stays minor and confidence low. The suggested fix is also imperfect, because any fixed example still reveals a band when it is swapped out.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1412,
+      "durationMs": 25881,
+      "sessionId": "39833797-d116-4ad6-978e-ab393b6ae834",
+      "costUsd": 0.1050536,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. In `FormatTips.kt`, `example()` tries the fixed 4827 first. If `isWrong` fails, it falls back to `farInteger()`, which is `ceil(max(|accepted|) + tolerance) + 4827` (line 93). That value is computed directly from the accepted answers. `AnswerChecker.kt:16` returns the tip for any UNPARSEABLE part, and it reaches the child through `PracticeService`/`PracticeMapping` before any reveal. A task whose accepted value is 4827 (or within tolerance of it) gets an example of about 9654, so subtracting 4827 recovers the key. The doc comment's \"not an oracle\" claim is therefore wrong for this branch. Exploitability is very limited, though. It only occurs for tasks whose answer lies near 4827, and an exact-match integer would have to be exactly 4827. The child would also need to know the constant, which is in source only, or notice that this task's example differs from the usual 4827. I'd downgrade it to a negligible minor, since it is a theoretical leak and not a practical one.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1063,
+      "durationMs": 16428,
+      "sessionId": "47fe4766-2274-4b70-94be-5e959fe83b92",
+      "costUsd": 0.070795,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does have no throttling, but that is deliberate. NFR-15 and OQ-23 say \"No lockout (LAN only, NFR-2)\". The admin-access spec has a \"No sign-in lockout\" requirement (contract/openspec/specs/admin-access/spec.md:227) and lists \"No account lockout, rate limiting, CAPTCHA or two-factor sign-in\" as out of scope (line 326). A test, AdminSessionTest, checks that 20 failed sign-ins do not lock the account. The same finding was already reviewed and rejected: the archived review-findings.json for implement-admin-access-api records \"The store spec excludes lockout and rate limiting\". Adding a lockout or 429 would break the spec, so this is not a defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1096,
+      "durationMs": 16011,
+      "sessionId": "d6e042f9-e38b-44a5-824f-257a01b4536f",
+      "costUsd": 0.0530688,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does have no throttling, but that is a deliberate product decision. The spec admin-access has \"Requirement: No sign-in lockout\" (spec.md:227) and lists \"No account lockout, rate limiting, CAPTCHA or two-factor sign-in\" as out of scope (spec.md:326). NFR-15 says \"No lockout (LAN only, NFR-2)\". OQ-23 and the archived implement-admin-access-api design.md also name lockout and rate limiting as non-goals. The password must be at least 12 characters (NFR-16), and the backend refuses to start with a shorter one. Adding a lockout would contradict the contract. The finding describes accepted, documented behavior, not a defect. Exposure is also limited to LAN clients.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/SignInFailureAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1330,
+      "durationMs": 367852,
+      "sessionId": "117daede-2f5d-4c95-9b91-a29e8042c5aa",
+      "costUsd": 0.1031452,
+      "numTurns": 8,
+      "result": {
+        "refuted": false,
+        "reasoning": "I could confirm part of the mechanism from the code. I did not run any tests.\n\nWhat holds up:\n- `SignInFailureAdvice` is a global `@RestControllerAdvice` at `HIGHEST_PRECEDENCE`, with no `assignableTypes`.\n- It catches every `HttpMessageNotReadableException` and `HttpMediaTypeNotSupportedException` app-wide.\n- Outside `POST /api/admin/session` it delegates to a bare `ResponseEntityExceptionHandler`. That produces Spring's default ProblemDetail. Its title and detail do not come from the `problem.title.*` and `problem.detail.*` catalog that `ProblemResponses` and the other advices use.\n- `PracticeProblemAdvice` and `ContentProblemAdvice` also handle `HttpMessageNotReadableException` with catalog-backed problems. They are scoped to specific controllers at the same `HIGHEST_PRECEDENCE`. Ties are broken by bean registration order, so the global advice can shadow them.\n\nWhat weakens it:\n- The class KDoc says \"An unreadable body or unsupported media type on any other path keeps Spring's standard problem response\". So the default response is documented as intentional, not accidental.\n- The child, profile and content paths appear to use body advices that rethrow custom exceptions such as `UnreadablePracticeBody` and `UnreadableSettingsException`. Those bypass the global handler, so the practical impact is probably limited to routes that have no such handling.\n- I did not confirm the ordering claim (\"bypasses any more specific advice registered later\"). Registration order for equal-order advices is unverified.\n\nNet: the catalog-bypass is real but narrow, and it is a minor, low-confidence NFR-9 consistency issue. I'm keeping the severity at minor.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/SignInFailureAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1363,
+      "durationMs": 27356,
+      "sessionId": "9364590d-e304-40ab-aa6d-32c7288004ea",
+      "costUsd": 0.1076434,
+      "numTurns": 8,
+      "result": {
+        "refuted": true,
+        "reasoning": "I could not confirm any real-user impact, so I'm treating the finding as refuted.\n\n- **Intended behavior:** The class doc at `SignInFailureAdvice.kt:19-24` says other paths deliberately \"keep Spring's standard problem response\". The advice only changes behavior for `POST /api/admin/session`.\n- **No catalog-backed handler is displaced for routine cases:**\n  - `ContentProblemAdvice` and `PracticeProblemAdvice` do declare `HttpMessageNotReadableException` handlers.\n  - Their body advices (`ContentBodyAdvice`, `PracticeBodyAdvice`) read the raw body themselves. They throw `UnreadableContentBody` / `UnreadablePracticeBody` for malformed, empty or non-object bodies, and Jackson only ever sees a fixed valid placeholder.\n  - Real Jackson-originated `HttpMessageNotReadableException`s therefore essentially never reach those handlers, so the catalog-backed paths are not bypassed in practice.\n- **No catalog alternative exists for the rest:** `HttpMediaTypeNotSupportedException` is not handled by any other advice in `src/main`. Without this advice the same Spring default 415 problem would be returned. The sign-in advice delegates to `ResponseEntityExceptionHandler` and gives the same result, so there is no regression.\n- **Precedence is uncertain and low impact:** Several advices share `HIGHEST_PRECEDENCE`, so the tie-break order is unverified. Even if the unscoped advice won a tie, the worst case is Spring's default problem body (400/415) instead of a catalog message on rare paths. That is not exploitable, leaks nothing, and is not a 500.\n- **Verdict:** this is a minor design or consistency nit at most. It is not a reproducible defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/domain/DisplayNamePolicy.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1147,
+      "durationMs": 13131,
+      "sessionId": "af55219f-1bb6-46f1-a6c8-7d0ab257fbc0",
+      "costUsd": 0.0424212,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The facts in the finding are correct. At DisplayNamePolicy.kt:29, `trim()` uses Kotlin `isWhitespace`, which does not cover U+200B (category Cf). A name made only of U+200B therefore passes `check`. I did not check the DB constraint or the HQ rendering, and I did not read the store spec itself.\n\nThis is not a defect in the code. The KDoc at lines 3-7 says the policy implements the spec rules: trim surrounding whitespace, 1-50 code points, no Cc, no U+FFFD. The code does exactly that. Rejecting invisible format characters is a stricter rule the spec doesn't ask for, not a bug in this mechanism.\n\nThe input is also operator-controlled. The name comes from the `DOUCKO_CHILD_DISPLAY_NAME` env var, set once in `.env` before first start. It is not child or user input, so the \"no raw 500\" and attacker concerns don't apply. The worst case is a self-inflicted blank-looking name.\n\nThe finding's own confidence is low. Whether HQ renders a blank name was not verified.\n\nThis is a spec-hardening suggestion, not a correctness bug.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/domain/DisplayNamePolicy.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1180,
+      "durationMs": 12859,
+      "sessionId": "75a6f330-1f04-47c2-8324-390f7bf61c3e",
+      "costUsd": 0.0428404,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code mechanism is real. `DisplayNamePolicy.check` (line 29) trims with Kotlin `trim()`. It then rejects only an empty name, U+FFFD, Cc control characters, and names over 50 code points. A name made only of U+200B (Cf) or similar would pass, and the DB `btrim` check wouldn't stop it. Kotlin `isWhitespace` does not include U+200B.\n\nThe problem can't be exploited, though. The only input is the `DOUCKO_CHILD_DISPLAY_NAME` environment variable, set in the operator's `.env` before the first start. That is the parent configuring their own single-family deployment. No child, API caller or attacker can supply this value. The finding has no security impact and no data integrity impact. The worst case is that the parent deliberately or accidentally pastes an invisible-only name and sees a blank name in HQ. That is self-inflicted, and the parent can fix it by editing `.env`.\n\nThe class doc says the implementation follows the store spec's explicit rules: trim, 1–50 code points, no Cc, no U+FFFD. The behaviour matches those rules, so it is a spec-conformant edge case, not a defect. The finding's own confidence is \"low\" and its severity is \"minor\".",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1212,
+      "durationMs": 16837,
+      "sessionId": "44c9a835-58a9-4e3b-90ef-70e9902aa995",
+      "costUsd": 0.0433018,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code does what the finding says: the allowlist is `localhost`, `backend` and dotted-quad IPv4. So `[::1]` and LAN host names get 400, and the regex accepts `999.1.1.1`. But this is the intended behaviour, not a bug. The KDoc above the bean says that only `localhost`, a bare IPv4 address and the Compose service name `backend` are answered. It says this is the same rule as the frontend's nginx and exists as a DNS-rebinding guard under NFR-2. Rejecting arbitrary host names is the point of the guard, because an allowed name is the opening a rebinding attack uses. The `999.1.1.1` case has no effect: nobody can reach the server through an impossible address, and the finding itself concedes this is not a security hole. The finding cites no requirement that the child reach the laptop by name or by IPv6, so the lockout is speculation. Its suggestions, validating octets and making the allowlist configurable, are enhancements rather than corrections. I did not check the nginx config or NFR-2 text, and I did not look for callers. The cited code is a single bean with no other callers that could change this.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1245,
+      "durationMs": 17940,
+      "sessionId": "64c8d0c0-0961-47fc-993d-b57b12b7a57a",
+      "costUsd": 0.0465058,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The allowlist (localhost, backend, bare IPv4) is a deliberate, documented DNS-rebinding guard (NFR-2) that mirrors the frontend nginx rule. Child access is via the LAN IPv4 address, which is accepted. Rejecting other host names is the intended behavior, not a defect. The loose octet regex has no security effect, and the finding concedes it is not a security hole. No supported scenario shows a real lockout; at most this is a configurability enhancement request. I did not check the nginx config.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1230,
+      "durationMs": 19108,
+      "sessionId": "afae04c4-efca-44ee-b6bc-93507e097b13",
+      "costUsd": 0.056789,
+      "numTurns": 5,
+      "result": {
+        "refuted": false,
+        "reasoning": "signIn at AdminSessionController.kt:38 throws InvalidCredentialsException on a mismatch, which SignInFailureAdvice answers as a 401. A search of src/main for 429, throttle, lockout, rate limit, bucket, Retry-After, sleep, delay and \"failed\" found no attempt counter, delay or lockout anywhere. Unlimited guessing is therefore possible, bounded in practice by the 12-character minimum and BCrypt cost. I did not open AdminCredentials or the security config, and did not check whether the admin-access spec deliberately omits lockout. Minor severity is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1263,
+      "durationMs": 16972,
+      "sessionId": "cdeef5d3-92b4-4d49-9203-b1e602dab340",
+      "costUsd": 0.054798799999999995,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The absence of throttling is real: signIn at line 38 has no counter, delay or lockout. But it is a deliberate, documented product decision, not a defect. The store spec admin-access says \"No sign-in lockout\" (decision OQ-23, NFR-15, with NFR-2 limiting the app to the LAN). The archived change's design.md lists lockout and rate limiting as non-goals \"excluded by the spec\". The prior review finding on this was waived with that reason in review-findings.json, and AdminSessionTest asserts that 20 failures do not lock. Adding a throttle would contradict the spec and its test. The practical risk is also low: one admin, a 12-character minimum password policy (NFR-16), BCrypt cost, and LAN-only exposure. The reviewer did not account for the spec decision. I treat this as refuted: a spec-sanctioned design choice that has already been waived, not an exploitable bug.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/application.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1142,
+      "durationMs": 27401,
+      "sessionId": "271f274c-f8b9-4714-a89c-af8486e33f7c",
+      "costUsd": 0.090608,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The facts are accurate. application.yaml:44-49 sets http-only and same-site=strict with no `secure`, and the timeout is idle-only (8h, enforced by AdminIdleTimeoutFilter). But this is a deliberate, spec-backed design, not a defect in the code. NFR-15 and openapi.yaml:1071 specify the session as \"8 h without admin activity\", and nothing requires an absolute lifetime. NFR-2 and the platform-foundation spec scope the deployment to a single home laptop, \"LAN only\". `tools/stack.mjs` and `tools/lib/compose.mjs` refuse any bind address that isn't loopback or the home-LAN address. The openapi server entry (openapi.yaml:69) says \"Home laptop (LAN only, NFR-2)\". TLS doesn't exist anywhere in this stack. Setting `cookie.secure=true` over plain HTTP would make browsers drop the cookie on any non-localhost LAN address, so admin sign-in would stop working. The suggested fix therefore can't be applied without adding TLS, which is a separate architectural decision. The \"stolen cookie never expires\" point is also weak: the cookie is HttpOnly, SameSite=Strict, path-scoped to /api/admin, and writes need the XSRF token. The remaining risk is LAN sniffing on a private home network, which falls under the accepted threat model. At most this is a documentation or hardening note, not an incorrect mechanism in the code.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/resources/application.yaml",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1175,
+      "durationMs": 23400,
+      "sessionId": "1492853f-1f8e-4eee-9b69-db0538481f58",
+      "costUsd": 0.0837112,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "severityAdjustment": "downgrade",
+        "reasoning": "The mechanism is real, but the impact is small.\n\nConfirmed at `src/main/resources/application.yaml:44-49`: the session cookie sets `http-only: true` and `same-site: strict`, with no `secure`. The only session limit is the 8 h idle timeout at line 42, which `AdminIdleTimeoutFilter` also enforces. I did not read the filter itself. I found no absolute lifetime anywhere.\n\n`tools/stack.mjs` (and the NFR-2 guard it implements) allows `DOUCKO_BIND_ADDRESS` to be 127.0.0.1 or the laptop's home-LAN address. Nothing in the repo terminates TLS, so on a LAN bind the admin password and cookie do cross the network in cleartext.\n\nThree things limit how much this matters:\n- **Attacker position:** the attacker has to be on the same home LAN and able to sniff or ARP-spoof. That is a small, trusted network for a single-family tutoring app.\n- **The suggested fix:** setting `cookie.secure=true` without adding TLS would break admin login over plain HTTP. Browsers drop Secure cookies on non-localhost HTTP. Only the \"terminate TLS at nginx\" half of the suggestion works.\n- **Absolute lifetime:** this only matters after the cookie has already been stolen. It is a hardening idea, not a vulnerability.\n\nI could not find the LAN plain-HTTP risk documented in the repo. My search of `docs`, `src`, README, `.env.example`, `compose*.y*ml` and `openspec` for plain HTTP, cleartext or HTTPS found nothing relevant. So the finding stands as a documentation gap and a hardening suggestion. It does not stand as an exploitable defect, and I would lower it below \"minor\"."
+      }
+    },
+    {
+      "label": "verify:openspec/changes/release-review-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1367,
+      "durationMs": 16289,
+      "sessionId": "ac71ec57-c7e2-4908-ae9e-827ea3eb1c42",
+      "costUsd": 0.035071000000000005,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding isn't about a defect in the code. It says a review process did not read certain specs, but its own evidence admits \"no scenario was found missing or contradicted.\" The cited file, `openspec/changes/release-review-api/tasks.md`, is only a task checklist. Tasks 2.1 (review-gate over `38b56c8..HEAD`) and 2.2 (disposition findings) are still unchecked, so the review it describes has not finished. The file makes no claim of full scenario-by-scenario coverage. Incomplete coverage by a reviewer is not a spec-compliance violation in the code, and the finding names no concrete requirement that is violated. I could not confirm any wrong mechanism, so I'm treating it as refuted."
+      }
+    },
+    {
+      "label": "verify:openspec/changes/release-review-api/tasks.md",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1400,
+      "durationMs": 15463,
+      "sessionId": "cf1a970b-8313-4656-bd64-cdce7b0c0689",
+      "costUsd": 0.0420142,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding doesn't describe a defect that a user or attacker could trigger. It is a complaint about how thorough a review process was, not a bug in the code. The cited tasks.md contains only an unchecked task list: 2.1 (review-gate over the range) and 2.2 (disposition findings) are both still open. It has no \"part (a)\" audit, no coverage summary and no \"0 scenarios enumerated\" claim, so the quoted evidence doesn't appear at the cited location. The finding also says \"no scenario was found missing or contradicted\", so it identifies no actual spec violation. The review itself hasn't finished yet, so an incomplete audit is expected at this stage. Nothing is exploitable or reproducible.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/adapter/out/persistence/JpaChildProfileStore.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1273,
+      "durationMs": 22520,
+      "sessionId": "0cae8cb3-28a5-459c-8949-f09f081d320d",
+      "costUsd": 0.0524708,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The check-then-act in ChildProfileInitializer.afterPropertiesSet() is real (exists() at line 18, then create() at line 21, with no lock). It is not a defect, though.\n\n- **The race needs two backend instances starting at once.** The project is a single-laptop deployment, and the finding itself concedes this.\n- **The worst outcome is a loud, safe startup failure.** The loser of the race would get a DataIntegrityViolation at startup. The id=1 PRIMARY KEY/CHECK keeps exactly one row. That instance fails to start, and the winner's row is intact. No data is corrupted and no request is served.\n- **The \"missing row → raw 500\" scenario cannot happen.** The initializer runs during context refresh, before the web server takes requests. If create() fails, the process exits. If it succeeds, or the other instance created the row, the row exists. updateSettings() can therefore never run without a row, so the checkNotNull branch is unreachable in a started instance.\n- **There is no spec-compliance impact.** No user input can reach this path, so the \"no raw 500 from user input\" rule is not at stake.\n\nThe suggested ON CONFLICT DO NOTHING would be harmless hardening. It would not fix a bug that can actually occur, so the finding does not hold as a correctness defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/profile/adapter/out/persistence/JpaChildProfileStore.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1306,
+      "durationMs": 18402,
+      "sessionId": "e1c82a7d-2c7b-4d67-a25e-83238ce8957d",
+      "costUsd": 0.045214,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The check-then-act in `ChildProfileInitializer.afterPropertiesSet()` (`exists()`, then `create()`) is real. But it can't be triggered by a user or attacker, and it has no lasting effect. No endpoint reaches it. It runs only during bean initialization at startup. Hitting it needs two backend instances to start against an empty database at the same moment. AGENTS.md describes a single-laptop deployment, so that setup doesn't occur.\n\nIf the race did happen, the id=1 primary key and CHECK constraint would reject the second insert. The losing instance would fail to start and be restarted. On restart `exists()` returns true and it proceeds. No duplicate row or corrupt data results.\n\nThe finding's second scenario, a missing row making `updateSettings()` hit `checkNotNull`, can't follow from the race. Either the winner inserted the row, or startup aborted before the app served any requests. The finding itself rates this minor with low confidence and concedes it is unlikely.\n\nI read only the two cited files. I did not check the V1 migration, so the id=1 constraint is taken from the finding's own description."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1047,
+      "durationMs": 18996,
+      "sessionId": "30e8fe20-06bb-4dac-9bb2-48325a14b81a",
+      "costUsd": 0.0719692,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding's suggestion is to confirm that the admin-access spec explicitly says \"no lockout\", and to amend the spec if it doesn't. It does say so. `contract/openspec/specs/admin-access/spec.md:227-237` has the requirement \"No sign-in lockout\". It states that failed sign-ins SHALL NOT lock the admin account or block the client, because the stack is LAN-only (NFR-15, NFR-2, decision OQ-23). It also has a scenario, \"20 consecutive failed sign-ins, then correct password succeeds with 204\". Line 326 of the same spec lists \"No account lockout, rate limiting, CAPTCHA or two-factor sign-in\" as an explicit non-goal. `AdminSessionController.signIn` (line 38) is just a credential check that throws `InvalidCredentialsException`, which matches that spec. So the absence of throttling is a documented, deliberate decision. There is no spec gap to amend and no code defect. The finding's own premise (\"no spec amendment was found\") is wrong, because the spec text exists. Earlier review-gate runs also raised the same concern and treated it as an accepted risk.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1080,
+      "durationMs": 21595,
+      "sessionId": "1a4bc107-07d0-4f8e-be78-2047039a6a1d",
+      "costUsd": 0.084197,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding asks to confirm the admin-access spec states \"no lockout\" explicitly. It does: contract/openspec/specs/admin-access/spec.md:227-237 has the requirement \"No sign-in lockout\" (decision OQ-23, NFR-15/NFR-2) with a 20-failures-then-success scenario, and line 326 also lists \"No account lockout, rate limiting, CAPTCHA or two-factor sign-in\". AdminSessionController.signIn (line 38) matches the spec, so there is no spec-compliance defect and no amendment is needed. LAN-only online guessing is an accepted, documented risk (12-character minimum password), not a compliance gap.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/adapter/in/web/ProblemResponses.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1561,
+      "durationMs": 22178,
+      "sessionId": "55454256-4277-4318-afb7-2984e3fa4d69",
+      "costUsd": 0.0515296,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "I could not confirm that a request reaches this line with a string `URI.create` rejects. The code is as the finding says: `ProblemResponses.kt:33` calls `URI.create(instance.replace(\" \", \"%20\"))` with no guard. `ProblemResponses.write` passes `request.requestURI`, and `ProblemErrorController` passes `ERROR_REQUEST_URI`. The finding's own examples are the problem.\n\n- **Tomcat stops them first.** Tomcat's request-line parser rejects `|`, `{`, `}`, `^`, `` ` ``, `<`, `>`, `\"` and `\\` in the path by default, and returns a 400 itself.\n- **`/x%zz` (malformed percent escape).** `CoyoteAdapter.postParseRequest` hits the decode failure and sends 400 before the host valve or any error-page dispatch. So `ProblemErrorController` never runs. Spring Security's filter chain and its `RequestRejectedHandler` never run either, because they sit behind the servlet pipeline.\n- **Requests the firewall does reject.** The `StrictHttpFirewall` rejections that do reach `RequestRejectedHandler` are `;`, `//`, encoded `%2e`, `%2f`, `%5c` and `%25`. Raw `requestURI` for those is still a legal URI string, so `URI.create` succeeds.\n- **Spaces.** These are already handled by the explicit replacement.\n\nI found no realistic path to the claimed `IllegalArgumentException`. The finding itself says it could not confirm which characters reach this code. Defensive hardening would be harmless, but the claimed mechanism is not demonstrated."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/shared/adapter/in/web/ProblemResponses.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1594,
+      "durationMs": 18069,
+      "sessionId": "bbffd5d7-918f-42a8-9acf-5677c10a1596",
+      "costUsd": 0.054762000000000005,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "URI.create is unguarded, but I found no real request that reaches it with a string it rejects. Tomcat rejects malformed percent escapes (/x%zz) and the characters | { } ^ [ ] \\ < > \" ` in the request target at the connector, before any servlet or Spring Security code runs. Spaces are already handled by the replace. The firewall-rejected cases (//, ;, %25) are still valid URI strings, and non-ASCII characters are accepted by URI.create. The other callers pass requestURI from requests that already routed through the connector and firewall. The finding itself says it could not confirm which characters reach this code. I did not run any requests, so this rests on known Tomcat behaviour.",
+        "severityAdjustment": "downgrade"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "12 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 1, contested: 3, rejected: 8"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/release-review-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "Phase 7 global release review of the backend (release-review-api), part a: admin, api, profile, shared, checking modules",
+    "summary": "Review gate for Phase 7 global release review of the backend (release-review-api), part a: admin, api, profile, shared, checking modules: 1 confirmed, 3 contested (treat as confirmed unless trivially wrong), 8 rejected.",
+    "confirmed": [
+      {
+        "title": "Format tip example is a deterministic function of the accepted answer and can leak the key before reveal",
+        "file": "src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt",
+        "line": 86,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "When the fixed example 4827 grades as not WRONG, the example becomes `ceil(max(|accepted|)+tolerance) + 4827` (`return ceiling + FIXED_INTEGER`). A child who sends an unparseable input gets that tip before the reveal (FR-27, NFR-1). They can subtract 4827 and recover the accepted value. The type docs claim the example 'does not act as an oracle', but this branch is an exact oracle for the narrow band of tasks whose answer lies near 4827.",
+        "suggestion": "Make the replacement example independent of the key. Use a fixed alternative such as 5913 or 7, and only fall back to `noexample` if every fixed candidate is accepted. Alternatively, derive the far value from a coarse bucket (a power of ten) instead of the exact bound.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is real in the code. `tipFor` is called from `AnswerChecker` when a part is UNPARSEABLE, and the tip is returned to the child before the reveal. `example()` tries the fixed 4827 first. If 4827 is not graded WRONG, it falls back to `farInteger(spec)`. That function returns `ceil(max(|accepted| + tolerance)) + 4827`, which is a deterministic function of the accepted value. Take a task whose accepted answer is 4827 and whose tolerance is 0. The child sends garbage and gets an example of 9654. Subtracting 4827 gives exactly 4827, which is the key. Even when the child can't subtract, the missing 4827 example already signals that the answer is near 4827. Nothing guards this elsewhere: the `FormatTips.kt` docs only claim the example is not an oracle \"over a set of values\". The impact is narrow, since it only applies to answers within the tolerance of 4827 (or whichever band makes the fixed example non-WRONG). Severity stays minor and confidence low. The suggested fix is also imperfect, because any fixed example still reveals a band when it is swapped out.",
+          "The mechanism is real. In `FormatTips.kt`, `example()` tries the fixed 4827 first. If `isWrong` fails, it falls back to `farInteger()`, which is `ceil(max(|accepted|) + tolerance) + 4827` (line 93). That value is computed directly from the accepted answers. `AnswerChecker.kt:16` returns the tip for any UNPARSEABLE part, and it reaches the child through `PracticeService`/`PracticeMapping` before any reveal. A task whose accepted value is 4827 (or within tolerance of it) gets an example of about 9654, so subtracting 4827 recovers the key. The doc comment's \"not an oracle\" claim is therefore wrong for this branch. Exploitability is very limited, though. It only occurs for tasks whose answer lies near 4827, and an exact-match integer would have to be exactly 4827. The child would also need to know the constant, which is in source only, or notice that this task's example differs from the usual 4827. I'd downgrade it to a negligible minor, since it is a theoretical leak and not a practical one."
+        ]
+      }
+    ],
+    "contested": [
+      {
+        "title": "SignInFailureAdvice is global and bypasses the message catalog for non-sign-in unreadable-body and media-type errors",
+        "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/SignInFailureAdvice.kt",
+        "line": 41,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "The advice has HIGHEST_PRECEDENCE and handles every HttpMessageNotReadableException and HttpMediaTypeNotSupportedException app-wide. For non-sign-in paths it delegates to an anonymous `ResponseEntityExceptionHandler` (`standard.handleException`). That returns Spring's default ProblemDetail, whose title and detail do not come from `problem.title.*` / `problem.detail.*` (NFR-9). It also bypasses any more specific advice registered later.",
+        "suggestion": "Scope the advice to the sign-in controller with `assignableTypes = [AdminSessionController::class]`. Let the other paths use the catalog-backed handlers, or render them through `ProblemResponses`.",
+        "dimension": "correctness",
+        "verdict": "contested",
+        "verifierNotes": [
+          "I could confirm part of the mechanism from the code. I did not run any tests.\n\nWhat holds up:\n- `SignInFailureAdvice` is a global `@RestControllerAdvice` at `HIGHEST_PRECEDENCE`, with no `assignableTypes`.\n- It catches every `HttpMessageNotReadableException` and `HttpMediaTypeNotSupportedException` app-wide.\n- Outside `POST /api/admin/session` it delegates to a bare `ResponseEntityExceptionHandler`. That produces Spring's default ProblemDetail. Its title and detail do not come from the `problem.title.*` and `problem.detail.*` catalog that `ProblemResponses` and the other advices use.\n- `PracticeProblemAdvice` and `ContentProblemAdvice` also handle `HttpMessageNotReadableException` with catalog-backed problems. They are scoped to specific controllers at the same `HIGHEST_PRECEDENCE`. Ties are broken by bean registration order, so the global advice can shadow them.\n\nWhat weakens it:\n- The class KDoc says \"An unreadable body or unsupported media type on any other path keeps Spring's standard problem response\". So the default response is documented as intentional, not accidental.\n- The child, profile and content paths appear to use body advices that rethrow custom exceptions such as `UnreadablePracticeBody` and `UnreadableSettingsException`. Those bypass the global handler, so the practical impact is probably limited to routes that have no such handling.\n- I did not confirm the ordering claim (\"bypasses any more specific advice registered later\"). Registration order for equal-order advices is unverified.\n\nNet: the catalog-bypass is real but narrow, and it is a minor, low-confidence NFR-9 consistency issue. I'm keeping the severity at minor.",
+          "I could not confirm any real-user impact, so I'm treating the finding as refuted.\n\n- **Intended behavior:** The class doc at `SignInFailureAdvice.kt:19-24` says other paths deliberately \"keep Spring's standard problem response\". The advice only changes behavior for `POST /api/admin/session`.\n- **No catalog-backed handler is displaced for routine cases:**\n  - `ContentProblemAdvice` and `PracticeProblemAdvice` do declare `HttpMessageNotReadableException` handlers.\n  - Their body advices (`ContentBodyAdvice`, `PracticeBodyAdvice`) read the raw body themselves. They throw `UnreadableContentBody` / `UnreadablePracticeBody` for malformed, empty or non-object bodies, and Jackson only ever sees a fixed valid placeholder.\n  - Real Jackson-originated `HttpMessageNotReadableException`s therefore essentially never reach those handlers, so the catalog-backed paths are not bypassed in practice.\n- **No catalog alternative exists for the rest:** `HttpMediaTypeNotSupportedException` is not handled by any other advice in `src/main`. Without this advice the same Spring default 415 problem would be returned. The sign-in advice delegates to `ResponseEntityExceptionHandler` and gives the same result, so there is no regression.\n- **Precedence is uncertain and low impact:** Several advices share `HIGHEST_PRECEDENCE`, so the tie-break order is unverified. Even if the unscoped advice won a tie, the worst case is Spring's default problem body (400/415) instead of a catalog message on rare paths. That is not exploitable, leaks nothing, and is not a 500.\n- **Verdict:** this is a minor design or consistency nit at most. It is not a reproducible defect."
+        ]
+      },
+      {
+        "title": "No brute-force resistance on admin sign-in",
+        "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+        "line": 38,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "POST /api/admin/session is permitAll and CSRF-exempt, and a failed attempt only throws InvalidCredentialsException (401). There is no attempt counter, delay or lockout. Anyone on the home LAN, including the child, can script unlimited password guesses against the single admin account. The 12-character minimum and BCrypt cost limit the practical risk.",
+        "suggestion": "Add a small in-memory throttle: for example exponential delay or a lockout after N consecutive failures within a window, answered with a 429 or the same 401 problem. Keep it global, since there is one admin and the client IP behind nginx is not reliable.",
+        "dimension": "security",
+        "verdict": "contested",
+        "verifierNotes": [
+          "signIn at AdminSessionController.kt:38 throws InvalidCredentialsException on a mismatch, which SignInFailureAdvice answers as a 401. A search of src/main for 429, throttle, lockout, rate limit, bucket, Retry-After, sleep, delay and \"failed\" found no attempt counter, delay or lockout anywhere. Unlimited guessing is therefore possible, bounded in practice by the 12-character minimum and BCrypt cost. I did not open AdminCredentials or the security config, and did not check whether the admin-access spec deliberately omits lockout. Minor severity is appropriate.",
+          "The absence of throttling is real: signIn at line 38 has no counter, delay or lockout. But it is a deliberate, documented product decision, not a defect. The store spec admin-access says \"No sign-in lockout\" (decision OQ-23, NFR-15, with NFR-2 limiting the app to the LAN). The archived change's design.md lists lockout and rate limiting as non-goals \"excluded by the spec\". The prior review finding on this was waived with that reason in review-findings.json, and AdminSessionTest asserts that 20 failures do not lock. Adding a throttle would contradict the spec and its test. The practical risk is also low: one admin, a 12-character minimum password policy (NFR-16), BCrypt cost, and LAN-only exposure. The reviewer did not account for the spec decision. I treat this as refuted: a spec-sanctioned design choice that has already been waived, not an exploitable bug."
+        ]
+      },
+      {
+        "title": "Admin session cookie has no Secure flag and no absolute lifetime",
+        "file": "src/main/resources/application.yaml",
+        "line": 44,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The session cookie sets HttpOnly and SameSite=Strict but not Secure. The stack serves plain HTTP on the LAN, so with DOUCKO_BIND_ADDRESS set to a LAN address the sign-in password and session cookie cross the network in clear text. A LAN sniffer could capture them. The session is also only idle-limited (8 h, AdminIdleTimeoutFilter), so a stolen cookie that is kept active never expires.",
+        "suggestion": "Document the plain-HTTP LAN risk, or terminate TLS at nginx and set cookie.secure=true. Add an absolute session lifetime next to the idle timeout.",
+        "dimension": "security",
+        "verdict": "contested",
+        "verifierNotes": [
+          "The facts are accurate. application.yaml:44-49 sets http-only and same-site=strict with no `secure`, and the timeout is idle-only (8h, enforced by AdminIdleTimeoutFilter). But this is a deliberate, spec-backed design, not a defect in the code. NFR-15 and openapi.yaml:1071 specify the session as \"8 h without admin activity\", and nothing requires an absolute lifetime. NFR-2 and the platform-foundation spec scope the deployment to a single home laptop, \"LAN only\". `tools/stack.mjs` and `tools/lib/compose.mjs` refuse any bind address that isn't loopback or the home-LAN address. The openapi server entry (openapi.yaml:69) says \"Home laptop (LAN only, NFR-2)\". TLS doesn't exist anywhere in this stack. Setting `cookie.secure=true` over plain HTTP would make browsers drop the cookie on any non-localhost LAN address, so admin sign-in would stop working. The suggested fix therefore can't be applied without adding TLS, which is a separate architectural decision. The \"stolen cookie never expires\" point is also weak: the cookie is HttpOnly, SameSite=Strict, path-scoped to /api/admin, and writes need the XSRF token. The remaining risk is LAN sniffing on a private home network, which falls under the accepted threat model. At most this is a documentation or hardening note, not an incorrect mechanism in the code.",
+          "The mechanism is real, but the impact is small.\n\nConfirmed at `src/main/resources/application.yaml:44-49`: the session cookie sets `http-only: true` and `same-site: strict`, with no `secure`. The only session limit is the 8 h idle timeout at line 42, which `AdminIdleTimeoutFilter` also enforces. I did not read the filter itself. I found no absolute lifetime anywhere.\n\n`tools/stack.mjs` (and the NFR-2 guard it implements) allows `DOUCKO_BIND_ADDRESS` to be 127.0.0.1 or the laptop's home-LAN address. Nothing in the repo terminates TLS, so on a LAN bind the admin password and cookie do cross the network in cleartext.\n\nThree things limit how much this matters:\n- **Attacker position:** the attacker has to be on the same home LAN and able to sniff or ARP-spoof. That is a small, trusted network for a single-family tutoring app.\n- **The suggested fix:** setting `cookie.secure=true` without adding TLS would break admin login over plain HTTP. Browsers drop Secure cookies on non-localhost HTTP. Only the \"terminate TLS at nginx\" half of the suggestion works.\n- **Absolute lifetime:** this only matters after the cookie has already been stolen. It is a hardening idea, not a vulnerability.\n\nI could not find the LAN plain-HTTP risk documented in the repo. My search of `docs`, `src`, README, `.env.example`, `compose*.y*ml` and `openspec` for plain HTTP, cleartext or HTTPS found nothing relevant. So the finding stands as a documentation gap and a hardening suggestion. It does not stand as an exploitable defect, and I would lower it below \"minor\"."
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "title": "Problem builder can throw on a malformed request URI, turning a 400/404 into a raw 500",
+        "file": "src/main/kotlin/cz/doucko/shared/adapter/in/web/ProblemResponses.kt",
+        "line": 33,
+        "severity": "major",
+        "confidence": "low",
+        "evidence": "`this.instance = URI.create(instance.replace(\" \", \"%20\"))` only escapes spaces. `instance` is the raw `request.requestURI` (from ProblemErrorController, requestRejectedHandler and the security entry points). A URI with an invalid percent escape such as `/api/x%zz` or other illegal characters makes `URI.create` throw IllegalArgumentException. That happens inside the error dispatch or the RequestRejectedHandler, where no advice catches it.",
+        "suggestion": "Build the instance defensively. Try `URI.create` in a try/catch and fall back to an encoded form (`UriComponentsBuilder.fromPath(...).build().encode()`) or a fixed `about:blank`. Add a test that sends a malformed percent escape to a child path and to `/error`.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "I couldn't confirm that a malformed request URI reaches `URI.create` in `ProblemResponses.problem` (line 33). The code does what the finding says: the only escaping is `replace(\" \", \"%20\")`, and every caller passes the raw `request.requestURI`. The trigger inputs named in the finding, though, are very likely refused before any of this code runs. I haven't run a request to check, and I didn't read the Tomcat or Spring Security sources.\n\n- **Invalid percent escapes such as `/api/x%zz`:** by default Tomcat should reject these during request-path decoding and return its own 400 at the connector level.\n- **Illegal characters such as `{ } | \\ ^ < > \"` and backticks:** Tomcat's request-target parser should reject these by default.\n- **Other unusual paths:** Spring Security's `StrictHttpFirewall` rejects encoded slashes, `%25`, semicolons and similar. That rejection goes through `requestRejectedHandler`, which uses `ProblemResponses` with a path the firewall has already accepted.\n- **Spaces:** these are already escaped by the existing `replace`.\n\nThe only inputs I can think of that might get through are high-byte or control-character paths. I could not confirm any concrete one. The finding is also marked low confidence and offers no reproducing request, so I'm treating it as unconfirmed.",
+          "The cited example (/api/x%zz) never reaches ProblemResponses. Tomcat rejects malformed percent escapes and the URI-illegal path characters with its own 400 during request parsing, before Spring Security, the advices or the error controller run. The only remaining gap is raw C1 control bytes (0x80–0x9F) in the path, which would need a hand-crafted request. I could not confirm that Tomcat accepts them. Even if it did, the result would be a bodiless 500, not a data leak or a child-facing failure. I could not positively confirm an exploitable path."
+        ]
+      },
+      {
+        "title": "Admin sign-in has no throttling or lockout",
+        "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+        "line": 37,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`signIn` calls `credentials.matches(...)` on every request with no attempt counter, delay or rate limit. The sign-in path is also CSRF-exempt and open to any LAN client. The single admin password (NFR-1) can be guessed online at BCrypt speed with no friction or audit trail.",
+        "suggestion": "Add a small in-memory failure counter with exponential back-off or a short lockout for repeated 401s. Return a Retry-After header, or a 429 problem from the catalog.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The code does have no throttling, but that is deliberate. NFR-15 and OQ-23 say \"No lockout (LAN only, NFR-2)\". The admin-access spec has a \"No sign-in lockout\" requirement (contract/openspec/specs/admin-access/spec.md:227) and lists \"No account lockout, rate limiting, CAPTCHA or two-factor sign-in\" as out of scope (line 326). A test, AdminSessionTest, checks that 20 failed sign-ins do not lock the account. The same finding was already reviewed and rejected: the archived review-findings.json for implement-admin-access-api records \"The store spec excludes lockout and rate limiting\". Adding a lockout or 429 would break the spec, so this is not a defect.",
+          "The code does have no throttling, but that is a deliberate product decision. The spec admin-access has \"Requirement: No sign-in lockout\" (spec.md:227) and lists \"No account lockout, rate limiting, CAPTCHA or two-factor sign-in\" as out of scope (spec.md:326). NFR-15 says \"No lockout (LAN only, NFR-2)\". OQ-23 and the archived implement-admin-access-api design.md also name lockout and rate limiting as non-goals. The password must be at least 12 characters (NFR-16), and the backend refuses to start with a shorter one. Adding a lockout would contradict the contract. The finding describes accepted, documented behavior, not a defect. Exposure is also limited to LAN clients."
+        ]
+      },
+      {
+        "title": "Display name trim ignores Unicode whitespace, so a blank-looking name passes validation",
+        "file": "src/main/kotlin/cz/doucko/profile/domain/DisplayNamePolicy.kt",
+        "line": 29,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`raw?.trim()` is Kotlin's `CharSequence.trim()` (isWhitespace). It does trim NBSP-class characters in Kotlin. But the Cc check does not cover U+200B, U+2009 or other format and space characters. The DB constraint `length(btrim(display_name)) > 0` only strips ASCII spaces. A name made only of U+200B is accepted by both and shows as blank in HQ.",
+        "suggestion": "Also reject names that contain no visible character, for example when every code point is category Cf or Zs. Add the matching violation message.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The facts in the finding are correct. At DisplayNamePolicy.kt:29, `trim()` uses Kotlin `isWhitespace`, which does not cover U+200B (category Cf). A name made only of U+200B therefore passes `check`. I did not check the DB constraint or the HQ rendering, and I did not read the store spec itself.\n\nThis is not a defect in the code. The KDoc at lines 3-7 says the policy implements the spec rules: trim surrounding whitespace, 1-50 code points, no Cc, no U+FFFD. The code does exactly that. Rejecting invisible format characters is a stricter rule the spec doesn't ask for, not a bug in this mechanism.\n\nThe input is also operator-controlled. The name comes from the `DOUCKO_CHILD_DISPLAY_NAME` env var, set once in `.env` before first start. It is not child or user input, so the \"no raw 500\" and attacker concerns don't apply. The worst case is a self-inflicted blank-looking name.\n\nThe finding's own confidence is low. Whether HQ renders a blank name was not verified.\n\nThis is a spec-hardening suggestion, not a correctness bug.",
+          "The code mechanism is real. `DisplayNamePolicy.check` (line 29) trims with Kotlin `trim()`. It then rejects only an empty name, U+FFFD, Cc control characters, and names over 50 code points. A name made only of U+200B (Cf) or similar would pass, and the DB `btrim` check wouldn't stop it. Kotlin `isWhitespace` does not include U+200B.\n\nThe problem can't be exploited, though. The only input is the `DOUCKO_CHILD_DISPLAY_NAME` environment variable, set in the operator's `.env` before the first start. That is the parent configuring their own single-family deployment. No child, API caller or attacker can supply this value. The finding has no security impact and no data integrity impact. The worst case is that the parent deliberately or accidentally pastes an invisible-only name and sees a blank name in HQ. That is self-inflicted, and the parent can fix it by editing `.env`.\n\nThe class doc says the implementation follows the store spec's explicit rules: trim, 1–50 code points, no Cc, no U+FFFD. The behaviour matches those rules, so it is a spec-conformant edge case, not a defect. The finding's own confidence is \"low\" and its severity is \"minor\"."
+        ]
+      },
+      {
+        "title": "DNS-rebinding firewall rejects IPv6 literals and any other LAN host name",
+        "file": "src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt",
+        "line": 50,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`setAllowedHostnames { host -> host == \"localhost\" || host == \"backend\" || IPV4.matches(host) }` accepts only dotted-quad IPv4, `localhost` and `backend`. `[::1]` and an mDNS or router host name for the laptop get 400. The IPV4 regex also accepts impossible octets such as 999.1.1.1. This is not a security hole, but it can lock the child out when the LAN address is reached by name.",
+        "suggestion": "Validate octets 0-255. Make the allowed hosts configurable (for example `doucko.security.allowed-hosts`) so the owner can add the laptop's host name without a code change.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The code does what the finding says: the allowlist is `localhost`, `backend` and dotted-quad IPv4. So `[::1]` and LAN host names get 400, and the regex accepts `999.1.1.1`. But this is the intended behaviour, not a bug. The KDoc above the bean says that only `localhost`, a bare IPv4 address and the Compose service name `backend` are answered. It says this is the same rule as the frontend's nginx and exists as a DNS-rebinding guard under NFR-2. Rejecting arbitrary host names is the point of the guard, because an allowed name is the opening a rebinding attack uses. The `999.1.1.1` case has no effect: nobody can reach the server through an impossible address, and the finding itself concedes this is not a security hole. The finding cites no requirement that the child reach the laptop by name or by IPv6, so the lockout is speculation. Its suggestions, validating octets and making the allowlist configurable, are enhancements rather than corrections. I did not check the nginx config or NFR-2 text, and I did not look for callers. The cited code is a single bean with no other callers that could change this.",
+          "The allowlist (localhost, backend, bare IPv4) is a deliberate, documented DNS-rebinding guard (NFR-2) that mirrors the frontend nginx rule. Child access is via the LAN IPv4 address, which is accepted. Rejecting other host names is the intended behavior, not a defect. The loose octet regex has no security effect, and the finding concedes it is not a security hole. No supported scenario shows a real lockout; at most this is a configurability enhancement request. I did not check the nginx config."
+        ]
+      },
+      {
+        "title": "Release review part (a) covered only partly: no scenario-by-scenario audit against the store specs",
+        "file": "openspec/changes/release-review-api/tasks.md",
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "The review read the admin, shared, profile and checking sources, the archived admin-access tasks.md and V1__child_profile.sql. It did not open the store specs (admin-access, child-profile, answer-checking, platform-foundation), contract/api/openapi.yaml, or contract/docs/mvp-capability-plan.md. No requirement-to-scenario checklist was built. Coverage summary: 0 scenarios formally enumerated; no scenario was found missing or contradicted in the code that was read.",
+        "suggestion": "Re-run the audit with the store specs and openapi.yaml loaded, covering OpenAPI status codes and undocumented fields. The checking golden table (FR-23) and the property tests were not reviewed, and neither were the practice, progress and storage modules.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding isn't about a defect in the code. It says a review process did not read certain specs, but its own evidence admits \"no scenario was found missing or contradicted.\" The cited file, `openspec/changes/release-review-api/tasks.md`, is only a task checklist. Tasks 2.1 (review-gate over `38b56c8..HEAD`) and 2.2 (disposition findings) are still unchecked, so the review it describes has not finished. The file makes no claim of full scenario-by-scenario coverage. Incomplete coverage by a reviewer is not a spec-compliance violation in the code, and the finding names no concrete requirement that is violated. I could not confirm any wrong mechanism, so I'm treating it as refuted.",
+          "The finding doesn't describe a defect that a user or attacker could trigger. It is a complaint about how thorough a review process was, not a bug in the code. The cited tasks.md contains only an unchecked task list: 2.1 (review-gate over the range) and 2.2 (disposition findings) are both still open. It has no \"part (a)\" audit, no coverage summary and no \"0 scenarios enumerated\" claim, so the quoted evidence doesn't appear at the cited location. The finding also says \"no scenario was found missing or contradicted\", so it identifies no actual spec violation. The review itself hasn't finished yet, so an incomplete audit is expected at this stage. Nothing is exploitable or reproducible."
+        ]
+      },
+      {
+        "title": "Single-row profile creation is not guarded against a concurrent first start",
+        "file": "src/main/kotlin/cz/doucko/profile/adapter/out/persistence/JpaChildProfileStore.kt",
+        "line": 15,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "ChildProfileInitializer.afterPropertiesSet() calls exists() and then create(), which is a check-then-act without a lock. The id=1 CHECK/PRIMARY KEY in V1 stops a second row, so a race would surface as a startup DataIntegrityViolation. A missing row would make updateSettings() fail on checkNotNull (IllegalStateException, which would be a raw 500 if it were ever hit). Hitting either needs two backend instances starting at once, so this is unlikely in the single-laptop deployment.",
+        "suggestion": "Make create idempotent with INSERT ... ON CONFLICT DO NOTHING. Optionally map the missing-row case to a problem response.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The check-then-act in ChildProfileInitializer.afterPropertiesSet() is real (exists() at line 18, then create() at line 21, with no lock). It is not a defect, though.\n\n- **The race needs two backend instances starting at once.** The project is a single-laptop deployment, and the finding itself concedes this.\n- **The worst outcome is a loud, safe startup failure.** The loser of the race would get a DataIntegrityViolation at startup. The id=1 PRIMARY KEY/CHECK keeps exactly one row. That instance fails to start, and the winner's row is intact. No data is corrupted and no request is served.\n- **The \"missing row → raw 500\" scenario cannot happen.** The initializer runs during context refresh, before the web server takes requests. If create() fails, the process exits. If it succeeds, or the other instance created the row, the row exists. updateSettings() can therefore never run without a row, so the checkNotNull branch is unreachable in a started instance.\n- **There is no spec-compliance impact.** No user input can reach this path, so the \"no raw 500 from user input\" rule is not at stake.\n\nThe suggested ON CONFLICT DO NOTHING would be harmless hardening. It would not fix a bug that can actually occur, so the finding does not hold as a correctness defect.",
+          "The check-then-act in `ChildProfileInitializer.afterPropertiesSet()` (`exists()`, then `create()`) is real. But it can't be triggered by a user or attacker, and it has no lasting effect. No endpoint reaches it. It runs only during bean initialization at startup. Hitting it needs two backend instances to start against an empty database at the same moment. AGENTS.md describes a single-laptop deployment, so that setup doesn't occur.\n\nIf the race did happen, the id=1 primary key and CHECK constraint would reject the second insert. The losing instance would fail to start and be restarted. On restart `exists()` returns true and it proceeds. No duplicate row or corrupt data results.\n\nThe finding's second scenario, a missing row making `updateSettings()` hit `checkNotNull`, can't follow from the race. Either the winner inserted the row, or startup aborted before the app served any requests. The finding itself rates this minor with low confidence and concedes it is unlikely.\n\nI read only the two cited files. I did not check the V1 migration, so the id=1 constraint is taken from the finding's own description."
+        ]
+      },
+      {
+        "title": "Sign-in has no throttling; this is deliberate and no spec amendment was found",
+        "file": "src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt",
+        "line": 38,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "signIn() BCrypt-checks every attempt. The archived admin-access task 2.3 asserts '20 failures then success', so the absence of lockout looks intentional and bounded by the 72-byte check before BCrypt. I did not confirm this against the spec text.",
+        "suggestion": "Confirm that the admin-access spec states 'no lockout' explicitly. If it does not, amend the spec, since NFR-2 limits exposure to the LAN.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding's suggestion is to confirm that the admin-access spec explicitly says \"no lockout\", and to amend the spec if it doesn't. It does say so. `contract/openspec/specs/admin-access/spec.md:227-237` has the requirement \"No sign-in lockout\". It states that failed sign-ins SHALL NOT lock the admin account or block the client, because the stack is LAN-only (NFR-15, NFR-2, decision OQ-23). It also has a scenario, \"20 consecutive failed sign-ins, then correct password succeeds with 204\". Line 326 of the same spec lists \"No account lockout, rate limiting, CAPTCHA or two-factor sign-in\" as an explicit non-goal. `AdminSessionController.signIn` (line 38) is just a credential check that throws `InvalidCredentialsException`, which matches that spec. So the absence of throttling is a documented, deliberate decision. There is no spec gap to amend and no code defect. The finding's own premise (\"no spec amendment was found\") is wrong, because the spec text exists. Earlier review-gate runs also raised the same concern and treated it as an accepted risk.",
+          "The finding asks to confirm the admin-access spec states \"no lockout\" explicitly. It does: contract/openspec/specs/admin-access/spec.md:227-237 has the requirement \"No sign-in lockout\" (decision OQ-23, NFR-15/NFR-2) with a 20-failures-then-success scenario, and line 326 also lists \"No account lockout, rate limiting, CAPTCHA or two-factor sign-in\". AdminSessionController.signIn (line 38) matches the spec, so there is no spec-compliance defect and no amendment is needed. LAN-only online guessing is an accepted, documented risk (12-character minimum password), not a compliance gap."
+        ]
+      },
+      {
+        "title": "Unguarded URI.create on the raw request URI can turn a malformed URL into a non-problem error",
+        "file": "src/main/kotlin/cz/doucko/shared/adapter/in/web/ProblemResponses.kt",
+        "line": 33,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`this.instance = URI.create(instance.replace(\" \", \"%20\"))`. `instance` is the raw `request.requestURI` (also ERROR_REQUEST_URI). `ProblemResponses.write` is also what the firewall's RequestRejectedHandler and `ProblemErrorController` call for rejected or malformed URLs. A URL with a malformed percent escape such as `/x%zz`, or a character URI rejects, makes `URI.create` throw IllegalArgumentException inside that error path. The client then gets the container's fallback error page instead of RFC 7807. This is the case NFR-9 and the 'no raw 500' rule cover. I could not run the code to confirm which characters actually reach this code.",
+        "suggestion": "Build the instance defensively: wrap URI.create in a try/catch and fall back to omitting `instance` or to a re-encoded path (e.g. `UriComponentsBuilder.fromPath(...).build().encode()`). Add a test that sends `/x%zz` and `/a|b` and asserts problem+json.",
+        "dimension": "visual",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "I could not confirm that a request reaches this line with a string `URI.create` rejects. The code is as the finding says: `ProblemResponses.kt:33` calls `URI.create(instance.replace(\" \", \"%20\"))` with no guard. `ProblemResponses.write` passes `request.requestURI`, and `ProblemErrorController` passes `ERROR_REQUEST_URI`. The finding's own examples are the problem.\n\n- **Tomcat stops them first.** Tomcat's request-line parser rejects `|`, `{`, `}`, `^`, `` ` ``, `<`, `>`, `\"` and `\\` in the path by default, and returns a 400 itself.\n- **`/x%zz` (malformed percent escape).** `CoyoteAdapter.postParseRequest` hits the decode failure and sends 400 before the host valve or any error-page dispatch. So `ProblemErrorController` never runs. Spring Security's filter chain and its `RequestRejectedHandler` never run either, because they sit behind the servlet pipeline.\n- **Requests the firewall does reject.** The `StrictHttpFirewall` rejections that do reach `RequestRejectedHandler` are `;`, `//`, encoded `%2e`, `%2f`, `%5c` and `%25`. Raw `requestURI` for those is still a legal URI string, so `URI.create` succeeds.\n- **Spaces.** These are already handled by the explicit replacement.\n\nI found no realistic path to the claimed `IllegalArgumentException`. The finding itself says it could not confirm which characters reach this code. Defensive hardening would be harmless, but the claimed mechanism is not demonstrated.",
+          "URI.create is unguarded, but I found no real request that reaches it with a string it rejects. Tomcat rejects malformed percent escapes (/x%zz) and the characters | { } ^ [ ] \\ < > \" ` in the request target at the connector, before any servlet or Spring Security code runs. Spaces are already handled by the replace. The firewall-rejected cases (//, ;, %25) are still valid URI strings, and non-ASCII characters are accepted by URI.create. The other callers pass requestURI from requests that already routed through the connector and firewall. The finding itself says it could not confirm which characters reach this code. I did not run any requests, so this rests on known Tomcat behaviour."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/release-review-api/review-findings.json"
+  }
+}
