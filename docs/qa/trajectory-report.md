@@ -19,7 +19,7 @@ Result: PASS, 3 warning(s)
 | 2026-10-05-fix-restore-schema-drift | clean | 3 | yes | - |
 | 2026-10-05-implement-practice-flow-api | clean | 4 | yes | practice, content, profile, shared |
 | 2026-10-07-implement-gamification-api | clean | 4 | yes | practice, content |
-| 2026-10-08-harden-phase5-api | clean | 4 | yes | - |
+| 2026-10-08-harden-phase5-api | clean | 6 | yes | - |
 | 2026-10-08-implement-progress-stats-api | clean | 6 | yes | practice, content |
 
 ## Cross-slice module overlap
