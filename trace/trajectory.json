@@ -106,7 +106,7 @@
     {
       "slice": "2026-10-09-release-review-api",
       "reviewEvidence": "clean",
-      "trailerCommits": 4,
+      "trailerCommits": 5,
       "libDomains": [
         "content",
         "practice"
