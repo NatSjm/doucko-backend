@@ -157,6 +157,7 @@
       "tests": [
         "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
         "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
+        "src/test/kotlin/cz/doucko/content/ContentAuthoringIT.kt",
         "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
         "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
         "src/test/kotlin/cz/doucko/content/TaskApiTest.kt",
@@ -754,6 +755,7 @@
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeRulesTest.kt"
       ],
       "recordings": []
@@ -1185,6 +1187,7 @@
         "src/test/kotlin/cz/doucko/practice/FlagQueueServiceTest.kt",
         "src/test/kotlin/cz/doucko/practice/FlagQueueServiceTest.kt",
         "src/test/kotlin/cz/doucko/practice/FlagQueueServiceTest.kt",
+        "src/test/kotlin/cz/doucko/practice/PracticeIT.kt",
         "src/test/kotlin/cz/doucko/practice/PracticeLogCaptureIT.kt",
         "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",
         "src/test/kotlin/cz/doucko/practice/ReevaluationRulesTest.kt",

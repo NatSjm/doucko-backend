@@ -18,6 +18,7 @@ import org.springframework.boot.test.system.CapturedOutput
 import org.springframework.boot.test.system.OutputCaptureExtension
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
+import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import java.io.File
@@ -283,5 +284,18 @@ class ContentAuthoringIT {
         mvc.adminGet(admin, "/api/admin/tasks", "q" to sentinel)
         mvc.uploadSource(admin, Files.pdf(1), "title" to sentinel, "grade" to "6", "subject" to "math")
         output.all shouldNotContain sentinel
+    }
+
+    // @trace FR-3
+    @Test
+    fun `a NUL character in task text is a 400 problem, not a conflict or a 500, and stores nothing`() {
+        val sourceId = source()
+        for (field in listOf("prompt" to "\"a\u0000b\"", "hints" to """["a\u0000b"]""")) {
+            mvc.adminJson("POST", admin, "/api/admin/tasks", taskJson(sourceId, field)).andExpect {
+                status { isBadRequest() }
+                content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+            }
+        }
+        jdbc.queryForObject("SELECT count(*) FROM task", Int::class.java) shouldBe 0
     }
 }
