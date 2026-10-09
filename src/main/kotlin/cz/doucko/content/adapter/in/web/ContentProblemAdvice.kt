@@ -11,6 +11,7 @@ import cz.doucko.content.domain.FieldError
 import cz.doucko.shared.adapter.`in`.web.ProblemResponses
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
+import org.slf4j.LoggerFactory
 import org.springframework.context.MessageSource
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.multipart.support.MissingServletRequestPartException
+import java.sql.SQLException
 
 /**
  * Problem responses of the content operations (contract `Problem`, info "Conventions"). Titles, details
@@ -38,6 +40,8 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 class ContentProblemAdvice(
     private val problems: ContentProblems,
 ) {
+    private val log = LoggerFactory.getLogger(ContentProblemAdvice::class.java)
+
     @ExceptionHandler(InvalidContent::class)
     fun invalid(
         exception: InvalidContent,
@@ -56,9 +60,28 @@ class ContentProblemAdvice(
         setProperty("conflicts", exception.conflicts)
     }
 
-    /** A concurrent edit broke a database rule between the check and the write (e.g. a task saved for a source being deleted). */
+    /**
+     * A database rule refused the write. A constraint violation (SQLSTATE class 23) means a concurrent edit broke
+     * a rule between the check and the write (e.g. a task saved for a source being deleted): 409. A data
+     * exception (class 22, e.g. a NUL character, which Postgres text and JSONB refuse) is invalid input: 400.
+     * Only the SQLSTATE is logged, never the value.
+     */
     @ExceptionHandler(DataIntegrityViolationException::class)
-    fun integrity(request: HttpServletRequest) = problems.respond(request, HttpStatus.CONFLICT, "content-conflict")
+    fun integrity(
+        exception: DataIntegrityViolationException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ProblemDetail> {
+        val state =
+            generateSequence<Throwable>(
+                exception,
+            ) { it.cause }.filterIsInstance<SQLException>().firstNotNullOfOrNull { it.sqlState }
+        log.warn("content write refused by the database: SQLSTATE {}", state)
+        return if (state?.startsWith("22") == true) {
+            problems.respond(request, HttpStatus.BAD_REQUEST, "content-text-invalid")
+        } else {
+            problems.respond(request, HttpStatus.CONFLICT, "content-conflict")
+        }
+    }
 
     @ExceptionHandler(UnsupportedUpload::class)
     fun unsupported(

@@ -1,0 +1,898 @@
+{
+  "workflow": "review-gate",
+  "file": "./.claude/workflows/review-gate.js",
+  "description": "Multi-dimensional adversarial review of a diff or capability: correctness, security, and spec compliance, with every finding adversarially verified before it is reported.",
+  "dryRun": false,
+  "startedAt": "2026-10-09T18:10:39.243Z",
+  "finishedAt": "2026-10-09T18:17:04.491Z",
+  "args": {
+    "scope": "Phase 7 global release review of the backend (release-review-api), part b: content module",
+    "baseRef": "38b56c8",
+    "headRef": "HEAD -- src/main/kotlin/cz/doucko/content",
+    "change": "release-review-api",
+    "focus": "This is the once-per-release whole-history review; slice reviews already happened per slice, so prioritise CROSS-MODULE and cross-slice defects. This run covers ONLY: src/main/kotlin/cz/doucko/content (read other modules only for context at call sites). Requirements: contract/docs/requirements.md; ownership table in contract/docs/mvp-capability-plan.md; API in contract/api/openapi.yaml. Check especially: answer keys leaking to child endpoints before reveal (FR-27, NFR-1); admin endpoints reachable without the admin; any user input producing a raw 500 or driver internals (RFC 7807 required); UNPARSEABLE consuming an attempt (FR-22); attempts persisted immediately (FR-31); XP ledger never reduced (FR-38); Europe/Prague week boundaries in stats; module boundaries (Spring Modulith); migrations append-only and consistent with entities; concurrency (double submit, races on attempts/XP); path traversal / upload limits in storage; no secrets committed; tools never addressing the owner's compose project 'doucko'. Skip tests unless they mask a defect."
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": "sonnet",
+    "budgetPerAgentUsd": 1.2,
+    "maxTotalUsd": 3.75,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 2.5753,
+  "steps": [
+    {
+      "label": "find:correctness",
+      "phase": "Find",
+      "agentType": "code-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 1567,
+      "durationMs": 180157,
+      "sessionId": "56819f20-2453-42c3-96fd-5caab39f889f",
+      "costUsd": 0.3608426,
+      "numTurns": 24,
+      "result": {
+        "findings": [
+          {
+            "title": "Source update/delete and task create don't take the content lock, leaving a grade-lock / reference race",
+            "file": "src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+            "line": 77,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`update` checks `sources.referencingTasks(id)` before allowing a grade change, but never calls `lock.exclusive()`. `TaskService.create` (line 125) also takes no lock, so a task created against the source after the check but before commit can end up with a grade that no longer matches its source. The delete path relies on an FK and on the catch-all DataIntegrityViolation handler to cover the equivalent race.",
+            "suggestion": "Take `ContentLock.exclusive()` first in `SourceService.update`/`delete` and in `TaskService.create`, as the mission and task edit paths already do. Or lock the source row (`FOR UPDATE`) in the task save path."
+          },
+          {
+            "title": "Any DataIntegrityViolationException is reported as 'content-conflict' 409",
+            "file": "src/main/kotlin/cz/doucko/content/adapter/in/web/ContentProblemAdvice.kt",
+            "line": 60,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`integrity()` answers every `DataIntegrityViolationException` with the 409 'content-conflict' problem. The comment says it exists for a task saved against a source being deleted, but NOT NULL, value-too-long, CHECK and JSON-size violations are also `DataIntegrityViolationException`s. Those are validation gaps between the domain rules and the DB, and they would be shown to the admin as a conflict with no message and no log.",
+            "suggestion": "Log the exception class and constraint name server-side. Map only FK/unique violations (inspect the SQLState or constraint name) to 409. Let other integrity errors surface as a 400 or 500 so the gap is noticed."
+          },
+          {
+            "title": "Served-content queries are N+1 and load every task with its JSON each time",
+            "file": "src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+            "line": 34,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "`missions()` calls `servableIds()`, which loads every published TEXT task with parts, hints, translations and images. `mission()` and `missionsContaining()` use `servable(UUID)`, which runs `tasks.find` once per task id. `isServed` and `task()` each add `missions.containing(...)` queries. These sit on the child practice path, so per-request cost grows with the catalogue.",
+            "suggestion": "Add a store query that returns the ids of published TEXT tasks for a given id set. Return task ids and status in one query, or cache within the transaction."
+          },
+          {
+            "title": "PDF and image uploads are validated by magic bytes only, and PDFBox parses the whole file in a DB transaction",
+            "file": "src/main/kotlin/cz/doucko/content/adapter/out/pdf/PdfBoxInspector.kt",
+            "line": 17,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`Loader.loadPDF(content)` parses up to the whole 25 MB or more of PDF in memory with no memory or time bounds. `SourceService.upload` calls it inside `@Transactional`, so a DB connection is held during parsing and file I/O. `TaskService.addImage` only checks a 16-byte header, so a non-decodable or oversized-dimension image is stored and served as `image/png` or `image/jpeg`. The endpoints are admin-only, which limits the exposure.",
+            "suggestion": "Parse and inspect before opening the transaction, and use `Loader.loadPDF` with a memory-usage setting. Decode image dimensions with `ImageIO` and cap pixel count at upload."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:security",
+      "phase": "Find",
+      "agentType": "security-reviewer",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 1595,
+      "durationMs": 78589,
+      "sessionId": "64bb9016-7016-4102-a296-8df3a378778d",
+      "costUsd": 0.16661679999999998,
+      "numTurns": 13,
+      "result": {
+        "findings": [
+          {
+            "title": "Uploaded PDF is served inline with no sandbox/CSP of its own",
+            "file": "src/main/kotlin/cz/doucko/content/adapter/in/web/SourceController.kt",
+            "line": 60,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "getSourceFile returns the stored bytes as application/pdf with Content-Disposition: inline. The only check on upload is a 16-byte magic-header sniff plus a PDFBox page count, so a PDF with embedded JavaScript or links is accepted and rendered in the admin's browser. The route is admin-only, so the attacker would need a malicious PDF, for example a crafted workbook scan the admin uploads themself. I did not verify what X-Content-Type-Options or CSP headers the security chain adds.",
+            "suggestion": "Add `Content-Security-Policy: sandbox` and `X-Content-Type-Options: nosniff` to this response, or serve the PDF with `attachment` disposition. Confirm the Spring Security header defaults still apply to this route."
+          },
+          {
+            "title": "Clean areas in the content module (checklist coverage)",
+            "file": "src/main/kotlin/cz/doucko/content/ServedContent.kt",
+            "line": 26,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "The checks below cover only the files I read: FilesystemFileStorage, SourceController, SourceService, TaskController, ServedContentService, ServedContent, the TaskService.addImage path and the JdbcTaskStore image methods. I did not read ApiMapping, JsonReaders, ContentProblemAdvice, the mission code or the security config. (1) Authz: the content module has no child controllers. The child surface is the ServedContent interface, which only returns PUBLISHED TEXT tasks inside PUBLISHED missions and exposes no mutation. All Source, Task and Mission controllers implement Admin*Api. I did not inspect the security config, so server-side enforcement of those routes is unconfirmed. (2) Answer-key leak: ServedPart.spec is the full AnswerSpec. The public ServedContent interface hands it to practice, whose DTO mapping decides what the child sees. That is out of scope here, but the practice review must check that spec is never serialised before the reveal. (3) Path traversal: storage keys are server-generated (`sources/<uuid>.pdf`, `images/<uuid>.png|jpg`) and `locate()` normalises and enforces `startsWith(root)`. The root is rejected if it lies inside a git working tree. (4) Upload limits: size is checked before and after the read, with the read bounded to limit+1 bytes. Image type is detected by magic bytes and limited to PNG/JPEG. The stored media type comes from detection, not from the client. (5) SQL: the JDBC stores I read use bound `?` parameters, and I saw no string interpolation. (6) Delete race: `task.source_id` has a `REFERENCES source ON DELETE RESTRICT` foreign key (V2 migration), so the check-then-delete in SourceService.delete cannot orphan tasks. (7) Image add races are serialised by `tasks.lock(taskId)`.",
+            "suggestion": "No action in this module. In the practice and web review, verify that ServedPart.spec and accepted answers are not serialised into child DTOs before the reveal (FR-27). In the security review, verify the admin matcher covers every Admin*Api route."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:spec-compliance",
+      "phase": "Find",
+      "agentType": "spec-compliance-auditor",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob,Bash --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 1538,
+      "durationMs": 78384,
+      "sessionId": "95173bd5-3dea-45c7-8ce3-5b51774f1fe7",
+      "costUsd": 0.21211420000000003,
+      "numTurns": 17,
+      "result": {
+        "findings": [
+          {
+            "title": "Blanket DataIntegrityViolationException→409 hides non-conflict constraint failures",
+            "file": "src/main/kotlin/cz/doucko/content/adapter/in/web/ContentProblemAdvice.kt",
+            "line": 60,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "@ExceptionHandler(DataIntegrityViolationException::class) answers every integrity violation with 409 'content-conflict' and no 'conflicts' list. The comment only anticipates a source-deletion race. A length/NOT NULL violation on a JSONB or varchar column would also surface as a misleading 409. It is still RFC 7807 with no driver text, so there is no raw 500 and no leak.",
+            "suggestion": "Narrow the handler to the known FK/unique constraint names, or add a test that every content field limit is validated before the database. Amend the spec/openapi note if 409 is intended."
+          },
+          {
+            "title": "ServedContent API hands the raw answer key (AnswerSpec) to consumers; non-leak relies entirely on the practice module's mapping",
+            "file": "src/main/kotlin/cz/doucko/content/ServedContent.kt",
+            "line": 26,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "ServedPart.spec: AnswerSpec is documented as 'the answer key: practice may use it only to grade and, after the reveal, to show the first accepted answer (FR-27)'. The content module enforces no structural separation. The only child-image path (practice PracticeMapping 'images' -> /api/child/images/{id}) and the TaskView mapping are in practice, outside this review's scope. Content itself does not leak.",
+            "suggestion": "Keep or add an IT in practice asserting that no child response before the reveal contains accepted/spec fields. Consider a separate grading-view type so the display view carries no key."
+          },
+          {
+            "title": "Served-content checks do N+1 task loads per request",
+            "file": "src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+            "line": 39,
+            "severity": "minor",
+            "confidence": "medium",
+            "evidence": "missionsContaining/mission/isServed call servable(taskId) = tasks.find(taskId) once per task id, then missions.containing(taskId). task() and image() each repeat these lookups, and every child task fetch re-queries. This is a latent performance issue, not a correctness one.",
+            "suggestion": "Add a batch TaskStore lookup (findAll(ids)) and reuse the already loaded Task. Not a release blocker."
+          },
+          {
+            "title": "Storage write-before-insert leaves orphan files on crash; storage root check ignores symlinks",
+            "file": "src/main/kotlin/cz/doucko/content/adapter/out/files/FilesystemFileStorage.kt",
+            "line": 45,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "Keys are server-generated (sources/<uuid>.pdf, images/<uuid>.<ext>), so path traversal is not reachable from user input, and locate() normalises and checks startsWith(root). SourceService.upload stores the file before sources.insert and cleans up via onRollback, so a JVM crash between the two leaves an orphan file. StorageRoot.check only walks lexical parents for .git and does not resolve symlinks (toRealPath).",
+            "suggestion": "Optionally use toRealPath in StorageRoot.check and add an orphan-sweep note to current-state. Traversal and upload limits are otherwise OK: size is checked before and after read, magic bytes are detected, and 413/415 come back as problem+json."
+          }
+        ]
+      }
+    },
+    {
+      "label": "find:visual",
+      "phase": "Find",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1807,
+      "durationMs": 90491,
+      "sessionId": "8acc547e-27a4-4e2c-be44-14595d2728db",
+      "costUsd": 0.31138119999999997,
+      "numTurns": 22,
+      "result": {
+        "findings": [
+          {
+            "title": "Delete/edit guards fail open if the ContentUsage port is missing",
+            "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+            "line": 90,
+            "severity": "major",
+            "confidence": "medium",
+            "evidence": "`usageProvider.getIfAvailable { ContentUsage.NONE }` (same in MissionService.kt:42). The only real implementation is practice's `PracticeContentUsage`. If that bean is absent (slice, profile or wiring change), every task or mission with attempts, reports or opened hints looks unused. `TaskService.delete` and `MissionService.delete` then pass `MissionRules.taskDelete` and `missionDelete` with `used=false`, and the task is deleted.",
+            "suggestion": "Make `ContentUsage` a required constructor dependency. Spring Modulith already guarantees the bean exists in the full app. If tests need a stub, provide it as a test bean. At minimum, fail closed instead of defaulting to NONE."
+          },
+          {
+            "title": "Source update/delete take no content lock, so they race with task creation",
+            "file": "src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+            "line": 66,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`update` (grade-lock check via `referencingTasks`) and `delete` run without `lock.exclusive()` or a row lock. `TaskService.create` and `update` validate the source and grade, then insert, also without a lock. A task created concurrently with a source grade change can end up with a grade that differs from its source's. A concurrent delete is only caught later as a DataIntegrityViolation, which maps to a generic 409.",
+            "suggestion": "Take `SELECT ... FOR UPDATE` on the source row in `update` and `delete`, and in task `validate`/`insert`. Alternatively use `lock.exclusive()` consistently."
+          },
+          {
+            "title": "PdfBox parsing of untrusted 50 MB uploads is in-memory, with no resource guard",
+            "file": "src/main/kotlin/cz/doucko/content/adapter/out/pdf/PdfBoxInspector.kt",
+            "line": 17,
+            "severity": "minor",
+            "confidence": "low",
+            "evidence": "`Loader.loadPDF(content)` loads the whole file into memory with default memory settings. The `catch (_: Exception)` does not catch `OutOfMemoryError` or `StackOverflowError`, which a crafted PDF (deep page tree, huge object or xref streams) can raise. An error like that would surface as a raw 500 rather than the RFC 7807 `pdf-unreadable` problem.",
+            "suggestion": "Load with `MemoryUsageSetup.setupTempFileOnly()` or a mixed-mode limit. Optionally catch `StackOverflowError` and `OutOfMemoryError` around the parse and map them to unreadable. Keep the 50 MB multipart cap."
+          }
+        ]
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1293,
+      "durationMs": 37736,
+      "sessionId": "d13b7a51-8c68-4a59-a563-d21f53b885d9",
+      "costUsd": 0.0724798,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "Confirmed by reading the code. SourceService.update (lines 66-84) and delete (86-93) never take ContentLock; SourceService has no ContentLock dependency. TaskService.create (124-129) takes no lock, while TaskService update/delete/setStatus and the MissionService paths all call lock.exclusive(). create runs validate(draft), which uses the source via TaskContext, so a concurrent source grade change that passes the referencingTasks check before the task commits can leave a task whose grade no longer matches its source under READ COMMITTED. The delete race is covered by the FK, as the finding says. The window is narrow (two admin writes at once), so minor severity and low confidence are right. I did not read TaskRules to confirm the exact grade-match rule.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1326,
+      "durationMs": 37488,
+      "sessionId": "2497bf40-e034-46c9-9371-8f8e3868ae85",
+      "costUsd": 0.0738438,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The race mechanism is real in the code. SourceService.update (lines 66-84) never calls lock.exclusive(), while the mission and task update/delete/setStatus paths do. TaskService.create (124-129) takes no lock either. TaskRules.validate runs with the source in its context (line 294), so it presumably checks task grade against source grade. Under Postgres READ COMMITTED, the sequence is: update checks referencingTasks (empty), a concurrent create validates against the old grade and inserts, then update commits the new grade. That leaves a task whose grade no longer matches its source. Nothing in the code I read prevents it, and I did not find a DB constraint or transaction isolation setting that does. The delete path is covered by the FK, as the finding says. Practical exploitability is very low. It needs two concurrent admin writes to the same source in a single-admin tutoring app, and the result is a content inconsistency, not a security or child-facing issue. I'm keeping the finding, but at minor severity and low confidence it's a hardening item.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/in/web/ContentProblemAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1294,
+      "durationMs": 36649,
+      "sessionId": "11b856a1-61ee-48f7-a17c-711c98bc8ee6",
+      "costUsd": 0.0554554,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "ContentProblemAdvice.integrity() (line 60-61) catches every DataIntegrityViolationException with no inspection of cause, SQLState or constraint name, and always returns 409 content-conflict. It doesn't log. NOT NULL, length and CHECK violations would be misreported as conflicts and leave no server-side trace. The advice has HIGHEST_PRECEDENCE and applies to the Source, Task, Mission and Reference controllers, so nothing overrides it there. Two overstatements: the response does carry a generic title and detail from the problem key (only the specific `conflicts` property is absent), and I did not check whether domain validation already prevents the non-FK/unique violations, so reachability is unverified. The finding stands as a minor, latent diagnosability issue.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/in/web/ContentProblemAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1327,
+      "durationMs": 36588,
+      "sessionId": "480d7b14-61a3-4b7b-b6f9-055ae60517c6",
+      "costUsd": 0.0533232,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "The code matches the finding. `ContentProblemAdvice.kt:60-61` has an `@ExceptionHandler(DataIntegrityViolationException::class)` that returns 409 \"content-conflict\" for any integrity violation. It doesn't inspect the SQLState or constraint name, and it doesn't log. Spring wraps NOT NULL, length, CHECK, FK and unique violations in this same exception, so they all become 409. The handler has the highest precedence and covers the Source, Task, Mission and Reference controllers.\n\nThe finding overstates two things:\n- The 409 response isn't empty. `problems.respond` builds a catalog-based problem from the \"content-conflict\" key, so it should carry a title and detail. I didn't open `ProblemResponses` to check. The missing log is real.\n- I haven't shown a concrete input that triggers a non-FK/unique violation. Domain validation (`InvalidContent` → 400) probably catches most cases first. The harm is therefore hypothetical: a future domain/DB validation gap would be mislabelled as a conflict and hidden from logs.\n\nThe impact is real but small. It's a diagnosability problem on an admin-only path. It can't be triggered by an attacker to cause harm, and it leaks no driver internals. Minor severity is appropriate.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1185,
+      "durationMs": 21344,
+      "sessionId": "e68ddd19-4bae-4fa8-8e24-e432cddda80b",
+      "costUsd": 0.0445806,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "The code matches the finding. `missions()` calls `servableIds()`, which runs `tasks.list(...)` with a PUBLISHED and TEXT filter. That loads the full Task objects for every published text task, including parts, hints, translations and images. `mission()` and `missionsContaining()` pass `::servable` to `served(...)`. That resolves to `servable(UUID)`, which calls `tasks.find(taskId)` once for each task id in a mission, so it is an N+1 pattern. `isServed()` and `task()` each add a `missions.containing(...)` call through `inPublishedMission`, and `task()` also calls `tasks.find`. Nothing in this file caches or batches these calls. I did not check whether the stores cache `find` results. The claim is about performance and not wrong results: the outputs are correct, and the cost grows with catalogue size and mission size. Missions are probably small, so the real impact is low. The severity of minor is reasonable, and it is a performance issue more than a correctness one.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1218,
+      "durationMs": 21395,
+      "sessionId": "fa685ce6-29a5-4c8e-aece-c195580a7406",
+      "costUsd": 0.043828,
+      "numTurns": 3,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is confirmed in ServedContentService.kt. `missions()` calls `servableIds()`, which runs `tasks.list(...)` and loads every published TEXT task. `mission()` and `missionsContaining()` pass `::servable(UUID)` into `served()`. That runs `tasks.find` once per task id in the mission, which is the N+1. `isServed()` and `task()` each call `tasks.find` and then `missions.containing`, so a single request issues several queries. Nothing in the file caches or batches these calls, and the read-only `@Transactional` does not remove the repeated queries. I did not read the store implementations, so I did not check whether `tasks.find` hits a cache. The cost is a latency and scalability problem, not a correctness or security one. A mission holds only a handful of tasks, and this is a single-household tutor app with a small catalogue, so no user or attacker is realistically harmed. The finding is real but low impact, so I downgrade it.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/out/pdf/PdfBoxInspector.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1294,
+      "durationMs": 26188,
+      "sessionId": "8cdc4043-f60b-4822-8ac1-6fcda2a5b2c6",
+      "costUsd": 0.0692008,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding doesn't hold up as a correctness defect. The code facts are partly accurate, but the claimed failure isn't one.\n\n- **Size bounds exist.** `SourceService.upload` rejects files over `Limits.PDF_BYTES` twice, once on the declared size and once on the bytes read. `TaskService.addImage` does the same with `Limits.IMAGE_BYTES`. `application.yaml` also caps multipart at 50MB. So \"parses 25 MB or more with no bounds\" is overstated, because input is capped before `PdfBoxInspector` runs.\n- **Magic-byte-only image checks look deliberate.** `FileKind.detect` over a header is the designed validation. The image is stored with the media type taken from the detected kind. A corrupt image only breaks rendering for the admin who uploaded it, and nothing is mis-served or leaked.\n- **The inspector is hardened where it matters.** `PdfBoxInspector` requires `%%EOF`, rejects encrypted files, and catches every exception, so a malformed PDF gives a 4xx validation error and not a 500. Its KDoc says this is intended.\n- **The transaction point is a performance preference.** Parsing inside `@Transactional` does hold a connection briefly. But the endpoints are admin-only, uploads are rare, and the order is deliberate: every check runs before anything is stored, with rollback cleanup. This isn't a wrong mechanism.\n- **At most a low-risk hardening note.** The finding has low confidence and minor severity, and nothing in it shows incorrect behavior.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/out/pdf/PdfBoxInspector.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1327,
+      "durationMs": 27015,
+      "sessionId": "99f58fe7-64c3-4f34-ba09-21705dc612db",
+      "costUsd": 0.07175139999999999,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The cited code matches the finding, but exploitability fails. PDF and image sizes are capped before any parsing (Limits.PDF_BYTES, Limits.IMAGE_BYTES, 50MB multipart). PdfBoxInspector requires %%EOF, rejects encrypted files and catches all exceptions, so malformed input returns a validation error and not a 500. Images are never decoded server-side; they are stored and served by detected magic bytes, so there is no server-side decode DoS. Holding a DB connection during a bounded parse is a minor inefficiency, reachable only by the admin on a single-family app, with no realistic attacker who could exhaust the pool. The suggested changes are optional hygiene, not a reproducible problem.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/in/web/SourceController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1332,
+      "durationMs": 32854,
+      "sessionId": "5e380e1a-8eeb-4953-a1df-f262e3306e91",
+      "costUsd": 0.06430620000000001,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding is not a real defect. I read `getSourceFile` at SourceController.kt:60. It does return `application/pdf` with `inline` disposition, as claimed. The two mitigating factors the finding left unchecked both hold up. (1) The admin security chain (AdminSecurityConfiguration.kt:61-98) covers `/api/admin/**` and never disables or customizes headers. Spring Security's default headers therefore apply, including `X-Content-Type-Options: nosniff`, so that suggestion is already satisfied. (2) The route requires an authenticated admin plus CSRF. The only possible \"attacker\" is a PDF the admin uploads themself, and the finding admits this. Browsers render PDFs in their own sandboxed viewer, and `application/pdf` is not an HTML-executing type, so there is no same-origin script execution. The remaining suggestion, `CSP: sandbox`, is optional hardening. It is not a wrong mechanism, and it could break the in-browser PDF viewer that the spec requires (\"PDF viewer beside the editor\"). The finding is low confidence and speculative, so I refute it."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/in/web/SourceController.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1365,
+      "durationMs": 32425,
+      "sessionId": "1f09c33e-c2b9-421e-864c-06e1231d1b5a",
+      "costUsd": 0.0471974,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code matches the description. `getSourceFile` returns `application/pdf` with `Content-Disposition: inline`, and no custom security headers are set anywhere in `src/main`. I still don't think it's exploitable.\n\n- **Content type is fixed.** The response is always `application/pdf`, set by the server. The browser can't reinterpret the bytes as HTML. Spring Security's default header chain also sends `X-Content-Type-Options: nosniff` unless it is disabled. A grep of `src/main` for `headers`, `contentSecurityPolicy`, `nosniff` and `frameOptions` found no disabling or custom config.\n- **PDF JavaScript is sandboxed by the browser's PDF viewer.** In Chrome and Firefox it can't reach the app's DOM, cookies or origin. Chrome's PDFium viewer does not give PDF scripts script access to the embedding origin, and Firefox's pdf.js sandboxes scripting. A CSP `sandbox` header would add little there.\n- **The attack needs the admin to upload a malicious PDF themself.** The route is admin-only and has no child or third-party upload path. That makes it self-attack, not a boundary crossing.\n- **The finding's own evidence is low confidence and admits it didn't check the security headers.**\n\nI found no concrete, realistic exploit path. Adding `attachment` disposition or a CSP would be optional hardening, not a vulnerability."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/ServedContent.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 2598,
+      "durationMs": 26853,
+      "sessionId": "2dd39a93-aee8-4e45-8b6f-c8516d00fd65",
+      "costUsd": 0.0481336,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "This finding doesn't report a defect. It's a \"clean areas\" coverage note whose own suggestion is \"No action in this module.\" The claims I checked match the code. `ServedPart.spec` at `ServedContent.kt:26-32` is the full `AnswerSpec`, and its KDoc limits use to grading and to the post-reveal answer (FR-27). `V2__content_authoring.sql:45` has `source_id ... REFERENCES source (id) ON DELETE RESTRICT`. No wrong mechanism is claimed. The only forward-looking items are reminders for the practice and security reviews, and the finding itself says it didn't verify those. It carries no exploitable or incorrect behaviour in the cited location, so it isn't a valid finding.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/ServedContent.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 2631,
+      "durationMs": 25790,
+      "sessionId": "cae60821-f74c-4632-9175-7129cd48132c",
+      "costUsd": 0.0421382,
+      "numTurns": 3,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding is a \"clean areas\" checklist note, not a defect. It says \"No action in this module\". There is no exploitable problem to reproduce. I read ServedContent.kt. It matches the finding's description. ServedPart.spec is the full AnswerSpec, and its KDoc limits use to grading and the post-reveal display. ServedContent has no mutation methods. This is an internal module API, not an HTTP surface, so a real user or attacker cannot reach it directly. The only follow-up is a hand-off to the practice review to check that spec is not serialised before the reveal. That is a generic reminder, not a confirmed leak. The finding is not an actionable vulnerability, so I mark it refuted.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/in/web/ContentProblemAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1229,
+      "durationMs": 27221,
+      "sessionId": "b2bcfae5-f073-404b-be0d-ab1372218d12",
+      "costUsd": 0.06079300000000001,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The handler at ContentProblemAdvice.kt:60-61 does map every DataIntegrityViolationException to a 409 'content-conflict' with no conflicts list. That part of the finding is accurate. The claimed harm is not confirmed. The finding only says a length or NOT NULL violation \"would also\" surface as a misleading 409, and nothing in the code shows such a violation can reach the database. The content module has its own validation layer (InvalidContent producing 400 'content-invalid' with field errors, plus the multipart and body-size handlers), which suggests field limits are checked before the write. My search found no other DataIntegrityViolationException usage in the code. The only test reference is a fixture in ContentTestSupport.kt:194 that throws it with the message \"fk\", which matches the documented FK race. The handler is a deliberate catch-all fallback. It returns an RFC 7807 problem with no driver text, so there is no raw 500 and no leak. The reviewer admits this and rates the finding minor at medium confidence. What remains is a speculative design preference to narrow the handler, not a demonstrated defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/in/web/ContentProblemAdvice.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1262,
+      "durationMs": 33415,
+      "sessionId": "daaf4c4f-ad52-43ba-826c-3c0b8ab902a0",
+      "costUsd": 0.0804696,
+      "numTurns": 7,
+      "result": {
+        "refuted": true,
+        "reasoning": "The handler exists and is blanket, but the claimed trigger is unreachable. The V2 migration has no varchar(n) columns, only text/integer plus CHECK constraints. Every CHECK (page_count, difficulty, modality, status, page, position) is validated in the domain rules and JsonReaders, which return 400 content-invalid first. JSONB has no length limit, and bodies over 1MB get 413 from ContentBodyAdvice. The remaining integrity violations are FK/unique races, where 409 is correct. The response is RFC 7807 with no driver text and no leak. What's left is a hypothetical about future constraints, not something a real user or attacker can trigger. I didn't read V3 (missions) or the controllers and use cases.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/ServedContent.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1284,
+      "durationMs": 24207,
+      "sessionId": "639c00e6-cabf-46ad-b202-badc76cbdbc4",
+      "costUsd": 0.05806560000000001,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding doesn't identify a defect. It's a design-hardening suggestion, and it says itself that \"Content itself does not leak.\" ServedPart.spec carrying the key is deliberate and documented. The module's internal API has to hand the grader the spec. The one child-facing mapping, PracticeMapping.kt:106-117, builds PartView from only key, label, type, unit and options. It never reads accepted or the spec contents, so no key reaches the child before the reveal. No code path was found that leaks, and no wrong behavior is claimed. This is an optional refactor, not a correctness bug.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/ServedContent.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1317,
+      "durationMs": 24452,
+      "sessionId": "d401b8c8-18ae-4ef0-83d0-803713944ee3",
+      "costUsd": 0.0575352,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding describes a design smell, not a reachable leak. ServedContent is an internal module API, not an HTTP endpoint. The only child-facing mapping (practice/adapter/in/web/PracticeMapping.kt:106-116) builds PartView from key, label, type, unit and options only. It never emits accepted values or the spec. The other `.spec` uses are internal grading in practice (Rules.kt, PracticeService, ProgressStats) and the DeterministicTutor. The finding itself says \"Content itself does not leak.\" No attacker or user path to the answer key was found, so there is nothing to exploit or reproduce."
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1012,
+      "durationMs": 29846,
+      "sessionId": "ce11d6ef-95be-4745-82c4-a89c78dd5dcf",
+      "costUsd": 0.050947,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. In ServedContentService.kt, `missionsContaining` (line 39) and `mission` (line 41) pass `::servable` into `served()`. That filters `mission.content.taskIds` through `servable(taskId)` (line 66), which calls `tasks.find(taskId)` once per id. `isServed` and `task` each call `find` and `missions.containing` again. `JdbcTaskStore.find` is plain JDBC with no caching, so each call is a separate query. Only `missions()` batches, through `servableIds()`. The finding is correctly labelled minor and performance-only, and it makes no claim of incorrect output. The behaviour is correct, so this is a latent N+1 and not a bug.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1045,
+      "durationMs": 30865,
+      "sessionId": "febb3d11-7d2a-4455-ad1c-0a714f9030c5",
+      "costUsd": 0.0521768,
+      "numTurns": 4,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism is real. In ServedContentService.kt:39 and :41, `served(it, ::servable)` calls `servable(taskId)` for each task id (line 66), and that calls `tasks.find(taskId)`. JdbcTaskStore uses plain JDBC, not JPA, so there is no persistence-context cache and each call is a separate query. `isServed` and `task` also repeat `tasks.find` and `missions.containing`. The list path (`missions()`) is batched through `servableIds`, so only the single-mission and containing paths are affected. This is a minor performance issue with no security impact and no correctness impact, as the finding itself says. A mission has a small number of tasks, so I'd keep it as minor and low priority. It does not block the release.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/out/files/FilesystemFileStorage.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1340,
+      "durationMs": 27779,
+      "sessionId": "735fa994-0c2b-46c0-8c54-48403a494ae8",
+      "costUsd": 0.048362199999999994,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The described code facts are accurate. Store-then-insert with onRollback cleanup (SourceService.kt:60-61) can leave an orphan file on a hard JVM crash. StorageRoot.check is lexical and does not resolve symlinks. Neither is a correctness defect. The orphan is an unreferenced UUID-named file that nothing reads, and no spec requirement is violated. The storage root is operator-configured, not user-controlled, and no attacker-reachable path creates symlinks under it. Traversal via locate() is properly guarded. The finding itself calls the fixes optional and its confidence low, so there is no demonstrable wrong behaviour.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/out/files/FilesystemFileStorage.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1373,
+      "durationMs": 25749,
+      "sessionId": "f8b33703-90e7-4de6-8477-2c3fc03f4739",
+      "costUsd": 0.0531142,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code facts are accurate. store() writes the file before the DB insert, so a crash between the two leaves an orphan file. StorageRoot.check walks lexical parents only and does not resolve symlinks. Neither is exploitable by a user or attacker. Keys are server-generated UUIDs, and locate() normalises and checks startsWith(root), so traversal is not reachable. An orphan needs a JVM crash in a narrow window. It is a harmless leak of a few files on the operator's own disk, not data loss or a security issue, and the code already cleans up on rollback. The symlink gap needs the operator to point DOUCKO_STORAGE_DIR at a symlink into a git tree. That is operator misconfiguration, not attacker input, and the guard only protects against accidental commits. The finding itself says \"optionally\" and rates confidence low. No real user or attacker can trigger a defect, so I'm treating it as refuted. The most that can be said is that it is a theoretical hardening suggestion.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1291,
+      "durationMs": 34399,
+      "sessionId": "0ce2be7b-eec6-4be5-bb01-66569b1b9c3c",
+      "costUsd": 0.071424,
+      "numTurns": 6,
+      "result": {
+        "refuted": true,
+        "reasoning": "The fallback to ContentUsage.NONE exists, but it is a documented design choice (content must not depend on practice; ObjectProvider avoids a compile-time dependency). PracticeContentUsage is a @Component in the scanned practice package, so in the real app the bean is always present. PracticeIT exercises the real ContentUsage and the content tests use FakeContentUsage on purpose. The claimed failure needs someone to remove the annotation or the scan, which is hypothetical. The proposed fix of a required dependency would break the module-dependency rule, and the claim that Spring Modulith guarantees the bean is wrong, since verify() checks boundaries, not bean registration. At most this is minor latent hardening, not a major bug.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1324,
+      "durationMs": 28830,
+      "sessionId": "04e770e3-a91c-4f04-a54e-243e3f051386",
+      "costUsd": 0.052315600000000004,
+      "numTurns": 5,
+      "result": {
+        "refuted": true,
+        "reasoning": "The finding doesn't hold up as exploitable or reproducible. `PracticeContentUsage` is an unconditional `@Component` with no `@Profile` or `@Conditional`. The application's component scan always registers it, so in the real app `getIfAvailable` returns it. The `NONE` fallback is deliberate and documented in `ContentUsage.kt`: it is the answer for the period before practice (slice 7) existed. It can only trigger if a developer removes the practice bean or builds a test slice without it. No user or attacker can cause that at runtime. The remaining issue is a design smell, a defensive default that would fail open after a future code change. It is not a real-user or attacker problem, and `ContentUsage.NONE` is also a non-security fallback that tests use. Because the bean is always wired, there is no reachable path where delete guards are bypassed.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1215,
+      "durationMs": 43378,
+      "sessionId": "1aa5d549-6987-4e95-bc56-7e3c31b55ba7",
+      "costUsd": 0.08238000000000001,
+      "numTurns": 7,
+      "result": {
+        "refuted": false,
+        "reasoning": "The mechanism holds in the code. `SourceService.update` (lines 66-84) and `delete` (86-93) take no `lock.exclusive()` and no row lock. `TaskService.create` (lines 124-129) takes no lock either, although `update`, `delete` and `setStatus` in the same class do call `lock.exclusive()`. So there is no mutual exclusion between a source grade change and a task insert. `update` reads `referencingTasks` and finds none, while a concurrent `create` validates against the old grade and inserts. Postgres defaults to READ COMMITTED and the schema has no composite constraint tying `task.grade` to `source.grade`. The only database guard is `source_id REFERENCES source ON DELETE RESTRICT` in V2__content_authoring.sql:45, so a task can end up with a grade that differs from its source. The delete half is partly mitigated: the FK prevents orphaned tasks, and the race only surfaces as a constraint violation rather than corrupt data. The grade-mismatch half is a real, unguarded race. Impact is narrow because this is a single-admin tool and the window is tiny, so minor severity and low confidence fit. I did not trace the exception mapping for the delete case.",
+        "severityAdjustment": "keep"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1248,
+      "durationMs": 33827,
+      "sessionId": "93b9672b-f993-4d2c-bb9e-b655388ecae1",
+      "costUsd": 0.072364,
+      "numTurns": 6,
+      "result": {
+        "refuted": false,
+        "reasoning": "The code confirms the mechanism, but it is very hard to trigger and has little effect.\n\n- `SourceService.update` and `SourceService.delete` (SourceService.kt:66-93) never call `lock.exclusive()` or take a row lock.\n- `TaskService.create` (TaskService.kt:125-129) also takes no lock. `update`, `delete` and `setStatus` do call `lock.exclusive()`.\n- So a source grade change can run concurrently with a task create under default READ COMMITTED isolation. The grade-lock check in `update` would then see no referencing tasks, while the new task's `validate` would still see the old source grade. I did not read `validate` or the source-update store, so this part is inferred from the finding.\n\nWhy the impact is small:\n- The delete race is already blocked by the foreign key `task.source_id REFERENCES source(id) ON DELETE RESTRICT` (V2 migration, line 45). Its worst outcome is a 409, not corrupt data. This part of the finding is harmless.\n- The grade race needs two admin requests on the same source within milliseconds. Only the single admin can send them, so this is not an attacker-reachable path.\n- The result would be one task whose grade differs from its source's grade. The admin can see and fix that, and it exposes no data and loses none.\n\nThe race is real but hard to reproduce. I would downgrade it to a nit.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/out/pdf/PdfBoxInspector.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1206,
+      "durationMs": 30563,
+      "sessionId": "01ca844f-496c-42b7-9e07-f3343679b193",
+      "costUsd": 0.0490162,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The only confirmed fact is that catch (_: Exception) won't catch OutOfMemoryError or StackOverflowError. The failure the finding claims, a crafted PDF raising one of those Errors, is speculative. pageCount only reads numberOfPages and doesn't decode content streams. The upload is capped at 50 MB (application.yaml:26) and already held as a ByteArray. PDFBox 3 guards against page-tree cycles and recursion, and most malformed parses throw IOException, which the existing catch maps to null (unreadable). The finding rates its own confidence as low, and the \"visual\" dimension tag doesn't fit. Adding setupTempFileOnly() would be reasonable hardening, but I couldn't confirm an actual defect.",
+        "severityAdjustment": "downgrade"
+      }
+    },
+    {
+      "label": "verify:src/main/kotlin/cz/doucko/content/adapter/out/pdf/PdfBoxInspector.kt",
+      "phase": "Verify",
+      "agentType": null,
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 1.2 --tools Read,Grep,Glob --json-schema <…> --model sonnet",
+      "promptChars": 1239,
+      "durationMs": 25993,
+      "sessionId": "6134dfed-57a9-435e-8b3a-e3395ebe0ea2",
+      "costUsd": 0.049153,
+      "numTurns": 4,
+      "result": {
+        "refuted": true,
+        "reasoning": "The code matches the finding: Loader.loadPDF(content) sits inside catch (_: Exception), which does not catch OutOfMemoryError or StackOverflowError. But I found no real exploit path. The upload is already a ByteArray capped at 50 MB, so parsing adds only modest overhead. Only the admin can call the endpoint (single-family app), so there's no anonymous attacker. PDFBox 3 has its own guards, such as page-tree cycle detection. I did not reproduce a crash. The worst realistic result is a 500 for one request from a deliberately hostile admin upload. That is a robustness nit rather than an exploitable problem.",
+        "severityAdjustment": "downgrade"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Find",
+      "message": "13 unique findings across 4 dimensions"
+    },
+    {
+      "phase": "Report",
+      "message": "confirmed: 5, contested: 0, rejected: 8"
+    }
+  ],
+  "persisted": [
+    "openspec/changes/release-review-api/review-findings.json"
+  ],
+  "returned": {
+    "scope": "Phase 7 global release review of the backend (release-review-api), part b: content module",
+    "summary": "Review gate for Phase 7 global release review of the backend (release-review-api), part b: content module: 5 confirmed, 0 contested (treat as confirmed unless trivially wrong), 8 rejected.",
+    "confirmed": [
+      {
+        "title": "Source update/delete and task create don't take the content lock, leaving a grade-lock / reference race",
+        "file": "src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+        "line": 77,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`update` checks `sources.referencingTasks(id)` before allowing a grade change, but never calls `lock.exclusive()`. `TaskService.create` (line 125) also takes no lock, so a task created against the source after the check but before commit can end up with a grade that no longer matches its source. The delete path relies on an FK and on the catch-all DataIntegrityViolation handler to cover the equivalent race.",
+        "suggestion": "Take `ContentLock.exclusive()` first in `SourceService.update`/`delete` and in `TaskService.create`, as the mission and task edit paths already do. Or lock the source row (`FOR UPDATE`) in the task save path.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "Confirmed by reading the code. SourceService.update (lines 66-84) and delete (86-93) never take ContentLock; SourceService has no ContentLock dependency. TaskService.create (124-129) takes no lock, while TaskService update/delete/setStatus and the MissionService paths all call lock.exclusive(). create runs validate(draft), which uses the source via TaskContext, so a concurrent source grade change that passes the referencingTasks check before the task commits can leave a task whose grade no longer matches its source under READ COMMITTED. The delete race is covered by the FK, as the finding says. The window is narrow (two admin writes at once), so minor severity and low confidence are right. I did not read TaskRules to confirm the exact grade-match rule.",
+          "The race mechanism is real in the code. SourceService.update (lines 66-84) never calls lock.exclusive(), while the mission and task update/delete/setStatus paths do. TaskService.create (124-129) takes no lock either. TaskRules.validate runs with the source in its context (line 294), so it presumably checks task grade against source grade. Under Postgres READ COMMITTED, the sequence is: update checks referencingTasks (empty), a concurrent create validates against the old grade and inserts, then update commits the new grade. That leaves a task whose grade no longer matches its source. Nothing in the code I read prevents it, and I did not find a DB constraint or transaction isolation setting that does. The delete path is covered by the FK, as the finding says. Practical exploitability is very low. It needs two concurrent admin writes to the same source in a single-admin tutoring app, and the result is a content inconsistency, not a security or child-facing issue. I'm keeping the finding, but at minor severity and low confidence it's a hardening item."
+        ]
+      },
+      {
+        "title": "Any DataIntegrityViolationException is reported as 'content-conflict' 409",
+        "file": "src/main/kotlin/cz/doucko/content/adapter/in/web/ContentProblemAdvice.kt",
+        "line": 60,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`integrity()` answers every `DataIntegrityViolationException` with the 409 'content-conflict' problem. The comment says it exists for a task saved against a source being deleted, but NOT NULL, value-too-long, CHECK and JSON-size violations are also `DataIntegrityViolationException`s. Those are validation gaps between the domain rules and the DB, and they would be shown to the admin as a conflict with no message and no log.",
+        "suggestion": "Log the exception class and constraint name server-side. Map only FK/unique violations (inspect the SQLState or constraint name) to 409. Let other integrity errors surface as a 400 or 500 so the gap is noticed.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "ContentProblemAdvice.integrity() (line 60-61) catches every DataIntegrityViolationException with no inspection of cause, SQLState or constraint name, and always returns 409 content-conflict. It doesn't log. NOT NULL, length and CHECK violations would be misreported as conflicts and leave no server-side trace. The advice has HIGHEST_PRECEDENCE and applies to the Source, Task, Mission and Reference controllers, so nothing overrides it there. Two overstatements: the response does carry a generic title and detail from the problem key (only the specific `conflicts` property is absent), and I did not check whether domain validation already prevents the non-FK/unique violations, so reachability is unverified. The finding stands as a minor, latent diagnosability issue.",
+          "The code matches the finding. `ContentProblemAdvice.kt:60-61` has an `@ExceptionHandler(DataIntegrityViolationException::class)` that returns 409 \"content-conflict\" for any integrity violation. It doesn't inspect the SQLState or constraint name, and it doesn't log. Spring wraps NOT NULL, length, CHECK, FK and unique violations in this same exception, so they all become 409. The handler has the highest precedence and covers the Source, Task, Mission and Reference controllers.\n\nThe finding overstates two things:\n- The 409 response isn't empty. `problems.respond` builds a catalog-based problem from the \"content-conflict\" key, so it should carry a title and detail. I didn't open `ProblemResponses` to check. The missing log is real.\n- I haven't shown a concrete input that triggers a non-FK/unique violation. Domain validation (`InvalidContent` → 400) probably catches most cases first. The harm is therefore hypothetical: a future domain/DB validation gap would be mislabelled as a conflict and hidden from logs.\n\nThe impact is real but small. It's a diagnosability problem on an admin-only path. It can't be triggered by an attacker to cause harm, and it leaks no driver internals. Minor severity is appropriate."
+        ]
+      },
+      {
+        "title": "Served-content queries are N+1 and load every task with its JSON each time",
+        "file": "src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+        "line": 34,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "`missions()` calls `servableIds()`, which loads every published TEXT task with parts, hints, translations and images. `mission()` and `missionsContaining()` use `servable(UUID)`, which runs `tasks.find` once per task id. `isServed` and `task()` each add `missions.containing(...)` queries. These sit on the child practice path, so per-request cost grows with the catalogue.",
+        "suggestion": "Add a store query that returns the ids of published TEXT tasks for a given id set. Return task ids and status in one query, or cache within the transaction.",
+        "dimension": "correctness",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The code matches the finding. `missions()` calls `servableIds()`, which runs `tasks.list(...)` with a PUBLISHED and TEXT filter. That loads the full Task objects for every published text task, including parts, hints, translations and images. `mission()` and `missionsContaining()` pass `::servable` to `served(...)`. That resolves to `servable(UUID)`, which calls `tasks.find(taskId)` once for each task id in a mission, so it is an N+1 pattern. `isServed()` and `task()` each add a `missions.containing(...)` call through `inPublishedMission`, and `task()` also calls `tasks.find`. Nothing in this file caches or batches these calls. I did not check whether the stores cache `find` results. The claim is about performance and not wrong results: the outputs are correct, and the cost grows with catalogue size and mission size. Missions are probably small, so the real impact is low. The severity of minor is reasonable, and it is a performance issue more than a correctness one.",
+          "The mechanism is confirmed in ServedContentService.kt. `missions()` calls `servableIds()`, which runs `tasks.list(...)` and loads every published TEXT task. `mission()` and `missionsContaining()` pass `::servable(UUID)` into `served()`. That runs `tasks.find` once per task id in the mission, which is the N+1. `isServed()` and `task()` each call `tasks.find` and then `missions.containing`, so a single request issues several queries. Nothing in the file caches or batches these calls, and the read-only `@Transactional` does not remove the repeated queries. I did not read the store implementations, so I did not check whether `tasks.find` hits a cache. The cost is a latency and scalability problem, not a correctness or security one. A mission holds only a handful of tasks, and this is a single-household tutor app with a small catalogue, so no user or attacker is realistically harmed. The finding is real but low impact, so I downgrade it."
+        ]
+      },
+      {
+        "title": "Served-content checks do N+1 task loads per request",
+        "file": "src/main/kotlin/cz/doucko/content/application/ServedContentService.kt",
+        "line": 39,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "missionsContaining/mission/isServed call servable(taskId) = tasks.find(taskId) once per task id, then missions.containing(taskId). task() and image() each repeat these lookups, and every child task fetch re-queries. This is a latent performance issue, not a correctness one.",
+        "suggestion": "Add a batch TaskStore lookup (findAll(ids)) and reuse the already loaded Task. Not a release blocker.",
+        "dimension": "spec-compliance",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism is real. In ServedContentService.kt, `missionsContaining` (line 39) and `mission` (line 41) pass `::servable` into `served()`. That filters `mission.content.taskIds` through `servable(taskId)` (line 66), which calls `tasks.find(taskId)` once per id. `isServed` and `task` each call `find` and `missions.containing` again. `JdbcTaskStore.find` is plain JDBC with no caching, so each call is a separate query. Only `missions()` batches, through `servableIds()`. The finding is correctly labelled minor and performance-only, and it makes no claim of incorrect output. The behaviour is correct, so this is a latent N+1 and not a bug.",
+          "The mechanism is real. In ServedContentService.kt:39 and :41, `served(it, ::servable)` calls `servable(taskId)` for each task id (line 66), and that calls `tasks.find(taskId)`. JdbcTaskStore uses plain JDBC, not JPA, so there is no persistence-context cache and each call is a separate query. `isServed` and `task` also repeat `tasks.find` and `missions.containing`. The list path (`missions()`) is batched through `servableIds`, so only the single-mission and containing paths are affected. This is a minor performance issue with no security impact and no correctness impact, as the finding itself says. A mission has a small number of tasks, so I'd keep it as minor and low priority. It does not block the release."
+        ]
+      },
+      {
+        "title": "Source update/delete take no content lock, so they race with task creation",
+        "file": "src/main/kotlin/cz/doucko/content/application/SourceService.kt",
+        "line": 66,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`update` (grade-lock check via `referencingTasks`) and `delete` run without `lock.exclusive()` or a row lock. `TaskService.create` and `update` validate the source and grade, then insert, also without a lock. A task created concurrently with a source grade change can end up with a grade that differs from its source's. A concurrent delete is only caught later as a DataIntegrityViolation, which maps to a generic 409.",
+        "suggestion": "Take `SELECT ... FOR UPDATE` on the source row in `update` and `delete`, and in task `validate`/`insert`. Alternatively use `lock.exclusive()` consistently.",
+        "dimension": "visual",
+        "verdict": "confirmed",
+        "verifierNotes": [
+          "The mechanism holds in the code. `SourceService.update` (lines 66-84) and `delete` (86-93) take no `lock.exclusive()` and no row lock. `TaskService.create` (lines 124-129) takes no lock either, although `update`, `delete` and `setStatus` in the same class do call `lock.exclusive()`. So there is no mutual exclusion between a source grade change and a task insert. `update` reads `referencingTasks` and finds none, while a concurrent `create` validates against the old grade and inserts. Postgres defaults to READ COMMITTED and the schema has no composite constraint tying `task.grade` to `source.grade`. The only database guard is `source_id REFERENCES source ON DELETE RESTRICT` in V2__content_authoring.sql:45, so a task can end up with a grade that differs from its source. The delete half is partly mitigated: the FK prevents orphaned tasks, and the race only surfaces as a constraint violation rather than corrupt data. The grade-mismatch half is a real, unguarded race. Impact is narrow because this is a single-admin tool and the window is tiny, so minor severity and low confidence fit. I did not trace the exception mapping for the delete case.",
+          "The code confirms the mechanism, but it is very hard to trigger and has little effect.\n\n- `SourceService.update` and `SourceService.delete` (SourceService.kt:66-93) never call `lock.exclusive()` or take a row lock.\n- `TaskService.create` (TaskService.kt:125-129) also takes no lock. `update`, `delete` and `setStatus` do call `lock.exclusive()`.\n- So a source grade change can run concurrently with a task create under default READ COMMITTED isolation. The grade-lock check in `update` would then see no referencing tasks, while the new task's `validate` would still see the old source grade. I did not read `validate` or the source-update store, so this part is inferred from the finding.\n\nWhy the impact is small:\n- The delete race is already blocked by the foreign key `task.source_id REFERENCES source(id) ON DELETE RESTRICT` (V2 migration, line 45). Its worst outcome is a 409, not corrupt data. This part of the finding is harmless.\n- The grade race needs two admin requests on the same source within milliseconds. Only the single admin can send them, so this is not an attacker-reachable path.\n- The result would be one task whose grade differs from its source's grade. The admin can see and fix that, and it exposes no data and loses none.\n\nThe race is real but hard to reproduce. I would downgrade it to a nit."
+        ]
+      }
+    ],
+    "contested": [],
+    "rejected": [
+      {
+        "title": "PDF and image uploads are validated by magic bytes only, and PDFBox parses the whole file in a DB transaction",
+        "file": "src/main/kotlin/cz/doucko/content/adapter/out/pdf/PdfBoxInspector.kt",
+        "line": 17,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`Loader.loadPDF(content)` parses up to the whole 25 MB or more of PDF in memory with no memory or time bounds. `SourceService.upload` calls it inside `@Transactional`, so a DB connection is held during parsing and file I/O. `TaskService.addImage` only checks a 16-byte header, so a non-decodable or oversized-dimension image is stored and served as `image/png` or `image/jpeg`. The endpoints are admin-only, which limits the exposure.",
+        "suggestion": "Parse and inspect before opening the transaction, and use `Loader.loadPDF` with a memory-usage setting. Decode image dimensions with `ImageIO` and cap pixel count at upload.",
+        "dimension": "correctness",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding doesn't hold up as a correctness defect. The code facts are partly accurate, but the claimed failure isn't one.\n\n- **Size bounds exist.** `SourceService.upload` rejects files over `Limits.PDF_BYTES` twice, once on the declared size and once on the bytes read. `TaskService.addImage` does the same with `Limits.IMAGE_BYTES`. `application.yaml` also caps multipart at 50MB. So \"parses 25 MB or more with no bounds\" is overstated, because input is capped before `PdfBoxInspector` runs.\n- **Magic-byte-only image checks look deliberate.** `FileKind.detect` over a header is the designed validation. The image is stored with the media type taken from the detected kind. A corrupt image only breaks rendering for the admin who uploaded it, and nothing is mis-served or leaked.\n- **The inspector is hardened where it matters.** `PdfBoxInspector` requires `%%EOF`, rejects encrypted files, and catches every exception, so a malformed PDF gives a 4xx validation error and not a 500. Its KDoc says this is intended.\n- **The transaction point is a performance preference.** Parsing inside `@Transactional` does hold a connection briefly. But the endpoints are admin-only, uploads are rare, and the order is deliberate: every check runs before anything is stored, with rollback cleanup. This isn't a wrong mechanism.\n- **At most a low-risk hardening note.** The finding has low confidence and minor severity, and nothing in it shows incorrect behavior.",
+          "The cited code matches the finding, but exploitability fails. PDF and image sizes are capped before any parsing (Limits.PDF_BYTES, Limits.IMAGE_BYTES, 50MB multipart). PdfBoxInspector requires %%EOF, rejects encrypted files and catches all exceptions, so malformed input returns a validation error and not a 500. Images are never decoded server-side; they are stored and served by detected magic bytes, so there is no server-side decode DoS. Holding a DB connection during a bounded parse is a minor inefficiency, reachable only by the admin on a single-family app, with no realistic attacker who could exhaust the pool. The suggested changes are optional hygiene, not a reproducible problem."
+        ]
+      },
+      {
+        "title": "Uploaded PDF is served inline with no sandbox/CSP of its own",
+        "file": "src/main/kotlin/cz/doucko/content/adapter/in/web/SourceController.kt",
+        "line": 60,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "getSourceFile returns the stored bytes as application/pdf with Content-Disposition: inline. The only check on upload is a 16-byte magic-header sniff plus a PDFBox page count, so a PDF with embedded JavaScript or links is accepted and rendered in the admin's browser. The route is admin-only, so the attacker would need a malicious PDF, for example a crafted workbook scan the admin uploads themself. I did not verify what X-Content-Type-Options or CSP headers the security chain adds.",
+        "suggestion": "Add `Content-Security-Policy: sandbox` and `X-Content-Type-Options: nosniff` to this response, or serve the PDF with `attachment` disposition. Confirm the Spring Security header defaults still apply to this route.",
+        "dimension": "security",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding is not a real defect. I read `getSourceFile` at SourceController.kt:60. It does return `application/pdf` with `inline` disposition, as claimed. The two mitigating factors the finding left unchecked both hold up. (1) The admin security chain (AdminSecurityConfiguration.kt:61-98) covers `/api/admin/**` and never disables or customizes headers. Spring Security's default headers therefore apply, including `X-Content-Type-Options: nosniff`, so that suggestion is already satisfied. (2) The route requires an authenticated admin plus CSRF. The only possible \"attacker\" is a PDF the admin uploads themself, and the finding admits this. Browsers render PDFs in their own sandboxed viewer, and `application/pdf` is not an HTML-executing type, so there is no same-origin script execution. The remaining suggestion, `CSP: sandbox`, is optional hardening. It is not a wrong mechanism, and it could break the in-browser PDF viewer that the spec requires (\"PDF viewer beside the editor\"). The finding is low confidence and speculative, so I refute it.",
+          "The code matches the description. `getSourceFile` returns `application/pdf` with `Content-Disposition: inline`, and no custom security headers are set anywhere in `src/main`. I still don't think it's exploitable.\n\n- **Content type is fixed.** The response is always `application/pdf`, set by the server. The browser can't reinterpret the bytes as HTML. Spring Security's default header chain also sends `X-Content-Type-Options: nosniff` unless it is disabled. A grep of `src/main` for `headers`, `contentSecurityPolicy`, `nosniff` and `frameOptions` found no disabling or custom config.\n- **PDF JavaScript is sandboxed by the browser's PDF viewer.** In Chrome and Firefox it can't reach the app's DOM, cookies or origin. Chrome's PDFium viewer does not give PDF scripts script access to the embedding origin, and Firefox's pdf.js sandboxes scripting. A CSP `sandbox` header would add little there.\n- **The attack needs the admin to upload a malicious PDF themself.** The route is admin-only and has no child or third-party upload path. That makes it self-attack, not a boundary crossing.\n- **The finding's own evidence is low confidence and admits it didn't check the security headers.**\n\nI found no concrete, realistic exploit path. Adding `attachment` disposition or a CSP would be optional hardening, not a vulnerability."
+        ]
+      },
+      {
+        "title": "Clean areas in the content module (checklist coverage)",
+        "file": "src/main/kotlin/cz/doucko/content/ServedContent.kt",
+        "line": 26,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "The checks below cover only the files I read: FilesystemFileStorage, SourceController, SourceService, TaskController, ServedContentService, ServedContent, the TaskService.addImage path and the JdbcTaskStore image methods. I did not read ApiMapping, JsonReaders, ContentProblemAdvice, the mission code or the security config. (1) Authz: the content module has no child controllers. The child surface is the ServedContent interface, which only returns PUBLISHED TEXT tasks inside PUBLISHED missions and exposes no mutation. All Source, Task and Mission controllers implement Admin*Api. I did not inspect the security config, so server-side enforcement of those routes is unconfirmed. (2) Answer-key leak: ServedPart.spec is the full AnswerSpec. The public ServedContent interface hands it to practice, whose DTO mapping decides what the child sees. That is out of scope here, but the practice review must check that spec is never serialised before the reveal. (3) Path traversal: storage keys are server-generated (`sources/<uuid>.pdf`, `images/<uuid>.png|jpg`) and `locate()` normalises and enforces `startsWith(root)`. The root is rejected if it lies inside a git working tree. (4) Upload limits: size is checked before and after the read, with the read bounded to limit+1 bytes. Image type is detected by magic bytes and limited to PNG/JPEG. The stored media type comes from detection, not from the client. (5) SQL: the JDBC stores I read use bound `?` parameters, and I saw no string interpolation. (6) Delete race: `task.source_id` has a `REFERENCES source ON DELETE RESTRICT` foreign key (V2 migration), so the check-then-delete in SourceService.delete cannot orphan tasks. (7) Image add races are serialised by `tasks.lock(taskId)`.",
+        "suggestion": "No action in this module. In the practice and web review, verify that ServedPart.spec and accepted answers are not serialised into child DTOs before the reveal (FR-27). In the security review, verify the admin matcher covers every Admin*Api route.",
+        "dimension": "security",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "This finding doesn't report a defect. It's a \"clean areas\" coverage note whose own suggestion is \"No action in this module.\" The claims I checked match the code. `ServedPart.spec` at `ServedContent.kt:26-32` is the full `AnswerSpec`, and its KDoc limits use to grading and to the post-reveal answer (FR-27). `V2__content_authoring.sql:45` has `source_id ... REFERENCES source (id) ON DELETE RESTRICT`. No wrong mechanism is claimed. The only forward-looking items are reminders for the practice and security reviews, and the finding itself says it didn't verify those. It carries no exploitable or incorrect behaviour in the cited location, so it isn't a valid finding.",
+          "The finding is a \"clean areas\" checklist note, not a defect. It says \"No action in this module\". There is no exploitable problem to reproduce. I read ServedContent.kt. It matches the finding's description. ServedPart.spec is the full AnswerSpec, and its KDoc limits use to grading and the post-reveal display. ServedContent has no mutation methods. This is an internal module API, not an HTTP surface, so a real user or attacker cannot reach it directly. The only follow-up is a hand-off to the practice review to check that spec is not serialised before the reveal. That is a generic reminder, not a confirmed leak. The finding is not an actionable vulnerability, so I mark it refuted."
+        ]
+      },
+      {
+        "title": "Blanket DataIntegrityViolationException→409 hides non-conflict constraint failures",
+        "file": "src/main/kotlin/cz/doucko/content/adapter/in/web/ContentProblemAdvice.kt",
+        "line": 60,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "@ExceptionHandler(DataIntegrityViolationException::class) answers every integrity violation with 409 'content-conflict' and no 'conflicts' list. The comment only anticipates a source-deletion race. A length/NOT NULL violation on a JSONB or varchar column would also surface as a misleading 409. It is still RFC 7807 with no driver text, so there is no raw 500 and no leak.",
+        "suggestion": "Narrow the handler to the known FK/unique constraint names, or add a test that every content field limit is validated before the database. Amend the spec/openapi note if 409 is intended.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The handler at ContentProblemAdvice.kt:60-61 does map every DataIntegrityViolationException to a 409 'content-conflict' with no conflicts list. That part of the finding is accurate. The claimed harm is not confirmed. The finding only says a length or NOT NULL violation \"would also\" surface as a misleading 409, and nothing in the code shows such a violation can reach the database. The content module has its own validation layer (InvalidContent producing 400 'content-invalid' with field errors, plus the multipart and body-size handlers), which suggests field limits are checked before the write. My search found no other DataIntegrityViolationException usage in the code. The only test reference is a fixture in ContentTestSupport.kt:194 that throws it with the message \"fk\", which matches the documented FK race. The handler is a deliberate catch-all fallback. It returns an RFC 7807 problem with no driver text, so there is no raw 500 and no leak. The reviewer admits this and rates the finding minor at medium confidence. What remains is a speculative design preference to narrow the handler, not a demonstrated defect.",
+          "The handler exists and is blanket, but the claimed trigger is unreachable. The V2 migration has no varchar(n) columns, only text/integer plus CHECK constraints. Every CHECK (page_count, difficulty, modality, status, page, position) is validated in the domain rules and JsonReaders, which return 400 content-invalid first. JSONB has no length limit, and bodies over 1MB get 413 from ContentBodyAdvice. The remaining integrity violations are FK/unique races, where 409 is correct. The response is RFC 7807 with no driver text and no leak. What's left is a hypothetical about future constraints, not something a real user or attacker can trigger. I didn't read V3 (missions) or the controllers and use cases."
+        ]
+      },
+      {
+        "title": "ServedContent API hands the raw answer key (AnswerSpec) to consumers; non-leak relies entirely on the practice module's mapping",
+        "file": "src/main/kotlin/cz/doucko/content/ServedContent.kt",
+        "line": 26,
+        "severity": "minor",
+        "confidence": "medium",
+        "evidence": "ServedPart.spec: AnswerSpec is documented as 'the answer key: practice may use it only to grade and, after the reveal, to show the first accepted answer (FR-27)'. The content module enforces no structural separation. The only child-image path (practice PracticeMapping 'images' -> /api/child/images/{id}) and the TaskView mapping are in practice, outside this review's scope. Content itself does not leak.",
+        "suggestion": "Keep or add an IT in practice asserting that no child response before the reveal contains accepted/spec fields. Consider a separate grading-view type so the display view carries no key.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The finding doesn't identify a defect. It's a design-hardening suggestion, and it says itself that \"Content itself does not leak.\" ServedPart.spec carrying the key is deliberate and documented. The module's internal API has to hand the grader the spec. The one child-facing mapping, PracticeMapping.kt:106-117, builds PartView from only key, label, type, unit and options. It never reads accepted or the spec contents, so no key reaches the child before the reveal. No code path was found that leaks, and no wrong behavior is claimed. This is an optional refactor, not a correctness bug.",
+          "The finding describes a design smell, not a reachable leak. ServedContent is an internal module API, not an HTTP endpoint. The only child-facing mapping (practice/adapter/in/web/PracticeMapping.kt:106-116) builds PartView from key, label, type, unit and options only. It never emits accepted values or the spec. The other `.spec` uses are internal grading in practice (Rules.kt, PracticeService, ProgressStats) and the DeterministicTutor. The finding itself says \"Content itself does not leak.\" No attacker or user path to the answer key was found, so there is nothing to exploit or reproduce."
+        ]
+      },
+      {
+        "title": "Storage write-before-insert leaves orphan files on crash; storage root check ignores symlinks",
+        "file": "src/main/kotlin/cz/doucko/content/adapter/out/files/FilesystemFileStorage.kt",
+        "line": 45,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "Keys are server-generated (sources/<uuid>.pdf, images/<uuid>.<ext>), so path traversal is not reachable from user input, and locate() normalises and checks startsWith(root). SourceService.upload stores the file before sources.insert and cleans up via onRollback, so a JVM crash between the two leaves an orphan file. StorageRoot.check only walks lexical parents for .git and does not resolve symlinks (toRealPath).",
+        "suggestion": "Optionally use toRealPath in StorageRoot.check and add an orphan-sweep note to current-state. Traversal and upload limits are otherwise OK: size is checked before and after read, magic bytes are detected, and 413/415 come back as problem+json.",
+        "dimension": "spec-compliance",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The described code facts are accurate. Store-then-insert with onRollback cleanup (SourceService.kt:60-61) can leave an orphan file on a hard JVM crash. StorageRoot.check is lexical and does not resolve symlinks. Neither is a correctness defect. The orphan is an unreferenced UUID-named file that nothing reads, and no spec requirement is violated. The storage root is operator-configured, not user-controlled, and no attacker-reachable path creates symlinks under it. Traversal via locate() is properly guarded. The finding itself calls the fixes optional and its confidence low, so there is no demonstrable wrong behaviour.",
+          "The code facts are accurate. store() writes the file before the DB insert, so a crash between the two leaves an orphan file. StorageRoot.check walks lexical parents only and does not resolve symlinks. Neither is exploitable by a user or attacker. Keys are server-generated UUIDs, and locate() normalises and checks startsWith(root), so traversal is not reachable. An orphan needs a JVM crash in a narrow window. It is a harmless leak of a few files on the operator's own disk, not data loss or a security issue, and the code already cleans up on rollback. The symlink gap needs the operator to point DOUCKO_STORAGE_DIR at a symlink into a git tree. That is operator misconfiguration, not attacker input, and the guard only protects against accidental commits. The finding itself says \"optionally\" and rates confidence low. No real user or attacker can trigger a defect, so I'm treating it as refuted. The most that can be said is that it is a theoretical hardening suggestion."
+        ]
+      },
+      {
+        "title": "Delete/edit guards fail open if the ContentUsage port is missing",
+        "file": "src/main/kotlin/cz/doucko/content/application/TaskService.kt",
+        "line": 90,
+        "severity": "major",
+        "confidence": "medium",
+        "evidence": "`usageProvider.getIfAvailable { ContentUsage.NONE }` (same in MissionService.kt:42). The only real implementation is practice's `PracticeContentUsage`. If that bean is absent (slice, profile or wiring change), every task or mission with attempts, reports or opened hints looks unused. `TaskService.delete` and `MissionService.delete` then pass `MissionRules.taskDelete` and `missionDelete` with `used=false`, and the task is deleted.",
+        "suggestion": "Make `ContentUsage` a required constructor dependency. Spring Modulith already guarantees the bean exists in the full app. If tests need a stub, provide it as a test bean. At minimum, fail closed instead of defaulting to NONE.",
+        "dimension": "visual",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The fallback to ContentUsage.NONE exists, but it is a documented design choice (content must not depend on practice; ObjectProvider avoids a compile-time dependency). PracticeContentUsage is a @Component in the scanned practice package, so in the real app the bean is always present. PracticeIT exercises the real ContentUsage and the content tests use FakeContentUsage on purpose. The claimed failure needs someone to remove the annotation or the scan, which is hypothetical. The proposed fix of a required dependency would break the module-dependency rule, and the claim that Spring Modulith guarantees the bean is wrong, since verify() checks boundaries, not bean registration. At most this is minor latent hardening, not a major bug.",
+          "The finding doesn't hold up as exploitable or reproducible. `PracticeContentUsage` is an unconditional `@Component` with no `@Profile` or `@Conditional`. The application's component scan always registers it, so in the real app `getIfAvailable` returns it. The `NONE` fallback is deliberate and documented in `ContentUsage.kt`: it is the answer for the period before practice (slice 7) existed. It can only trigger if a developer removes the practice bean or builds a test slice without it. No user or attacker can cause that at runtime. The remaining issue is a design smell, a defensive default that would fail open after a future code change. It is not a real-user or attacker problem, and `ContentUsage.NONE` is also a non-security fallback that tests use. Because the bean is always wired, there is no reachable path where delete guards are bypassed."
+        ]
+      },
+      {
+        "title": "PdfBox parsing of untrusted 50 MB uploads is in-memory, with no resource guard",
+        "file": "src/main/kotlin/cz/doucko/content/adapter/out/pdf/PdfBoxInspector.kt",
+        "line": 17,
+        "severity": "minor",
+        "confidence": "low",
+        "evidence": "`Loader.loadPDF(content)` loads the whole file into memory with default memory settings. The `catch (_: Exception)` does not catch `OutOfMemoryError` or `StackOverflowError`, which a crafted PDF (deep page tree, huge object or xref streams) can raise. An error like that would surface as a raw 500 rather than the RFC 7807 `pdf-unreadable` problem.",
+        "suggestion": "Load with `MemoryUsageSetup.setupTempFileOnly()` or a mixed-mode limit. Optionally catch `StackOverflowError` and `OutOfMemoryError` around the parse and map them to unreadable. Keep the 50 MB multipart cap.",
+        "dimension": "visual",
+        "verdict": "rejected",
+        "verifierNotes": [
+          "The only confirmed fact is that catch (_: Exception) won't catch OutOfMemoryError or StackOverflowError. The failure the finding claims, a crafted PDF raising one of those Errors, is speculative. pageCount only reads numberOfPages and doesn't decode content streams. The upload is capped at 50 MB (application.yaml:26) and already held as a ByteArray. PDFBox 3 guards against page-tree cycles and recursion, and most malformed parses throw IOException, which the existing catch maps to null (unreadable). The finding rates its own confidence as low, and the \"visual\" dimension tag doesn't fit. Adding setupTempFileOnly() would be reasonable hardening, but I couldn't confirm an actual defect.",
+          "The code matches the finding: Loader.loadPDF(content) sits inside catch (_: Exception), which does not catch OutOfMemoryError or StackOverflowError. But I found no real exploit path. The upload is already a ByteArray capped at 50 MB, so parsing adds only modest overhead. Only the admin can call the endpoint (single-family app), so there's no anonymous attacker. PDFBox 3 has its own guards, such as page-tree cycle detection. I did not reproduce a crash. The worst realistic result is a 500 for one request from a deliberately hostile admin upload. That is a robustness nit rather than an exploitable problem."
+        ]
+      }
+    ],
+    "reviewEvidence": "openspec/changes/release-review-api/review-findings.json"
+  }
+}

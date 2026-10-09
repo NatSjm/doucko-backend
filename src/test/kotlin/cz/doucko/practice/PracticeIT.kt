@@ -943,4 +943,24 @@ class PracticeIT {
         JsonPath.parse(replay).read<List<Map<String, Any?>>>("$.parts") shouldBe
             JsonPath.parse(primary).read<List<Map<String, Any?>>>("$.parts")
     }
+
+    // @trace FR-26
+    // @trace FR-41
+    @Test
+    fun `a NUL character in an answer or a report note is a 400 problem, never a 500, and stores nothing`() {
+        val multi =
+            "parts" to
+                """[{"key":"a","label":"a","spec":{"type":"CHOICE_MULTI","accepted":["A"],"options":[{"key":"A","text":"x"},{"key":"B","text":"y"}]}}]"""
+        val choice = task(multi)
+        val t = task()
+        val m = mission(listOf(choice, t))
+        attempt(m, choice, """{"a":["A\u0000"]}""").isProblem(400).andExpect { jsonPath("$.errors[0].field") { value("answers.a") } }
+        attempt(m, t, """{"a":"1\u00002"}""").isProblem(400).andExpect { jsonPath("$.errors[0].field") { value("answers.a") } }
+        report(
+            m,
+            t,
+            """{"reason":"OTHER","note":"a\u0000b"}""",
+        ).isProblem(400).andExpect { jsonPath("$.errors[0].field") { value("note") } }
+        nothingStored()
+    }
 }

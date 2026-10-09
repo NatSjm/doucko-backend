@@ -213,6 +213,7 @@ object ReportRules {
                 is JsonText.WrongType -> null.also { errors += FieldError("note", "wrong-type") }
                 is JsonText.Value -> note.text.trim().ifEmpty { null }
             }
+        if (text != null && text.contains('\u0000')) errors += FieldError("note", "nul-character")
         if (text != null && text.codePointCount(0, text.length) > NOTE_MAX) errors += FieldError("note", "too-long", listOf(NOTE_MAX))
         if (parsed == ReportReason.OTHER && text == null && note !is JsonText.WrongType) errors += FieldError("note", "note-required")
         // A missing or unknown reason always adds an error, so no error means a parsed reason.

@@ -11,7 +11,7 @@ Result: PASS
 |---|---|---|---|---|---|
 | FR-1 | yes | yes | backend, frontend | 17 | - |
 | FR-2 | yes | yes | backend, frontend | 1 | - |
-| FR-3 | yes | yes | backend, frontend | 24 | - |
+| FR-3 | yes | yes | backend, frontend | 25 | - |
 | FR-4 | yes | yes | backend, frontend | 4 | - |
 | FR-5 | yes | yes | backend | 3 | - |
 | FR-6 | yes | yes | backend, frontend | 33 | - |
@@ -37,7 +37,7 @@ Result: PASS
 | FR-23 | yes | yes | backend | 7 | - |
 | FR-24 | yes | yes | backend, frontend | 1 | - |
 | FR-25 | yes | yes | backend, frontend | 8 | - |
-| FR-26 | yes | yes | backend, frontend | 6 | - |
+| FR-26 | yes | yes | backend, frontend | 7 | - |
 | FR-27 | yes | yes | backend, frontend | 9 | - |
 | FR-28 | yes | yes | backend, frontend | 3 | - |
 | FR-29 | yes | yes | backend, frontend | 2 | - |
@@ -53,7 +53,7 @@ Result: PASS
 | FR-39 | yes | yes | backend, frontend | 6 | - |
 | FR-58 | yes | yes | frontend | n/a | n/a |
 | FR-40 | yes | yes | backend, frontend | 42 | - |
-| FR-41 | yes | yes | backend, frontend | 42 | - |
+| FR-41 | yes | yes | backend, frontend | 43 | - |
 | FR-42 | yes | yes | backend | 1 | - |
 | FR-43 | yes | yes | backend | 52 | - |
 | FR-44 | yes | yes | backend | 10 | - |

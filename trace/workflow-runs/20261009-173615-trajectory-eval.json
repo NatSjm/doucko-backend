@@ -1,0 +1,460 @@
+{
+  "workflow": "trajectory-eval",
+  "file": "./.claude/workflows/trajectory-eval.js",
+  "description": "Trajectory evaluation: grade the PATH each slice took, not just its output. A fresh judge (maker≠checker) scores each slice on process-order, test-integrity, in-scope discipline, and craft, reading the git log/diff/spec/tasks/review evidence. The LLM half of trajectory evals — the deterministic half is check-trajectory.mjs.",
+  "dryRun": false,
+  "startedAt": "2026-10-09T17:36:15.952Z",
+  "finishedAt": "2026-10-09T17:36:26.834Z",
+  "args": {
+    "slices": [
+      {
+        "slice": "implement-admin-access-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\nf94a58f 2026-10-04 16:54:04 +0200 feat(admin): admin sign-in, session, CSRF and idle expiry (slice 2)\n513a886 2026-10-04 17:07:08 +0200 fix(admin): slice 2 backend review-gate findings\na4117cf 2026-10-04 17:08:19 +0200 docs(admin): slice 2 backend handoff after the review gate\n584e05d 2026-10-04 17:09:19 +0200 chore(admin): archive slice 2 backend (implement-admin-access-api)\n\nFiles per commit:\nf94a58f: .env.example, compose.yaml, docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice2-compose-smoke.md, docs/qa/evidence/slice2-red-run.md, docs/qa/traceability-report.md, fixtures/PROVENANCE.md, openspec/changes/implement-admin-access-api/design.md, openspec/changes/implement-admin-access-api/proposal.md, openspec/changes/implement-admin-access-api/specs/admin-access/spec.md, openspec/changes/implement-admin-access-api/tasks.md\n513a886: docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-admin-access-api/review-findings.json, src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt, src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt, src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutFilterTest.kt, src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt, src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt, src/test/kotlin/cz/doucko/admin/ChildOperationsContractTest.kt, trace/acceptance-contracts.json, trace/ledger.jsonl, trace/trace.json\na4117cf: docs/current-state.md, openspec/changes/implement-admin-access-api/tasks.md, trace/ledger.jsonl\n584e05d: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-admin-access-api/design.md, openspec/changes/archive/2026-10-04-implement-admin-access-api/proposal.md, openspec/changes/archive/2026-10-04-implement-admin-access-api/review-findings.json, openspec/changes/archive/2026-10-04-implement-admin-access-api/specs/admin-access/spec.md, openspec/changes/archive/2026-10-04-implement-admin-access-api/tasks.md, openspec/specs/admin-access/spec.md, trace/ledger.jsonl, trace/trace.json, trace/trajectory.json\nTasks: 19 done, 0 open.\nReview evidence: clean:true; findings 10; statuses {\"fixed\":6,\"waived\":4}\nArchive folder: openspec/changes/archive/2026-10-04-implement-admin-access-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-answer-checking-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\n0120326 2026-10-04 17:31:58 +0200 feat(checking): pure answer checker with a 212-case golden table (slice 3)\nf26150d 2026-10-04 17:46:35 +0200 fix(checking): slice 3 review-gate findings\n6343ca7 2026-10-04 17:53:58 +0200 fix(checking): tip example never throws; compact and no-example fallbacks\n5e71433 2026-10-04 17:58:45 +0200 chore(checking): archive slice 3 backend (implement-answer-checking-api)\n\nFiles per commit:\n0120326: docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice3-checker-run.md, docs/qa/evidence/slice3-red-run.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, fixtures/PROVENANCE.md, openspec/changes/implement-answer-checking-api/design.md, openspec/changes/implement-answer-checking-api/proposal.md, openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md, openspec/changes/implement-answer-checking-api/tasks.md, quality/coverage-baseline.json\nf26150d: docs/qa/traceability-report.md, openspec/changes/implement-answer-checking-api/design.md, openspec/changes/implement-answer-checking-api/review-findings.json, openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md, src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt, src/main/kotlin/cz/doucko/checking/domain/Grader.kt, src/main/kotlin/cz/doucko/checking/domain/Rational.kt, src/main/resources/messages.properties, src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt, src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt, src/test/kotlin/cz/doucko/checking/GoldenScenarioCoverageTest.kt, src/test/resources/checking/golden-table.jsonl\n6343ca7: docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-answer-checking-api/review-findings.json, openspec/changes/implement-answer-checking-api/tasks.md, src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt, src/main/resources/messages.properties, src/test/kotlin/cz/doucko/checking/CheckerEdgeCasesTest.kt, trace/acceptance-contracts.json, trace/ledger.jsonl, trace/trace.json\n5e71433: docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice3-checker-run.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-answer-checking-api/design.md, openspec/changes/archive/2026-10-04-implement-answer-checking-api/proposal.md, openspec/changes/archive/2026-10-04-implement-answer-checking-api/review-findings.json, openspec/changes/archive/2026-10-04-implement-answer-checking-api/specs/answer-checking/spec.md, openspec/changes/archive/2026-10-04-implement-answer-checking-api/tasks.md, openspec/specs/answer-checking/spec.md, quality/coverage-baseline.json\nTasks: 18 done, 0 open.\nReview evidence: clean:true; findings 14; statuses {\"fixed\":8,\"waived\":6}\nArchive folder: openspec/changes/archive/2026-10-04-implement-answer-checking-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-authoring-missions-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\nd001eab 2026-10-04 21:57:53 +0200 feat(content): missions, publishing rules and delete guards (slice 6 backend)\n07518f9 2026-10-04 22:16:44 +0200 fix(content): review-gate fixes for slice 6 backend\nea4bf12 2026-10-04 22:19:54 +0200 chore(content): archive slice 6 backend (implement-authoring-missions-api)\n68fbac5 2026-10-04 22:20:07 +0200 chore(trace): slice 6 ledger events\n\nFiles per commit:\nd001eab: docs/qa/automated-verification-latest.md, docs/qa/evidence/slice6-red-run.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/implement-authoring-missions-api/.openspec.yaml, openspec/changes/implement-authoring-missions-api/design.md, openspec/changes/implement-authoring-missions-api/proposal.md, openspec/changes/implement-authoring-missions-api/specs/content-authoring/spec.md, openspec/changes/implement-authoring-missions-api/tasks.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/content/ContentModule.kt, src/main/kotlin/cz/doucko/content/ContentUsage.kt\n07518f9: docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-authoring-missions-api/design.md, openspec/changes/implement-authoring-missions-api/review-findings.json, openspec/changes/implement-authoring-missions-api/specs/content-authoring/spec.md, openspec/changes/implement-authoring-missions-api/tasks.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/content/application/Conflicts.kt, src/main/kotlin/cz/doucko/content/application/MissionService.kt, src/main/kotlin/cz/doucko/content/application/TaskService.kt, src/main/kotlin/cz/doucko/content/domain/Missions.kt, src/test/kotlin/cz/doucko/content/MissionApiTest.kt\nea4bf12: docs/current-state.md, docs/qa/evidence/slice6-compose-smoke.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-authoring-missions-api/.openspec.yaml, openspec/changes/archive/2026-10-04-implement-authoring-missions-api/design.md, openspec/changes/archive/2026-10-04-implement-authoring-missions-api/proposal.md, openspec/changes/archive/2026-10-04-implement-authoring-missions-api/review-findings.json, openspec/changes/archive/2026-10-04-implement-authoring-missions-api/specs/content-authoring/spec.md, openspec/changes/archive/2026-10-04-implement-authoring-missions-api/tasks.md, openspec/specs/content-authoring/spec.md, trace/ledger.jsonl\n68fbac5: docs/qa/trajectory-report.md, trace/ledger.jsonl, trace/trajectory.json\nTasks: 16 done, 0 open.\nReview evidence: clean:false; findings 6; statuses {\"fixed\":6}\nArchive folder: openspec/changes/archive/2026-10-04-implement-authoring-missions-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-authoring-tasks-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\n499b23c 2026-10-04 20:10:05 +0200 feat(content): sources, tasks, images, preview, tester and bulk publish (slice 5 backend)\n3738bfe 2026-10-04 20:51:06 +0200 fix(content): review-gate fixes for slice 5 backend\n69bd884 2026-10-04 20:52:54 +0200 chore(content): archive slice 5 backend (implement-authoring-tasks-api)\nb80321a 2026-10-04 20:53:06 +0200 chore(trace): slice 5 ledger events and task note wording\n19a364a 2026-10-04 21:14:38 +0200 docs(backend): slice 5 real-stack smoke after the merge (PASS)\n2efecba 2026-10-04 21:14:57 +0200 docs(content): slice 5 review finding F09 fixed by the post-merge smoke\nd1d68df 2026-10-04 21:15:23 +0200 docs(content): slice 5 waiver reasons in the field the trajectory check reads\n\nFiles per commit:\n499b23c: .env.example, Dockerfile, compose.yaml, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice5-compose-smoke.md, docs/qa/evidence/slice5-red-run.md, docs/qa/traceability-report.md, fixtures/PROVENANCE.md, openspec/changes/implement-authoring-tasks-api/design.md, openspec/changes/implement-authoring-tasks-api/proposal.md, openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md, openspec/changes/implement-authoring-tasks-api/tasks.md\n3738bfe: .gitignore, docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-authoring-tasks-api/design.md, openspec/changes/implement-authoring-tasks-api/proposal.md, openspec/changes/implement-authoring-tasks-api/review-findings.json, openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md, openspec/changes/implement-authoring-tasks-api/tasks.md, src/main/kotlin/cz/doucko/content/adapter/in/web/ContentProblemAdvice.kt, src/main/kotlin/cz/doucko/content/adapter/out/files/FilesystemFileStorage.kt, src/main/kotlin/cz/doucko/content/adapter/out/persistence/JdbcTaskStore.kt, src/main/kotlin/cz/doucko/content/application/Ports.kt\n69bd884: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/design.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/proposal.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/review-findings.json, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/specs/content-authoring/spec.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/tasks.md, openspec/specs/content-authoring/spec.md, trace/ledger.jsonl, trace/trace.json, trace/trajectory.json\nb80321a: docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/tasks.md, trace/ledger.jsonl, trace/trajectory.json\n19a364a: docs/current-state.md, docs/qa/evidence/slice5-compose-smoke.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/tasks.md, trace/trajectory.json\n2efecba: docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/review-findings.json, trace/trajectory.json\nd1d68df: docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/review-findings.json, trace/trajectory.json\nTasks: 17 done, 0 open.\nReview evidence: clean:true; findings 14; statuses {\"fixed\":12,\"waived\":2}\nArchive folder: openspec/changes/archive/2026-10-04-implement-authoring-tasks-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-child-profile-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\nfb65275 2026-10-04 17:39:03 +0200 feat(profile): child profile, first-start display name and settings API (slice 4)\nde80c7a 2026-10-04 17:47:15 +0200 fix(profile): slice 4 review-gate findings\n8ddebf1 2026-10-04 18:00:34 +0200 test(profile): review-gate dispositions, coverage ratchet after the fixes\n32b4fa3 2026-10-04 18:01:36 +0200 chore(profile): archive slice 4 backend (implement-child-profile-api)\n\nFiles per commit:\nfb65275: .env.example, compose.yaml, docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice4-red-run.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, fixtures/PROVENANCE.md, openspec/changes/implement-child-profile-api/design.md, openspec/changes/implement-child-profile-api/proposal.md, openspec/changes/implement-child-profile-api/specs/child-profile/spec.md, openspec/changes/implement-child-profile-api/tasks.md\nde80c7a: docs/qa/evidence/slice4-compose-smoke.md, docs/qa/traceability-report.md, openspec/changes/implement-child-profile-api/review-findings.json, openspec/changes/implement-child-profile-api/tasks.md, src/main/kotlin/cz/doucko/profile/application/ChildProfileInitializer.kt, src/main/kotlin/cz/doucko/profile/application/ProfileConfiguration.kt, src/main/kotlin/cz/doucko/profile/application/ProfileSettingsService.kt, src/main/resources/messages.properties, src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt, trace/ledger.jsonl, trace/trace.json, trace/workflow-runs/20261004-154020-review-gate.json\n8ddebf1: docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-child-profile-api/review-findings.json, openspec/changes/implement-child-profile-api/tasks.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/profile/adapter/out/persistence/ChildProfileEntity.kt, src/main/kotlin/cz/doucko/profile/adapter/out/persistence/JpaChildProfileStore.kt, src/main/kotlin/cz/doucko/profile/application/ProfileSettingsService.kt, src/test/kotlin/cz/doucko/profile/ChildProfileEntityTest.kt, trace/ledger.jsonl, trace/trace.json\n32b4fa3: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-child-profile-api/design.md, openspec/changes/archive/2026-10-04-implement-child-profile-api/proposal.md, openspec/changes/archive/2026-10-04-implement-child-profile-api/review-findings.json, openspec/changes/archive/2026-10-04-implement-child-profile-api/specs/child-profile/spec.md, openspec/changes/archive/2026-10-04-implement-child-profile-api/tasks.md, openspec/specs/child-profile/spec.md, trace/ledger.jsonl, trace/trace.json, trace/trajectory.json\nTasks: 20 done, 0 open.\nReview evidence: clean:true; findings 8; statuses {\"waived\":2,\"fixed\":6}\nArchive folder: openspec/changes/archive/2026-10-04-implement-child-profile-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-platform-foundation-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\n69ea343 2026-10-04 01:22:52 +0200 feat(platform): slice 1 backend foundation (pre-review)\n24d6c7a 2026-10-04 07:12:39 +0200 fix(platform): slice 1 backend review-gate findings\nf553d30 2026-10-04 07:43:09 +0200 fix(platform): slice 1 backend review-gate findings, round 2\naf9a4c2 2026-10-04 07:45:52 +0200 docs(platform): slice 1 backend round-2 red/green and mutation evidence\n5bf3df9 2026-10-04 09:44:07 +0200 fix(platform): close the backend's DNS-rebinding door\nd2cb340 2026-10-04 14:30:38 +0200 fix(platform): slice 1 backend review-gate findings, round 3\n1e015a2 2026-10-04 14:31:23 +0200 docs(platform): backend review findings dispositioned (all fixed in d2cb340)\n43bff11 2026-10-04 15:14:12 +0200 chore(platform): archive slice 1 backend (implement-platform-foundation-api)\n\nFiles per commit:\n69ea343: .dockerignore, .editorconfig, .env.example, Dockerfile, compose.yaml, docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice1-compose-smoke.md, docs/qa/process-defects.json, docs/qa/process-health.md, fixtures/PROVENANCE.md, openspec/changes/implement-platform-foundation-api/.openspec.yaml\n24d6c7a: .editorconfig, compose.yaml, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice1-compose-smoke.md, docs/qa/evidence/slice1-review-fixes.md, docs/qa/traceability-report.md, docs/qa/workflow-args/review-gate-slice1-api.json, fixtures/PROVENANCE.md, openspec/changes/implement-platform-foundation-api/design.md, openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md, src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt, src/main/resources/application.yaml\nf553d30: .dockerignore, docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-platform-foundation-api/design.md, openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md, src/main/kotlin/cz/doucko/shared/adapter/in/web/ProblemErrorController.kt, src/main/kotlin/cz/doucko/shared/adapter/in/web/ProblemResponses.kt, src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt, src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt, src/main/resources/application.yaml, src/main/resources/logback-spring.xml, src/main/resources/messages.properties\naf9a4c2: docs/qa/evidence/slice1-review-fixes.md, openspec/changes/implement-platform-foundation-api/tasks.md, trace/ledger.jsonl\n5bf3df9: compose.yaml, docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-platform-foundation-api/design.md, openspec/changes/implement-platform-foundation-api/tasks.md, src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt, src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt, src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt, trace/ledger.jsonl, trace/trace.json\nd2cb340: docs/qa/automated-verification-latest.md, docs/qa/evidence/slice1-compose-smoke.md, docs/qa/traceability-report.md, openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md, openspec/changes/implement-platform-foundation-api/tasks.md, src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt, src/main/resources/application.yaml, src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt, src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt, trace/ledger.jsonl, trace/trace.json, trace/workflow-runs/20261004-120852-review-gate.json\n1e015a2: openspec/changes/implement-platform-foundation-api/review-findings.json, trace/ledger.jsonl\n43bff11: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-platform-foundation-api/.openspec.yaml, openspec/changes/archive/2026-10-04-implement-platform-foundation-api/design.md, openspec/changes/archive/2026-10-04-implement-platform-foundation-api/proposal.md, openspec/changes/archive/2026-10-04-implement-platform-foundation-api/review-findings.json, openspec/changes/archive/2026-10-04-implement-platform-foundation-api/specs/platform-foundation/spec.md, openspec/changes/archive/2026-10-04-implement-platform-foundation-api/tasks.md, openspec/specs/platform-foundation/spec.md, trace/ledger.jsonl, trace/trace.json\nTasks: 21 done, 0 open.\nReview evidence: clean:false; findings 13; statuses {\"fixed\":13}\nArchive folder: openspec/changes/archive/2026-10-04-implement-platform-foundation-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "fix-restore-schema-drift",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\n4828464 2026-10-05 19:32:11 +0200 fix(platform): restore migrates a dump older than the running schema\n13e1f9b 2026-10-05 19:50:32 +0200 fix(platform): review-gate fixes for fix-restore-schema-drift\nce74e52 2026-10-05 20:00:51 +0200 chore(platform): archive fix-restore-schema-drift\n\nFiles per commit:\n4828464: docs/current-state.md, docs/qa/evidence/fix-restore-schema-drift.md, docs/qa/traceability-report.md, openspec/changes/fix-restore-schema-drift/design.md, openspec/changes/fix-restore-schema-drift/proposal.md, openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md, openspec/changes/fix-restore-schema-drift/tasks.md, src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt, src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt, tools/lib/migrations.mjs, tools/restore.mjs, trace/trace.json\n13e1f9b: docs/qa/evidence/fix-restore-schema-drift.md, docs/qa/traceability-report.md, openspec/changes/fix-restore-schema-drift/design.md, openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md, openspec/changes/fix-restore-schema-drift/tasks.md, src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt, tools/restore.mjs, trace/trace.json\nce74e52: docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-05-fix-restore-schema-drift/design.md, openspec/changes/archive/2026-10-05-fix-restore-schema-drift/proposal.md, openspec/changes/archive/2026-10-05-fix-restore-schema-drift/review-findings.json, openspec/changes/archive/2026-10-05-fix-restore-schema-drift/specs/platform-foundation/spec.md, openspec/changes/archive/2026-10-05-fix-restore-schema-drift/tasks.md, openspec/specs/platform-foundation/spec.md, trace/ledger.jsonl, trace/trace.json\nTasks: 10 done, 0 open.\nReview evidence: clean:true; findings 17; statuses {\"fixed\":15,\"waived\":2}\nArchive folder: openspec/changes/archive/2026-10-05-fix-restore-schema-drift (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-practice-flow-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\n444bef9 2026-10-05 08:40:43 +0200 feat(practice): child practice flow, attempt log and tutor seam (slice 7 backend)\n6befcf1 2026-10-05 08:58:57 +0200 fix(practice): review-gate fixes for slice 7 backend\n4bff9c9 2026-10-05 09:01:47 +0200 chore(practice): archive slice 7 backend (implement-practice-flow-api)\n616b0c3 2026-10-05 09:01:57 +0200 chore(trace): slice 7 ledger events\n\nFiles per commit:\n444bef9: docs/qa/automated-verification-latest.md, docs/qa/evidence/slice7-compose-smoke.md, docs/qa/evidence/slice7-red-run.md, docs/qa/traceability-report.md, openspec/changes/implement-practice-flow-api/design.md, openspec/changes/implement-practice-flow-api/proposal.md, openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md, openspec/changes/implement-practice-flow-api/tasks.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/content/ServedContent.kt, src/main/kotlin/cz/doucko/content/adapter/in/web/ContentBodyAdvice.kt, src/main/kotlin/cz/doucko/content/adapter/out/persistence/JdbcTaskStore.kt\n6befcf1: docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-practice-flow-api/design.md, openspec/changes/implement-practice-flow-api/review-findings.json, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/practice/adapter/in/web/ChildControllers.kt, src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeMapping.kt, src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeReaders.kt, src/main/kotlin/cz/doucko/practice/adapter/out/persistence/JdbcPracticeStore.kt, src/main/kotlin/cz/doucko/practice/application/Ports.kt, src/main/kotlin/cz/doucko/practice/application/PracticeService.kt, src/main/kotlin/cz/doucko/practice/domain/Model.kt\n4bff9c9: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-05-implement-practice-flow-api/design.md, openspec/changes/archive/2026-10-05-implement-practice-flow-api/proposal.md, openspec/changes/archive/2026-10-05-implement-practice-flow-api/review-findings.json, openspec/changes/archive/2026-10-05-implement-practice-flow-api/specs/practice-flow/spec.md, openspec/changes/archive/2026-10-05-implement-practice-flow-api/tasks.md, openspec/specs/practice-flow/spec.md, trace/ledger.jsonl, trace/trace.json, trace/trajectory.json\n616b0c3: docs/qa/trajectory-report.md, trace/ledger.jsonl, trace/trajectory.json\nTasks: 15 done, 0 open.\nReview evidence: clean:false; findings 9; statuses {\"fixed\":8,\"waived\":1}\nArchive folder: openspec/changes/archive/2026-10-05-implement-practice-flow-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-gamification-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\nae434be 2026-10-07 12:12:00 +0200 feat(practice): XP ledger, completion bonuses, ranks and rank-ups (slice 8 backend)\n33f5bf2 2026-10-07 12:56:08 +0200 fix(practice): review-gate fixes for slice 8 backend\n2b71bb7 2026-10-07 12:58:57 +0200 chore(practice): archive slice 8 backend (implement-gamification-api)\n9527006 2026-10-07 20:25:53 +0200 Merge slice 8 (gamification) backend into main\n\nFiles per commit:\nae434be: docs/qa/automated-verification-latest.md, docs/qa/evidence/slice8-red-run.md, docs/qa/traceability-report.md, fixtures/PROVENANCE.md, openspec/changes/implement-gamification-api/design.md, openspec/changes/implement-gamification-api/proposal.md, openspec/changes/implement-gamification-api/specs/gamification/spec.md, openspec/changes/implement-gamification-api/tasks.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/content/PublishedMissionChanged.kt, src/main/kotlin/cz/doucko/content/ServedContent.kt, src/main/kotlin/cz/doucko/content/application/MissionService.kt\n33f5bf2: docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-gamification-api/design.md, openspec/changes/implement-gamification-api/specs/gamification/spec.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/practice/adapter/out/persistence/JdbcPracticeStore.kt, src/main/kotlin/cz/doucko/practice/adapter/out/persistence/JdbcXpLedger.kt, src/main/kotlin/cz/doucko/practice/application/Gamification.kt, src/main/kotlin/cz/doucko/practice/application/GamificationSettings.kt, src/main/kotlin/cz/doucko/practice/application/Ports.kt, src/main/kotlin/cz/doucko/practice/domain/Gamification.kt, src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt\n2b71bb7: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-07-implement-gamification-api/design.md, openspec/changes/archive/2026-10-07-implement-gamification-api/proposal.md, openspec/changes/archive/2026-10-07-implement-gamification-api/review-findings.json, openspec/changes/archive/2026-10-07-implement-gamification-api/specs/gamification/spec.md, openspec/changes/archive/2026-10-07-implement-gamification-api/tasks.md, openspec/specs/gamification/spec.md, trace/trace.json, trace/trajectory.json, trace/workflow-runs/20261007-101412-review-gate.json\n9527006: trace/ledger.jsonl\nTasks: 15 done, 0 open.\nReview evidence: clean:true; findings 6; statuses {\"fixed\":6}\nArchive folder: openspec/changes/archive/2026-10-07-implement-gamification-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "harden-phase5-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\ne1e7d17 2026-10-08 06:30:22 +0200 feat(tools): isolated e2e stack doucko-e2e (up/seed/down) for the real-stack suite\n81c0fbd 2026-10-08 07:12:28 +0200 test(content,practice): sourceRef refusals without a source; dismissing an attempt-less report\nd3081de 2026-10-08 07:28:48 +0200 fix(tools): review-gate fixes for the e2e stack (harden-phase5-api)\n5913aa2 2026-10-08 07:54:55 +0200 chore(phase5): coverage ratchet, e2e-stack proof, review dispositions, archive harden-phase5-api\nc3a0454 2026-10-08 07:56:12 +0200 chore(factory): install PD-16 (G5 e2eStack, n/a for backend)\n26648ee 2026-10-08 08:14:38 +0200 merge: Phase 5 hardening (backend)\n\nFiles per commit:\ne1e7d17: compose.e2e.yaml, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, package.json, src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt, tools/e2e-stack.env, tools/e2e-stack.mjs, tools/lib/e2e-seed.mjs, tools/lib/e2e-stack.mjs, trace/trace.json, trace/trajectory.json\n81c0fbd: docs/qa/traceability-report.md, openspec/changes/harden-phase5-api/design.md, openspec/changes/harden-phase5-api/proposal.md, openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md, openspec/changes/harden-phase5-api/tasks.md, src/test/kotlin/cz/doucko/content/TaskRulesTest.kt, src/test/kotlin/cz/doucko/practice/FlagQueueServiceTest.kt, trace/trace.json\nd3081de: docs/qa/traceability-report.md, docs/qa/workflow-args/review-gate-harden-phase5-api.json, openspec/changes/harden-phase5-api/design.md, openspec/changes/harden-phase5-api/review-findings.json, openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md, openspec/changes/harden-phase5-api/tasks.md, src/test/kotlin/cz/doucko/content/TaskRulesTest.kt, src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt, tools/e2e-stack.mjs, tools/lib/e2e-seed.mjs, tools/lib/e2e-stack.mjs, tools/test/e2e-seed-harness.mjs\n5913aa2: docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/evidence/phase5-e2e-stack.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-08-harden-phase5-api/design.md, openspec/changes/archive/2026-10-08-harden-phase5-api/proposal.md, openspec/changes/archive/2026-10-08-harden-phase5-api/review-findings.json, openspec/changes/archive/2026-10-08-harden-phase5-api/specs/platform-foundation/spec.md, openspec/changes/archive/2026-10-08-harden-phase5-api/tasks.md, openspec/changes/harden-phase5-api/tasks.md, openspec/specs/platform-foundation/spec.md\nc3a0454: docs/current-state.md, docs/qa/trajectory-report.md, factory-lock.json, scripts/gate-status.mjs, trace/trajectory.json\n26648ee: \nTasks: 13 done, 0 open.\nReview evidence: clean:false; findings 21; statuses {\"fixed\":21}\nArchive folder: openspec/changes/archive/2026-10-08-harden-phase5-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-progress-stats-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\n9c24960 2026-10-07 22:19:37 +0200 feat(practice): weekly stats, flag queue, re-evaluation and dismiss (slice 9 backend)\n2dfbb77 2026-10-07 22:46:20 +0200 fix(practice): review-gate fixes for slice 9 backend\n1db68a2 2026-10-08 00:10:30 +0200 test(practice): slice 9 edge paths and the QA battery after the review fixes\n7e30946 2026-10-08 00:13:02 +0200 chore(practice): archive slice 9 backend (implement-progress-stats-api)\ne40423d 2026-10-08 00:15:28 +0200 Merge slice 9 (progress-stats) backend into main\nf822521 2026-10-08 00:27:40 +0200 docs(backend): slice 9 real-stack smoke after the merge (PASS)\n\nFiles per commit:\n9c24960: docs/qa/evidence/slice9-red-run.md, docs/qa/traceability-report.md, openspec/changes/implement-progress-stats-api/design.md, openspec/changes/implement-progress-stats-api/proposal.md, openspec/changes/implement-progress-stats-api/specs/progress-stats/spec.md, openspec/changes/implement-progress-stats-api/tasks.md, src/main/kotlin/cz/doucko/content/ContentCatalog.kt, src/main/kotlin/cz/doucko/content/ContentModule.kt, src/main/kotlin/cz/doucko/content/application/ContentCatalogService.kt, src/main/kotlin/cz/doucko/practice/PracticeModule.kt, src/main/kotlin/cz/doucko/practice/adapter/in/web/AdminStatsController.kt, src/main/kotlin/cz/doucko/practice/adapter/in/web/AdminStatsProblemAdvice.kt\n2dfbb77: docs/qa/traceability-report.md, openspec/changes/implement-progress-stats-api/design.md, src/main/kotlin/cz/doucko/content/ContentCatalog.kt, src/main/kotlin/cz/doucko/content/adapter/out/persistence/JdbcTaskStore.kt, src/main/kotlin/cz/doucko/content/application/ContentCatalogService.kt, src/main/kotlin/cz/doucko/content/application/Ports.kt, src/main/kotlin/cz/doucko/practice/adapter/out/persistence/JdbcPracticeStore.kt, src/main/kotlin/cz/doucko/practice/application/Ports.kt, src/main/kotlin/cz/doucko/practice/application/PracticeService.kt, src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt, src/main/kotlin/cz/doucko/practice/domain/Rules.kt, src/test/kotlin/cz/doucko/content/ContentTestSupport.kt\n1db68a2: docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/practice/adapter/in/web/AdminStatsController.kt, src/main/kotlin/cz/doucko/practice/adapter/in/web/AdminStatsProblemAdvice.kt, src/main/kotlin/cz/doucko/practice/domain/Stats.kt, src/test/kotlin/cz/doucko/practice/FlagQueueServiceTest.kt, src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt, trace/trace.json\n7e30946: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-08-implement-progress-stats-api/design.md, openspec/changes/archive/2026-10-08-implement-progress-stats-api/proposal.md, openspec/changes/archive/2026-10-08-implement-progress-stats-api/review-findings.json, openspec/changes/archive/2026-10-08-implement-progress-stats-api/specs/progress-stats/spec.md, openspec/changes/archive/2026-10-08-implement-progress-stats-api/tasks.md, openspec/specs/progress-stats/spec.md, trace/trace.json, trace/trajectory.json, trace/workflow-runs/20261007-202408-review-gate.json\ne40423d: trace/ledger.jsonl\nf822521: docs/current-state.md, docs/qa/evidence/slice9-compose-smoke.md, docs/qa/trajectory-report.md, trace/ledger.jsonl, trace/trajectory.json\nTasks: 15 done, 0 open.\nReview evidence: clean:false; findings 8; statuses {\"fixed\":6,\"waived\":2}\nArchive folder: openspec/changes/archive/2026-10-08-implement-progress-stats-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      }
+    ]
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": "sonnet",
+    "budgetPerAgentUsd": 0.35,
+    "maxTotalUsd": 5.9,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "failed",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 0.0407,
+  "steps": [
+    {
+      "label": "judge:implement-admin-access-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-admin-access-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-admin-access-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-admin-access-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-answer-checking-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-answer-checking-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-answer-checking-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-answer-checking-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-authoring-missions-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-authoring-missions-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-authoring-missions-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-authoring-missions-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-authoring-tasks-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-authoring-tasks-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-authoring-tasks-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-authoring-tasks-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-child-profile-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-child-profile-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-child-profile-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-child-profile-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-platform-foundation-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-platform-foundation-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-platform-foundation-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-platform-foundation-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:fix-restore-schema-drift:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:fix-restore-schema-drift:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:fix-restore-schema-drift:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:fix-restore-schema-drift:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-practice-flow-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-practice-flow-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-practice-flow-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-practice-flow-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-gamification-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-gamification-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-gamification-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-gamification-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:harden-phase5-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:harden-phase5-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:harden-phase5-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:harden-phase5-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-progress-stats-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-progress-stats-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-progress-stats-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "judge:implement-progress-stats-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": false,
+      "error": "agent definition .claude/agents/eval-judge.md not found"
+    },
+    {
+      "label": "write-trajectory-artifacts",
+      "phase": "Aggregate",
+      "agentType": null,
+      "structured": false,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --model sonnet",
+      "promptChars": 1369,
+      "durationMs": 10802,
+      "sessionId": "0d3d4373-4ef6-4ba9-8616-84a0c0c6fcb1",
+      "costUsd": 0.0407114,
+      "numTurns": 2,
+      "result": "I couldn't write any of the three files, so nothing was created:\n\n- `evals/results/trajectory-latest.json`\n- `evals/results/trajectory-manifest.json`\n- `docs/qa/trajectory-eval-report.md`\n\nBash is disabled in this session, and I have no file-writing tool here. I only have Read, Glob, Grep, and the Google Drive and Claude Docs tools. None of those can create files in the working directory.\n\nI also couldn't get the real UTC time. `date -u` needs Bash, and I won't guess a timestamp for `WORKFLOW_FILL_ISO_UTC`.\n\nTo finish this, re-run it in a session with Write or Bash enabled. I'd then take the timestamp from `date -u +%Y-%m-%dT%H:%M:%SZ`, create the `evals/results/` directory, and write the three files exactly as specified."
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Collect",
+      "message": "11 slice(s) × 4 dimensions = 44 judgements"
+    },
+    {
+      "phase": "Aggregate",
+      "message": "scored 0 judgement(s): 0 pass; dimensions {}"
+    }
+  ],
+  "persisted": [],
+  "returned": {
+    "slices": 0,
+    "judgements": 0,
+    "passed": 0,
+    "dimensions": {},
+    "sliceRollup": {},
+    "wrote": [
+      "evals/results/trajectory-latest.json",
+      "evals/results/trajectory-manifest.json",
+      "docs/qa/trajectory-eval-report.md"
+    ]
+  }
+}

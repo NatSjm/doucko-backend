@@ -1,0 +1,1804 @@
+{
+  "workflow": "trajectory-eval",
+  "file": "./.claude/workflows/trajectory-eval.js",
+  "description": "Trajectory evaluation: grade the PATH each slice took, not just its output. A fresh judge (maker≠checker) scores each slice on process-order, test-integrity, in-scope discipline, and craft, reading the git log/diff/spec/tasks/review evidence. The LLM half of trajectory evals — the deterministic half is check-trajectory.mjs.",
+  "dryRun": false,
+  "startedAt": "2026-10-09T17:36:46.509Z",
+  "finishedAt": "2026-10-09T17:41:09.280Z",
+  "args": {
+    "slices": [
+      {
+        "slice": "implement-admin-access-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\nf94a58f 2026-10-04 16:54:04 +0200 feat(admin): admin sign-in, session, CSRF and idle expiry (slice 2)\n513a886 2026-10-04 17:07:08 +0200 fix(admin): slice 2 backend review-gate findings\na4117cf 2026-10-04 17:08:19 +0200 docs(admin): slice 2 backend handoff after the review gate\n584e05d 2026-10-04 17:09:19 +0200 chore(admin): archive slice 2 backend (implement-admin-access-api)\n\nFiles per commit:\nf94a58f: .env.example, compose.yaml, docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice2-compose-smoke.md, docs/qa/evidence/slice2-red-run.md, docs/qa/traceability-report.md, fixtures/PROVENANCE.md, openspec/changes/implement-admin-access-api/design.md, openspec/changes/implement-admin-access-api/proposal.md, openspec/changes/implement-admin-access-api/specs/admin-access/spec.md, openspec/changes/implement-admin-access-api/tasks.md\n513a886: docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-admin-access-api/review-findings.json, src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminIdleTimeoutFilter.kt, src/main/kotlin/cz/doucko/admin/adapter/in/web/AdminSessionController.kt, src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutFilterTest.kt, src/test/kotlin/cz/doucko/admin/AdminIdleTimeoutTest.kt, src/test/kotlin/cz/doucko/admin/AdminSessionTest.kt, src/test/kotlin/cz/doucko/admin/ChildOperationsContractTest.kt, trace/acceptance-contracts.json, trace/ledger.jsonl, trace/trace.json\na4117cf: docs/current-state.md, openspec/changes/implement-admin-access-api/tasks.md, trace/ledger.jsonl\n584e05d: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-admin-access-api/design.md, openspec/changes/archive/2026-10-04-implement-admin-access-api/proposal.md, openspec/changes/archive/2026-10-04-implement-admin-access-api/review-findings.json, openspec/changes/archive/2026-10-04-implement-admin-access-api/specs/admin-access/spec.md, openspec/changes/archive/2026-10-04-implement-admin-access-api/tasks.md, openspec/specs/admin-access/spec.md, trace/ledger.jsonl, trace/trace.json, trace/trajectory.json\nTasks: 19 done, 0 open.\nReview evidence: clean:true; findings 10; statuses {\"fixed\":6,\"waived\":4}\nArchive folder: openspec/changes/archive/2026-10-04-implement-admin-access-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-answer-checking-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\n0120326 2026-10-04 17:31:58 +0200 feat(checking): pure answer checker with a 212-case golden table (slice 3)\nf26150d 2026-10-04 17:46:35 +0200 fix(checking): slice 3 review-gate findings\n6343ca7 2026-10-04 17:53:58 +0200 fix(checking): tip example never throws; compact and no-example fallbacks\n5e71433 2026-10-04 17:58:45 +0200 chore(checking): archive slice 3 backend (implement-answer-checking-api)\n\nFiles per commit:\n0120326: docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice3-checker-run.md, docs/qa/evidence/slice3-red-run.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, fixtures/PROVENANCE.md, openspec/changes/implement-answer-checking-api/design.md, openspec/changes/implement-answer-checking-api/proposal.md, openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md, openspec/changes/implement-answer-checking-api/tasks.md, quality/coverage-baseline.json\nf26150d: docs/qa/traceability-report.md, openspec/changes/implement-answer-checking-api/design.md, openspec/changes/implement-answer-checking-api/review-findings.json, openspec/changes/implement-answer-checking-api/specs/answer-checking/spec.md, src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt, src/main/kotlin/cz/doucko/checking/domain/Grader.kt, src/main/kotlin/cz/doucko/checking/domain/Rational.kt, src/main/resources/messages.properties, src/test/kotlin/cz/doucko/checking/AnswerCheckerPropertyTest.kt, src/test/kotlin/cz/doucko/checking/CheckerTimingTest.kt, src/test/kotlin/cz/doucko/checking/GoldenScenarioCoverageTest.kt, src/test/resources/checking/golden-table.jsonl\n6343ca7: docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-answer-checking-api/review-findings.json, openspec/changes/implement-answer-checking-api/tasks.md, src/main/kotlin/cz/doucko/checking/domain/FormatTips.kt, src/main/resources/messages.properties, src/test/kotlin/cz/doucko/checking/CheckerEdgeCasesTest.kt, trace/acceptance-contracts.json, trace/ledger.jsonl, trace/trace.json\n5e71433: docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice3-checker-run.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-answer-checking-api/design.md, openspec/changes/archive/2026-10-04-implement-answer-checking-api/proposal.md, openspec/changes/archive/2026-10-04-implement-answer-checking-api/review-findings.json, openspec/changes/archive/2026-10-04-implement-answer-checking-api/specs/answer-checking/spec.md, openspec/changes/archive/2026-10-04-implement-answer-checking-api/tasks.md, openspec/specs/answer-checking/spec.md, quality/coverage-baseline.json\nTasks: 18 done, 0 open.\nReview evidence: clean:true; findings 14; statuses {\"fixed\":8,\"waived\":6}\nArchive folder: openspec/changes/archive/2026-10-04-implement-answer-checking-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-authoring-missions-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\nd001eab 2026-10-04 21:57:53 +0200 feat(content): missions, publishing rules and delete guards (slice 6 backend)\n07518f9 2026-10-04 22:16:44 +0200 fix(content): review-gate fixes for slice 6 backend\nea4bf12 2026-10-04 22:19:54 +0200 chore(content): archive slice 6 backend (implement-authoring-missions-api)\n68fbac5 2026-10-04 22:20:07 +0200 chore(trace): slice 6 ledger events\n\nFiles per commit:\nd001eab: docs/qa/automated-verification-latest.md, docs/qa/evidence/slice6-red-run.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/implement-authoring-missions-api/.openspec.yaml, openspec/changes/implement-authoring-missions-api/design.md, openspec/changes/implement-authoring-missions-api/proposal.md, openspec/changes/implement-authoring-missions-api/specs/content-authoring/spec.md, openspec/changes/implement-authoring-missions-api/tasks.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/content/ContentModule.kt, src/main/kotlin/cz/doucko/content/ContentUsage.kt\n07518f9: docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-authoring-missions-api/design.md, openspec/changes/implement-authoring-missions-api/review-findings.json, openspec/changes/implement-authoring-missions-api/specs/content-authoring/spec.md, openspec/changes/implement-authoring-missions-api/tasks.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/content/application/Conflicts.kt, src/main/kotlin/cz/doucko/content/application/MissionService.kt, src/main/kotlin/cz/doucko/content/application/TaskService.kt, src/main/kotlin/cz/doucko/content/domain/Missions.kt, src/test/kotlin/cz/doucko/content/MissionApiTest.kt\nea4bf12: docs/current-state.md, docs/qa/evidence/slice6-compose-smoke.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-authoring-missions-api/.openspec.yaml, openspec/changes/archive/2026-10-04-implement-authoring-missions-api/design.md, openspec/changes/archive/2026-10-04-implement-authoring-missions-api/proposal.md, openspec/changes/archive/2026-10-04-implement-authoring-missions-api/review-findings.json, openspec/changes/archive/2026-10-04-implement-authoring-missions-api/specs/content-authoring/spec.md, openspec/changes/archive/2026-10-04-implement-authoring-missions-api/tasks.md, openspec/specs/content-authoring/spec.md, trace/ledger.jsonl\n68fbac5: docs/qa/trajectory-report.md, trace/ledger.jsonl, trace/trajectory.json\nTasks: 16 done, 0 open.\nReview evidence: clean:false; findings 6; statuses {\"fixed\":6}\nArchive folder: openspec/changes/archive/2026-10-04-implement-authoring-missions-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-authoring-tasks-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\n499b23c 2026-10-04 20:10:05 +0200 feat(content): sources, tasks, images, preview, tester and bulk publish (slice 5 backend)\n3738bfe 2026-10-04 20:51:06 +0200 fix(content): review-gate fixes for slice 5 backend\n69bd884 2026-10-04 20:52:54 +0200 chore(content): archive slice 5 backend (implement-authoring-tasks-api)\nb80321a 2026-10-04 20:53:06 +0200 chore(trace): slice 5 ledger events and task note wording\n19a364a 2026-10-04 21:14:38 +0200 docs(backend): slice 5 real-stack smoke after the merge (PASS)\n2efecba 2026-10-04 21:14:57 +0200 docs(content): slice 5 review finding F09 fixed by the post-merge smoke\nd1d68df 2026-10-04 21:15:23 +0200 docs(content): slice 5 waiver reasons in the field the trajectory check reads\n\nFiles per commit:\n499b23c: .env.example, Dockerfile, compose.yaml, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice5-compose-smoke.md, docs/qa/evidence/slice5-red-run.md, docs/qa/traceability-report.md, fixtures/PROVENANCE.md, openspec/changes/implement-authoring-tasks-api/design.md, openspec/changes/implement-authoring-tasks-api/proposal.md, openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md, openspec/changes/implement-authoring-tasks-api/tasks.md\n3738bfe: .gitignore, docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-authoring-tasks-api/design.md, openspec/changes/implement-authoring-tasks-api/proposal.md, openspec/changes/implement-authoring-tasks-api/review-findings.json, openspec/changes/implement-authoring-tasks-api/specs/content-authoring/spec.md, openspec/changes/implement-authoring-tasks-api/tasks.md, src/main/kotlin/cz/doucko/content/adapter/in/web/ContentProblemAdvice.kt, src/main/kotlin/cz/doucko/content/adapter/out/files/FilesystemFileStorage.kt, src/main/kotlin/cz/doucko/content/adapter/out/persistence/JdbcTaskStore.kt, src/main/kotlin/cz/doucko/content/application/Ports.kt\n69bd884: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/design.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/proposal.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/review-findings.json, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/specs/content-authoring/spec.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/tasks.md, openspec/specs/content-authoring/spec.md, trace/ledger.jsonl, trace/trace.json, trace/trajectory.json\nb80321a: docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/tasks.md, trace/ledger.jsonl, trace/trajectory.json\n19a364a: docs/current-state.md, docs/qa/evidence/slice5-compose-smoke.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/tasks.md, trace/trajectory.json\n2efecba: docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/review-findings.json, trace/trajectory.json\nd1d68df: docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-authoring-tasks-api/review-findings.json, trace/trajectory.json\nTasks: 17 done, 0 open.\nReview evidence: clean:true; findings 14; statuses {\"fixed\":12,\"waived\":2}\nArchive folder: openspec/changes/archive/2026-10-04-implement-authoring-tasks-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-child-profile-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\nfb65275 2026-10-04 17:39:03 +0200 feat(profile): child profile, first-start display name and settings API (slice 4)\nde80c7a 2026-10-04 17:47:15 +0200 fix(profile): slice 4 review-gate findings\n8ddebf1 2026-10-04 18:00:34 +0200 test(profile): review-gate dispositions, coverage ratchet after the fixes\n32b4fa3 2026-10-04 18:01:36 +0200 chore(profile): archive slice 4 backend (implement-child-profile-api)\n\nFiles per commit:\nfb65275: .env.example, compose.yaml, docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice4-red-run.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, fixtures/PROVENANCE.md, openspec/changes/implement-child-profile-api/design.md, openspec/changes/implement-child-profile-api/proposal.md, openspec/changes/implement-child-profile-api/specs/child-profile/spec.md, openspec/changes/implement-child-profile-api/tasks.md\nde80c7a: docs/qa/evidence/slice4-compose-smoke.md, docs/qa/traceability-report.md, openspec/changes/implement-child-profile-api/review-findings.json, openspec/changes/implement-child-profile-api/tasks.md, src/main/kotlin/cz/doucko/profile/application/ChildProfileInitializer.kt, src/main/kotlin/cz/doucko/profile/application/ProfileConfiguration.kt, src/main/kotlin/cz/doucko/profile/application/ProfileSettingsService.kt, src/main/resources/messages.properties, src/test/kotlin/cz/doucko/profile/ChildProfileStartupTest.kt, trace/ledger.jsonl, trace/trace.json, trace/workflow-runs/20261004-154020-review-gate.json\n8ddebf1: docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-child-profile-api/review-findings.json, openspec/changes/implement-child-profile-api/tasks.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/profile/adapter/out/persistence/ChildProfileEntity.kt, src/main/kotlin/cz/doucko/profile/adapter/out/persistence/JpaChildProfileStore.kt, src/main/kotlin/cz/doucko/profile/application/ProfileSettingsService.kt, src/test/kotlin/cz/doucko/profile/ChildProfileEntityTest.kt, trace/ledger.jsonl, trace/trace.json\n32b4fa3: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-child-profile-api/design.md, openspec/changes/archive/2026-10-04-implement-child-profile-api/proposal.md, openspec/changes/archive/2026-10-04-implement-child-profile-api/review-findings.json, openspec/changes/archive/2026-10-04-implement-child-profile-api/specs/child-profile/spec.md, openspec/changes/archive/2026-10-04-implement-child-profile-api/tasks.md, openspec/specs/child-profile/spec.md, trace/ledger.jsonl, trace/trace.json, trace/trajectory.json\nTasks: 20 done, 0 open.\nReview evidence: clean:true; findings 8; statuses {\"waived\":2,\"fixed\":6}\nArchive folder: openspec/changes/archive/2026-10-04-implement-child-profile-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-platform-foundation-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\n69ea343 2026-10-04 01:22:52 +0200 feat(platform): slice 1 backend foundation (pre-review)\n24d6c7a 2026-10-04 07:12:39 +0200 fix(platform): slice 1 backend review-gate findings\nf553d30 2026-10-04 07:43:09 +0200 fix(platform): slice 1 backend review-gate findings, round 2\naf9a4c2 2026-10-04 07:45:52 +0200 docs(platform): slice 1 backend round-2 red/green and mutation evidence\n5bf3df9 2026-10-04 09:44:07 +0200 fix(platform): close the backend's DNS-rebinding door\nd2cb340 2026-10-04 14:30:38 +0200 fix(platform): slice 1 backend review-gate findings, round 3\n1e015a2 2026-10-04 14:31:23 +0200 docs(platform): backend review findings dispositioned (all fixed in d2cb340)\n43bff11 2026-10-04 15:14:12 +0200 chore(platform): archive slice 1 backend (implement-platform-foundation-api)\n\nFiles per commit:\n69ea343: .dockerignore, .editorconfig, .env.example, Dockerfile, compose.yaml, docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice1-compose-smoke.md, docs/qa/process-defects.json, docs/qa/process-health.md, fixtures/PROVENANCE.md, openspec/changes/implement-platform-foundation-api/.openspec.yaml\n24d6c7a: .editorconfig, compose.yaml, docs/qa/automated-verification-latest.md, docs/qa/evidence/slice1-compose-smoke.md, docs/qa/evidence/slice1-review-fixes.md, docs/qa/traceability-report.md, docs/qa/workflow-args/review-gate-slice1-api.json, fixtures/PROVENANCE.md, openspec/changes/implement-platform-foundation-api/design.md, openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md, src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt, src/main/resources/application.yaml\nf553d30: .dockerignore, docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-platform-foundation-api/design.md, openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md, src/main/kotlin/cz/doucko/shared/adapter/in/web/ProblemErrorController.kt, src/main/kotlin/cz/doucko/shared/adapter/in/web/ProblemResponses.kt, src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt, src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt, src/main/resources/application.yaml, src/main/resources/logback-spring.xml, src/main/resources/messages.properties\naf9a4c2: docs/qa/evidence/slice1-review-fixes.md, openspec/changes/implement-platform-foundation-api/tasks.md, trace/ledger.jsonl\n5bf3df9: compose.yaml, docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-platform-foundation-api/design.md, openspec/changes/implement-platform-foundation-api/tasks.md, src/main/kotlin/cz/doucko/shared/adapter/in/web/SecurityConfiguration.kt, src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt, src/test/kotlin/cz/doucko/platform/ComposeConfigurationTest.kt, trace/ledger.jsonl, trace/trace.json\nd2cb340: docs/qa/automated-verification-latest.md, docs/qa/evidence/slice1-compose-smoke.md, docs/qa/traceability-report.md, openspec/changes/implement-platform-foundation-api/specs/platform-foundation/spec.md, openspec/changes/implement-platform-foundation-api/tasks.md, src/main/kotlin/cz/doucko/shared/logging/RequestContentLogGuard.kt, src/main/resources/application.yaml, src/test/kotlin/cz/doucko/DouckoBackendApplicationIT.kt, src/test/kotlin/cz/doucko/platform/FixtureProvenanceTest.kt, trace/ledger.jsonl, trace/trace.json, trace/workflow-runs/20261004-120852-review-gate.json\n1e015a2: openspec/changes/implement-platform-foundation-api/review-findings.json, trace/ledger.jsonl\n43bff11: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-04-implement-platform-foundation-api/.openspec.yaml, openspec/changes/archive/2026-10-04-implement-platform-foundation-api/design.md, openspec/changes/archive/2026-10-04-implement-platform-foundation-api/proposal.md, openspec/changes/archive/2026-10-04-implement-platform-foundation-api/review-findings.json, openspec/changes/archive/2026-10-04-implement-platform-foundation-api/specs/platform-foundation/spec.md, openspec/changes/archive/2026-10-04-implement-platform-foundation-api/tasks.md, openspec/specs/platform-foundation/spec.md, trace/ledger.jsonl, trace/trace.json\nTasks: 21 done, 0 open.\nReview evidence: clean:false; findings 13; statuses {\"fixed\":13}\nArchive folder: openspec/changes/archive/2026-10-04-implement-platform-foundation-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "fix-restore-schema-drift",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\n4828464 2026-10-05 19:32:11 +0200 fix(platform): restore migrates a dump older than the running schema\n13e1f9b 2026-10-05 19:50:32 +0200 fix(platform): review-gate fixes for fix-restore-schema-drift\nce74e52 2026-10-05 20:00:51 +0200 chore(platform): archive fix-restore-schema-drift\n\nFiles per commit:\n4828464: docs/current-state.md, docs/qa/evidence/fix-restore-schema-drift.md, docs/qa/traceability-report.md, openspec/changes/fix-restore-schema-drift/design.md, openspec/changes/fix-restore-schema-drift/proposal.md, openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md, openspec/changes/fix-restore-schema-drift/tasks.md, src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt, src/test/kotlin/cz/doucko/platform/OperatorToolGuardTest.kt, tools/lib/migrations.mjs, tools/restore.mjs, trace/trace.json\n13e1f9b: docs/qa/evidence/fix-restore-schema-drift.md, docs/qa/traceability-report.md, openspec/changes/fix-restore-schema-drift/design.md, openspec/changes/fix-restore-schema-drift/specs/platform-foundation/spec.md, openspec/changes/fix-restore-schema-drift/tasks.md, src/test/kotlin/cz/doucko/platform/BackupRestoreIT.kt, tools/restore.mjs, trace/trace.json\nce74e52: docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-05-fix-restore-schema-drift/design.md, openspec/changes/archive/2026-10-05-fix-restore-schema-drift/proposal.md, openspec/changes/archive/2026-10-05-fix-restore-schema-drift/review-findings.json, openspec/changes/archive/2026-10-05-fix-restore-schema-drift/specs/platform-foundation/spec.md, openspec/changes/archive/2026-10-05-fix-restore-schema-drift/tasks.md, openspec/specs/platform-foundation/spec.md, trace/ledger.jsonl, trace/trace.json\nTasks: 10 done, 0 open.\nReview evidence: clean:true; findings 17; statuses {\"fixed\":15,\"waived\":2}\nArchive folder: openspec/changes/archive/2026-10-05-fix-restore-schema-drift (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-practice-flow-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\n444bef9 2026-10-05 08:40:43 +0200 feat(practice): child practice flow, attempt log and tutor seam (slice 7 backend)\n6befcf1 2026-10-05 08:58:57 +0200 fix(practice): review-gate fixes for slice 7 backend\n4bff9c9 2026-10-05 09:01:47 +0200 chore(practice): archive slice 7 backend (implement-practice-flow-api)\n616b0c3 2026-10-05 09:01:57 +0200 chore(trace): slice 7 ledger events\n\nFiles per commit:\n444bef9: docs/qa/automated-verification-latest.md, docs/qa/evidence/slice7-compose-smoke.md, docs/qa/evidence/slice7-red-run.md, docs/qa/traceability-report.md, openspec/changes/implement-practice-flow-api/design.md, openspec/changes/implement-practice-flow-api/proposal.md, openspec/changes/implement-practice-flow-api/specs/practice-flow/spec.md, openspec/changes/implement-practice-flow-api/tasks.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/content/ServedContent.kt, src/main/kotlin/cz/doucko/content/adapter/in/web/ContentBodyAdvice.kt, src/main/kotlin/cz/doucko/content/adapter/out/persistence/JdbcTaskStore.kt\n6befcf1: docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-practice-flow-api/design.md, openspec/changes/implement-practice-flow-api/review-findings.json, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/practice/adapter/in/web/ChildControllers.kt, src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeMapping.kt, src/main/kotlin/cz/doucko/practice/adapter/in/web/PracticeReaders.kt, src/main/kotlin/cz/doucko/practice/adapter/out/persistence/JdbcPracticeStore.kt, src/main/kotlin/cz/doucko/practice/application/Ports.kt, src/main/kotlin/cz/doucko/practice/application/PracticeService.kt, src/main/kotlin/cz/doucko/practice/domain/Model.kt\n4bff9c9: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-05-implement-practice-flow-api/design.md, openspec/changes/archive/2026-10-05-implement-practice-flow-api/proposal.md, openspec/changes/archive/2026-10-05-implement-practice-flow-api/review-findings.json, openspec/changes/archive/2026-10-05-implement-practice-flow-api/specs/practice-flow/spec.md, openspec/changes/archive/2026-10-05-implement-practice-flow-api/tasks.md, openspec/specs/practice-flow/spec.md, trace/ledger.jsonl, trace/trace.json, trace/trajectory.json\n616b0c3: docs/qa/trajectory-report.md, trace/ledger.jsonl, trace/trajectory.json\nTasks: 15 done, 0 open.\nReview evidence: clean:false; findings 9; statuses {\"fixed\":8,\"waived\":1}\nArchive folder: openspec/changes/archive/2026-10-05-implement-practice-flow-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-gamification-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\nae434be 2026-10-07 12:12:00 +0200 feat(practice): XP ledger, completion bonuses, ranks and rank-ups (slice 8 backend)\n33f5bf2 2026-10-07 12:56:08 +0200 fix(practice): review-gate fixes for slice 8 backend\n2b71bb7 2026-10-07 12:58:57 +0200 chore(practice): archive slice 8 backend (implement-gamification-api)\n9527006 2026-10-07 20:25:53 +0200 Merge slice 8 (gamification) backend into main\n\nFiles per commit:\nae434be: docs/qa/automated-verification-latest.md, docs/qa/evidence/slice8-red-run.md, docs/qa/traceability-report.md, fixtures/PROVENANCE.md, openspec/changes/implement-gamification-api/design.md, openspec/changes/implement-gamification-api/proposal.md, openspec/changes/implement-gamification-api/specs/gamification/spec.md, openspec/changes/implement-gamification-api/tasks.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/content/PublishedMissionChanged.kt, src/main/kotlin/cz/doucko/content/ServedContent.kt, src/main/kotlin/cz/doucko/content/application/MissionService.kt\n33f5bf2: docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, openspec/changes/implement-gamification-api/design.md, openspec/changes/implement-gamification-api/specs/gamification/spec.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/practice/adapter/out/persistence/JdbcPracticeStore.kt, src/main/kotlin/cz/doucko/practice/adapter/out/persistence/JdbcXpLedger.kt, src/main/kotlin/cz/doucko/practice/application/Gamification.kt, src/main/kotlin/cz/doucko/practice/application/GamificationSettings.kt, src/main/kotlin/cz/doucko/practice/application/Ports.kt, src/main/kotlin/cz/doucko/practice/domain/Gamification.kt, src/test/kotlin/cz/doucko/practice/GamificationConfigTest.kt\n2b71bb7: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-07-implement-gamification-api/design.md, openspec/changes/archive/2026-10-07-implement-gamification-api/proposal.md, openspec/changes/archive/2026-10-07-implement-gamification-api/review-findings.json, openspec/changes/archive/2026-10-07-implement-gamification-api/specs/gamification/spec.md, openspec/changes/archive/2026-10-07-implement-gamification-api/tasks.md, openspec/specs/gamification/spec.md, trace/trace.json, trace/trajectory.json, trace/workflow-runs/20261007-101412-review-gate.json\n9527006: trace/ledger.jsonl\nTasks: 15 done, 0 open.\nReview evidence: clean:true; findings 6; statuses {\"fixed\":6}\nArchive folder: openspec/changes/archive/2026-10-07-implement-gamification-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "harden-phase5-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\ne1e7d17 2026-10-08 06:30:22 +0200 feat(tools): isolated e2e stack doucko-e2e (up/seed/down) for the real-stack suite\n81c0fbd 2026-10-08 07:12:28 +0200 test(content,practice): sourceRef refusals without a source; dismissing an attempt-less report\nd3081de 2026-10-08 07:28:48 +0200 fix(tools): review-gate fixes for the e2e stack (harden-phase5-api)\n5913aa2 2026-10-08 07:54:55 +0200 chore(phase5): coverage ratchet, e2e-stack proof, review dispositions, archive harden-phase5-api\nc3a0454 2026-10-08 07:56:12 +0200 chore(factory): install PD-16 (G5 e2eStack, n/a for backend)\n26648ee 2026-10-08 08:14:38 +0200 merge: Phase 5 hardening (backend)\n\nFiles per commit:\ne1e7d17: compose.e2e.yaml, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, package.json, src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt, tools/e2e-stack.env, tools/e2e-stack.mjs, tools/lib/e2e-seed.mjs, tools/lib/e2e-stack.mjs, trace/trace.json, trace/trajectory.json\n81c0fbd: docs/qa/traceability-report.md, openspec/changes/harden-phase5-api/design.md, openspec/changes/harden-phase5-api/proposal.md, openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md, openspec/changes/harden-phase5-api/tasks.md, src/test/kotlin/cz/doucko/content/TaskRulesTest.kt, src/test/kotlin/cz/doucko/practice/FlagQueueServiceTest.kt, trace/trace.json\nd3081de: docs/qa/traceability-report.md, docs/qa/workflow-args/review-gate-harden-phase5-api.json, openspec/changes/harden-phase5-api/design.md, openspec/changes/harden-phase5-api/review-findings.json, openspec/changes/harden-phase5-api/specs/platform-foundation/spec.md, openspec/changes/harden-phase5-api/tasks.md, src/test/kotlin/cz/doucko/content/TaskRulesTest.kt, src/test/kotlin/cz/doucko/platform/E2eStackToolTest.kt, tools/e2e-stack.mjs, tools/lib/e2e-seed.mjs, tools/lib/e2e-stack.mjs, tools/test/e2e-seed-harness.mjs\n5913aa2: docs/current-state.md, docs/qa/automated-verification-latest.md, docs/qa/evidence/phase5-e2e-stack.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-08-harden-phase5-api/design.md, openspec/changes/archive/2026-10-08-harden-phase5-api/proposal.md, openspec/changes/archive/2026-10-08-harden-phase5-api/review-findings.json, openspec/changes/archive/2026-10-08-harden-phase5-api/specs/platform-foundation/spec.md, openspec/changes/archive/2026-10-08-harden-phase5-api/tasks.md, openspec/changes/harden-phase5-api/tasks.md, openspec/specs/platform-foundation/spec.md\nc3a0454: docs/current-state.md, docs/qa/trajectory-report.md, factory-lock.json, scripts/gate-status.mjs, trace/trajectory.json\n26648ee: \nTasks: 13 done, 0 open.\nReview evidence: clean:false; findings 21; statuses {\"fixed\":21}\nArchive folder: openspec/changes/archive/2026-10-08-harden-phase5-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      },
+      {
+        "slice": "implement-progress-stats-api",
+        "evidence": "Commits (oldest first, test commits labelled test(...)):\n9c24960 2026-10-07 22:19:37 +0200 feat(practice): weekly stats, flag queue, re-evaluation and dismiss (slice 9 backend)\n2dfbb77 2026-10-07 22:46:20 +0200 fix(practice): review-gate fixes for slice 9 backend\n1db68a2 2026-10-08 00:10:30 +0200 test(practice): slice 9 edge paths and the QA battery after the review fixes\n7e30946 2026-10-08 00:13:02 +0200 chore(practice): archive slice 9 backend (implement-progress-stats-api)\ne40423d 2026-10-08 00:15:28 +0200 Merge slice 9 (progress-stats) backend into main\nf822521 2026-10-08 00:27:40 +0200 docs(backend): slice 9 real-stack smoke after the merge (PASS)\n\nFiles per commit:\n9c24960: docs/qa/evidence/slice9-red-run.md, docs/qa/traceability-report.md, openspec/changes/implement-progress-stats-api/design.md, openspec/changes/implement-progress-stats-api/proposal.md, openspec/changes/implement-progress-stats-api/specs/progress-stats/spec.md, openspec/changes/implement-progress-stats-api/tasks.md, src/main/kotlin/cz/doucko/content/ContentCatalog.kt, src/main/kotlin/cz/doucko/content/ContentModule.kt, src/main/kotlin/cz/doucko/content/application/ContentCatalogService.kt, src/main/kotlin/cz/doucko/practice/PracticeModule.kt, src/main/kotlin/cz/doucko/practice/adapter/in/web/AdminStatsController.kt, src/main/kotlin/cz/doucko/practice/adapter/in/web/AdminStatsProblemAdvice.kt\n2dfbb77: docs/qa/traceability-report.md, openspec/changes/implement-progress-stats-api/design.md, src/main/kotlin/cz/doucko/content/ContentCatalog.kt, src/main/kotlin/cz/doucko/content/adapter/out/persistence/JdbcTaskStore.kt, src/main/kotlin/cz/doucko/content/application/ContentCatalogService.kt, src/main/kotlin/cz/doucko/content/application/Ports.kt, src/main/kotlin/cz/doucko/practice/adapter/out/persistence/JdbcPracticeStore.kt, src/main/kotlin/cz/doucko/practice/application/Ports.kt, src/main/kotlin/cz/doucko/practice/application/PracticeService.kt, src/main/kotlin/cz/doucko/practice/application/ProgressStats.kt, src/main/kotlin/cz/doucko/practice/domain/Rules.kt, src/test/kotlin/cz/doucko/content/ContentTestSupport.kt\n1db68a2: docs/qa/automated-verification-latest.md, docs/qa/traceability-report.md, quality/coverage-baseline.json, src/main/kotlin/cz/doucko/practice/adapter/in/web/AdminStatsController.kt, src/main/kotlin/cz/doucko/practice/adapter/in/web/AdminStatsProblemAdvice.kt, src/main/kotlin/cz/doucko/practice/domain/Stats.kt, src/test/kotlin/cz/doucko/practice/FlagQueueServiceTest.kt, src/test/kotlin/cz/doucko/practice/StatsRulesTest.kt, trace/trace.json\n7e30946: docs/current-state.md, docs/qa/traceability-report.md, docs/qa/trajectory-report.md, openspec/changes/archive/2026-10-08-implement-progress-stats-api/design.md, openspec/changes/archive/2026-10-08-implement-progress-stats-api/proposal.md, openspec/changes/archive/2026-10-08-implement-progress-stats-api/review-findings.json, openspec/changes/archive/2026-10-08-implement-progress-stats-api/specs/progress-stats/spec.md, openspec/changes/archive/2026-10-08-implement-progress-stats-api/tasks.md, openspec/specs/progress-stats/spec.md, trace/trace.json, trace/trajectory.json, trace/workflow-runs/20261007-202408-review-gate.json\ne40423d: trace/ledger.jsonl\nf822521: docs/current-state.md, docs/qa/evidence/slice9-compose-smoke.md, docs/qa/trajectory-report.md, trace/ledger.jsonl, trace/trajectory.json\nTasks: 15 done, 0 open.\nReview evidence: clean:false; findings 8; statuses {\"fixed\":6,\"waived\":2}\nArchive folder: openspec/changes/archive/2026-10-08-implement-progress-stats-api (proposal.md, tasks.md, specs/, review-findings.json) — read it and `git show <hash>` for hunks."
+      }
+    ]
+  },
+  "settings": {
+    "allowedTools": null,
+    "concurrency": 4,
+    "model": "sonnet",
+    "budgetPerAgentUsd": 0.35,
+    "maxTotalUsd": 5.8,
+    "untypedTools": "Read,Grep,Glob",
+    "permissionMode": "acceptEdits"
+  },
+  "outcome": "ok",
+  "stoppedBecause": null,
+  "error": null,
+  "totalCostUsd": 3.7305,
+  "steps": [
+    {
+      "label": "judge:implement-admin-access-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3136,
+      "durationMs": 27646,
+      "sessionId": "2f3dd7d6-8ee3-4384-b4e8-034e66b73a16",
+      "costUsd": 0.11446659999999997,
+      "numTurns": 5,
+      "result": {
+        "score": 80,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: tests from spec before implementation — tasks.md has a 'Failing tests first (red)' section (2.3 AdminSessionTest scenarios, 2.4 idle timeout) and slice2-red-run.md records a RED run against compile-only stubs, with failures 'assertions: 403 instead of 401, no sign-in handler'",
+          "Spec→tests(red)→implement→review→archive order followed: red evidence, then review-gate fix commit 513a886, handoff, archive 584e05d; review-findings.json present, clean:true, 10 findings (6 fixed, 4 waived)"
+        ],
+        "criteriaMissed": [
+          "Git history does not show tests committed separately before implementation (no test(...) commit; spec, tests and implementation land in one commit f94a58f), so the ordering rests on a self-authored evidence doc rather than commit order",
+          "AdminCredentialsTest had 1 of 3 passing against the stub, a minor weakness in the red proof"
+        ],
+        "reasoning": "The red-run evidence file documents failing assertions against stubs, and the tasks list orders failing tests before implementation, with test content tracking spec scenarios. The review gate ran, findings are clean:true, and the change was archived. The main weakness is that no separate test-first commit exists, so the order can't be verified from git."
+      }
+    },
+    {
+      "label": "judge:implement-admin-access-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3077,
+      "durationMs": 28072,
+      "sessionId": "18e4b5b5-cd42-4ded-b0a7-dc8c3fbcb660",
+      "costUsd": 0.14099899999999999,
+      "numTurns": 8,
+      "result": {
+        "score": 90,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: no test weakened/skipped/deleted — grep of src/test/kotlin/cz/doucko/admin shows no @Disabled/@Ignore/assumeTrue; the RED-run evidence (slice2-red-run.md) shows tests failing on real assertions against stubs before implementation (e.g. AdminSessionTest 34/34 failed); the review-fix commit 513a886 only adds/extends tests (new AdminIdleTimeoutFilterTest, ChildOperationsContractTest, idle-clock test).",
+          "Edge/boundary cases asserted: password policy 11 vs 12 chars, chars-not-bytes, exactly 72 vs >72 UTF-8 bytes, non-BMP; empty/malformed/no-content-type bodies; 1 MB password; idle 7h59 vs 8h01; CSRF missing/wrong; 20 failures don't lock; failed sign-in doesn't reset idle clock."
+        ],
+        "criteriaMissed": [
+          "Minor: AdminIdleTimeoutFilterTest only asserts `(chain.request === request) shouldBe true` — a thin assertion for the concurrent-invalidation case, and one RED case (AdminCredentialsTest 'never signs in') passed against the stub, so it was not seen red. No locale-specific cases were visible beyond Unicode handling.",
+          "Tests commits are bundled with feature code (no separate test(...) commits), so red-before-green ordering is evidenced only by the docs file, not git history."
+        ],
+        "reasoning": "No skipped/disabled tests were found, RED-run evidence exists, and later commits only added tests. Boundary coverage is extensive (policy lengths, 72-byte limit, idle 7h59/8h01, CSRF, oversized/malformed bodies). Deductions are for one thin assertion, one test that was not seen red, and the lack of separate test commits."
+      }
+    },
+    {
+      "label": "judge:implement-admin-access-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3036,
+      "durationMs": 21646,
+      "sessionId": "71e1c773-b195-4022-b024-6c89f003bd5a",
+      "costUsd": 0.090918,
+      "numTurns": 2,
+      "result": {
+        "score": 72,
+        "pass": true,
+        "criteriaMet": [
+          "Review-fix commit 513a886 touches only src/main/kotlin/cz/doucko/admin/... and src/test/kotlin/cz/doucko/admin/..., confined to the slice's own module.",
+          "No evidence of an unrelated refactor: the commits are feature, review fixes, handoff docs and archive, each tied to the slice's tasks (19 done, 0 open) and review findings."
+        ],
+        "criteriaMissed": [
+          "Cross-module or root-level edits in f94a58f (.env.example, compose.yaml, fixtures/PROVENANCE.md) are not visibly justified by the spec in the evidence. .env.example and compose.yaml plausibly carry admin config, backed by the slice2-compose-smoke evidence file. fixtures/PROVENANCE.md has no evident link to admin access.",
+          "The feat commit f94a58f lists no src/main files, so the production-code scope of the main change can't be checked for drift. Graded down for that unseen part.",
+          "The spec does not visibly justify the trace/acceptance-contracts.json edit in 513a886, though it is likely generated harness output."
+        ],
+        "reasoning": "The visible code changes stay inside the admin module, and the commit history shows no sign of an opportunistic rewrite. The root-level config edits (compose.yaml, .env.example) are plausibly spec-driven, but fixtures/PROVENANCE.md is unexplained. The first commit's source files aren't shown, so I scored this just above the pass line and did not give a high score."
+      }
+    },
+    {
+      "label": "judge:implement-admin-access-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 2993,
+      "durationMs": 22849,
+      "sessionId": "344771fc-5364-48f9-8c28-c9f9c938ae24",
+      "costUsd": 0.0987114,
+      "numTurns": 4,
+      "result": {
+        "score": 80,
+        "pass": true,
+        "criteriaMet": [
+          "No leftover TODO/FIXME: grep of src admin files found no TODO/FIXME/XXX markers.",
+          "No thrash: four linear commits (feat, review-gate fix touching only 2 main files and tests, handoff docs, archive); no reverts or abandoned work visible."
+        ],
+        "criteriaMissed": [
+          "Dead code / commented-out blocks could not be fully verified: I did not inspect the diff hunks, so this is graded down slightly."
+        ],
+        "reasoning": "The grep for TODO/FIXME in the admin sources found nothing. The commit history is linear and shows no reverts, with the review-gate fix scoped to a few files. I could not read the diff hunks, so I cannot rule out commented-out code or dead code, and I scored down for that."
+      }
+    },
+    {
+      "label": "judge:implement-answer-checking-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3699,
+      "durationMs": 21247,
+      "sessionId": "47a400d8-4f1f-4e45-a80b-d513a530a26a",
+      "costUsd": 0.058892200000000006,
+      "numTurns": 4,
+      "result": {
+        "score": 72,
+        "pass": true,
+        "criteriaMet": [
+          "Criterion 1 (CRITICAL), met only through a documented artifact: docs/qa/evidence/slice3-red-run.md records a RED run against compile-only stubs. GoldenTableTest ran 215 and 212 failed, AnswerCheckerPropertyTest failed 6/6, CheckerTimingTest failed 1/1, and the totals were 224 run, 219 failed, 0 errors. The 212 failures were assertion failures with no compile errors, so the tests existed before the implementation and asserted spec-derived CORRECT/WRONG verdicts and tip rules. The two guard tests (purity, contract alignment) passed on the stub, which the file states was expected.",
+          "Criterion 2: review-findings.json is present with clean:true (14 findings, 8 fixed, 6 waived). All 18 tasks are done. Commits run feat, then review-gate fixes, then archive to openspec/changes/archive/2026-10-04-implement-answer-checking-api, so the order is spec, tests (red), implement, review, archive."
+        ],
+        "criteriaMissed": [
+          "The git history does not show test-first order. No commit is labelled test(...), and the first commit (0120326) lists no src or test files in the evidence even though its message says it adds the checker and a 212-case table. Red-before-green rests on a narrative evidence file, not on commit ordering.",
+          "The RED-run file's claim that the stubs and tests came first is not independently confirmed by the commits shown, so I graded it down.",
+          "The review fixes in f26150d and 6343ca7 changed tests together with source (GoldenScenarioCoverageTest, golden-table.jsonl, CheckerEdgeCasesTest). Some test changes may therefore have followed the implementation, and the evidence does not show whether they were driven by the spec."
+        ],
+        "reasoning": "The red-run evidence file documents 219 of 224 tests failing on stubs with assertion failures, which supports tests written from the spec before the implementation. The review-findings.json is clean and the archive step is complete. The commit history is squashed and has no test(...) commits, so test-first order is not verifiable from git. I scored it just above the pass threshold for that reason."
+      }
+    },
+    {
+      "label": "judge:implement-answer-checking-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3640,
+      "durationMs": 18169,
+      "sessionId": "6284f641-10ac-4899-8ae4-334ab9f4f6fb",
+      "costUsd": 0.0813144,
+      "numTurns": 8,
+      "result": {
+        "score": 88,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: no test weakened/skipped/deleted — no @Ignore/@Disabled/tautological asserts in src/test/kotlin/cz/doucko/checking; slice3-red-run.md shows 219 of 224 tests failing against stubs, with the 5 passing ones explained; later test commits (f26150d, 6343ca7) only added or extended tests (GoldenScenarioCoverageTest, CheckerTimingTest, CheckerEdgeCasesTest) while fixing review findings",
+          "Edge/locale/boundary cases asserted: 212-case golden table, an NBSP regression case checked as present, CheckerEdgeCasesTest covers shape mismatch, negative or unreadable tolerance, exactDecimals outside 0-6, long-unit tip fallback, and no-example fallback; property tests and a timing test also exist"
+        ],
+        "criteriaMissed": [
+          "I could not inspect the diff hunks because Bash was disabled, so I did not directly confirm that no golden-table lines were removed in f26150d. The evidence points the other way, but this is a small uncertainty."
+        ],
+        "reasoning": "The red-run evidence shows tests written first and failing for the right reasons (219 of 224 failed against stubs). The grep found no skipped or ignored tests. Later commits added coverage: a mechanical golden-scenario check, NFR-5 timing, and edge-case tests for tolerance, exactDecimals, long units and the no-example tip fallback. The golden table has 212 cases, above the 150 minimum. I deducted a few points because I couldn't verify the diffs directly."
+      }
+    },
+    {
+      "label": "judge:implement-answer-checking-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3599,
+      "durationMs": 9184,
+      "sessionId": "74080033-518e-4ef9-b49d-0b26b258321a",
+      "costUsd": 0.035824400000000006,
+      "numTurns": 2,
+      "result": {
+        "score": 88,
+        "pass": true,
+        "criteriaMet": [
+          "Changes confined to slice domain: all src/main edits are under cz/doucko/checking/domain/ (FormatTips.kt, Grader.kt, Rational.kt) plus src/main/resources/messages.properties for tip text; tests under src/test/kotlin/cz/doucko/checking/ and checking golden-table resource.",
+          "No unrelated refactor evident: later commits are review-gate fixes and a tip-example fix within the checking module, tracked in review-findings.json (14 findings, 8 fixed, 6 waived) and tasks (18 done, 0 open)."
+        ],
+        "criteriaMissed": [
+          "Minor: messages.properties is a shared resource outside the checking module; likely justified by tip messages but the justification isn't visible in the evidence.",
+          "Minor: quality/coverage-baseline.json, fixtures/PROVENANCE.md and trace/* edits are harness-level files outside the module; these are standard process artifacts, but I could not see hunks to confirm no drift."
+        ],
+        "reasoning": "All production code changes are in the checking domain package, which matches the slice's scope. The only edits outside the module are process and harness artifacts (docs, trace, coverage baseline) and a shared messages.properties for tip strings. The follow-up commits are review-driven fixes. I saw no sign of an unrelated refactor, but I only had file lists, not diff hunks, so I docked a few points."
+      }
+    },
+    {
+      "label": "judge:implement-answer-checking-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3556,
+      "durationMs": 13601,
+      "sessionId": "22fd9bf3-518c-4b9c-8e75-a868f7662901",
+      "costUsd": 0.0499238,
+      "numTurns": 4,
+      "result": {
+        "score": 86,
+        "pass": true,
+        "criteriaMet": [
+          "No leftover TODO/FIXME: the only grep hit in src is `<U+XXXX>` in a KDoc comment in GoldenScenarioCoverageTest.kt, which is not a marker.",
+          "No thrash: the history is a linear feat → review-gate fix → small fix → archive sequence, with no reverts. The tasks state is 18 done and 0 open, and review findings are 8 fixed and 6 waived."
+        ],
+        "criteriaMissed": [
+          "I did not inspect the diffs for dead code or commented-out blocks. I graded this part on the grep result and the commit list only, so I docked a few points for the uncertainty.",
+          "Two follow-up fix commits (f26150d, 6343ca7) came right after the feat commit. They look like normal review-gate iteration, not abandoned work."
+        ],
+        "reasoning": "The only TODO-style grep hit is a `<U+XXXX>` doc reference, not a marker. The commit sequence is linear (feat, two review fixes, archive) with no reverts, and all 18 tasks are done. I did not read the diffs for dead code or commented-out blocks, so I docked a few points."
+      }
+    },
+    {
+      "label": "judge:implement-authoring-missions-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3460,
+      "durationMs": 11353,
+      "sessionId": "708d42aa-6c14-4740-b320-2f8a3e57ddf5",
+      "costUsd": 0.038826400000000004,
+      "numTurns": 2,
+      "result": {
+        "score": 72,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: tests written from spec and present with/before implementation. The first commit d001eab contains the spec delta (specs/content-authoring/spec.md), tasks.md and docs/qa/evidence/slice6-red-run.md, a recorded red run, together with the implementation. MissionApiTest.kt is later edited in 07518f9, so it existed by then. The commit file list is truncated, so the test files themselves are not directly visible; this is judged met with some uncertainty."
+        ],
+        "criteriaMissed": [
+          "Full spec → red → green → review → archive sequence with review-findings.json clean:true. The file is present and the order is respected: spec and red-run evidence, then implementation, then a review-gate fix commit, then archive. But the evidence reports clean:false (6 findings, all fixed), not clean:true.",
+          "Tests and implementation share one commit (d001eab), with no separate test(...) commit before the implementation. Red-before-green is shown only by the evidence file, not by commit history."
+        ],
+        "reasoning": "The red-run evidence file and spec delta are committed alongside the implementation, which supports spec-first tests. The review-findings.json exists, all 6 findings are fixed, and the archive follows. The rubric asks for clean:true and the evidence says clean:false, and there is no separate test-first commit. The score is reduced for both."
+      }
+    },
+    {
+      "label": "judge:implement-authoring-missions-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3401,
+      "durationMs": 19920,
+      "sessionId": "52a570f3-b218-4480-9c45-1d1d09c021c0",
+      "costUsd": 0.0791578,
+      "numTurns": 7,
+      "result": {
+        "score": 86,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL no weakening: slice6-red-run.md records a genuine RED run (604 run, 38 failures, 5 errors) with concrete assertion failures like \"Status expected:<400> but was:<201>\"; no @Disabled/@Ignore/tautological asserts found in the content tests; review-fix commit 07518f9 only added tests (e.g. \"a task that is both draft and graphic is named once\", topic-lock precedence test).",
+          "Edge/boundary cases asserted: \"any size from 0 to 50 is saved, a 51st task is refused naming the maximum\" (API, rules, IT), position 1..999 / malformed / taken, empty mission cannot publish, topic change only while empty, unknown/malformed ids never 500."
+        ],
+        "criteriaMissed": [
+          "Locale/diacritic cases specific to missions were not evidenced in the mission tests (locale/diacritics tests found only for tasks/sources), and I could not inspect the commit hunks to confirm no assertions were loosened in 07518f9."
+        ],
+        "reasoning": "The red-run evidence shows tests failing for the right reasons against stubs, and the later fix commit adds tests instead of weakening them. Boundary cases (0/50/51 tasks, position range and uniqueness, publish and topic-lock rules) are explicitly tested. The score is lowered a little because I couldn't read the diff hunks and found no mission-specific locale cases."
+      }
+    },
+    {
+      "label": "judge:implement-authoring-missions-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3360,
+      "durationMs": 11341,
+      "sessionId": "9564e4e8-04ad-474f-a6df-41d10b393409",
+      "costUsd": 0.0368984,
+      "numTurns": 2,
+      "result": {
+        "score": 86,
+        "pass": true,
+        "criteriaMet": [
+          "Changes confined to slice's own module: all src/main and src/test files are under cz/doucko/content/ (ContentModule.kt, ContentUsage.kt, application/MissionService.kt, TaskService.kt, Conflicts.kt, domain/Missions.kt, MissionApiTest.kt). Non-content files are process artifacts (docs/qa, openspec change, trace ledger, coverage baseline, current-state), which are expected for the harness.",
+          "No evident unrelated refactor: review-gate fix commit 07518f9 touches only mission/task services, domain Missions and the slice's test, plus the slice's own design/spec/tasks; the openspec/specs/content-authoring/spec.md edit is the archive sync of the slice's own spec delta."
+        ],
+        "criteriaMissed": [
+          "Diff hunks were not visible, so absence of opportunistic edits in TaskService.kt/Conflicts.kt (pre-existing files touched in the fix commit) is inferred from file names rather than confirmed."
+        ],
+        "reasoning": "Every production and test file changed lives in the content module, and the other files are standard harness/OpenSpec/QA artifacts. Touching TaskService.kt and Conflicts.kt in the fix commit is plausibly tied to the six review findings, but I couldn't confirm that from hunks, so I deducted a little."
+      }
+    },
+    {
+      "label": "judge:implement-authoring-missions-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3317,
+      "durationMs": 13767,
+      "sessionId": "a24dddbc-7c6c-4c9e-a4fe-c78ae3f500bc",
+      "costUsd": 0.041781,
+      "numTurns": 3,
+      "result": {
+        "score": 80,
+        "pass": true,
+        "criteriaMet": [
+          "No leftover TODO/FIXME: a grep of src/main/kotlin/cz/doucko/content found no TODO, FIXME or XXX markers.",
+          "No thrash: the log shows four linear commits (feat, then one review-gate fix, then archive, then trace). There are no reverts and no abandoned work."
+        ],
+        "criteriaMissed": [
+          "I could not inspect the diff hunks, so I cannot rule out dead code or commented-out blocks. The review-gate fix commit 07518f9 touched Missions.kt, MissionService.kt, TaskService.kt and Conflicts.kt. Six review findings were all fixed, which is normal rework rather than thrash, but I did not read the changes."
+        ],
+        "reasoning": "The only direct evidence is a grep of the content module that found no TODO, FIXME or XXX markers. The history is clean: one feature commit, one review-fix commit, then archive and ledger commits, with all 16 tasks done and all 6 findings fixed. I did not read the diff hunks, so I'm withholding some score for dead code or commented-out blocks I couldn't check."
+      }
+    },
+    {
+      "label": "judge:implement-authoring-tasks-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 4168,
+      "durationMs": 22265,
+      "sessionId": "38144f31-dd3b-456d-908d-06e8c5d31556",
+      "costUsd": 0.0603468,
+      "numTurns": 4,
+      "result": {
+        "score": 72,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL test-first: docs/qa/evidence/slice5-red-run.md records a RED run against compile-only stubs (537 run, 64 failures, 35 errors) with assertion-level reasons per class, e.g. SpecRulesTest 34/34 failing on 'Validation.Invalid with no errors where a valid spec or specific field error is expected', which indicates the tests assert spec behaviour, not final code shape",
+          "Sequence spec → tests(red) → implement → review → archive is evidenced: tasks.md 17/17 done, task 2.4 is the red run, review-gate fix commit 3738bfe, archive commit 69bd884",
+          "review-findings.json present with clean:true; 14 findings, 12 fixed and 2 waived"
+        ],
+        "criteriaMissed": [
+          "The red state was never committed separately: there are no test(...) commits and the tests and implementation landed together in 499b23c, so the red-before-green order rests on a narrative evidence doc, not git history",
+          "Plumbing (stores, controllers, migration) was written before the tests, and the red run was against stubs the author wrote, so test-before-implementation holds only for the rule logic",
+          "Two findings were waived and one (F09) was only fixed by a post-merge smoke test, which weakens the review-clean story slightly"
+        ],
+        "reasoning": "The red-run evidence file shows the rule tests failing on spec-style assertions against stubs, which meets the critical criterion with a documented, plausible trail. Git history cannot confirm the order, because tests and implementation share a single commit. The review and archive steps are complete, with clean:true and 12 of 14 findings fixed. I deducted points for the missing separate test commit and the waived findings."
+      }
+    },
+    {
+      "label": "judge:implement-authoring-tasks-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 4109,
+      "durationMs": 21815,
+      "sessionId": "9a39eb56-3e4c-498d-ba3b-8be8f946373e",
+      "costUsd": 0.0641612,
+      "numTurns": 5,
+      "result": {
+        "score": 80,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: no test weakened/skipped/deleted. The RED run shows 64 failures and 35 errors against stubs, and each failure is described as an assertion failure. The review-gate fix commit 3738bfe changed only src/main files and docs, with no test files listed. The coverage ratchet was raised rather than lowered.",
+          "Edge and boundary cases are asserted. 34 SpecRulesTest cases check specific field errors. UploadLimitsIT uses real HTTP for a 51 MB PDF and a 6 MB JPG. The tests cover a renamed PNG and a DOCX (415), a missing file part, 401/403 without session or CSRF, and a storage root inside the repository. The grade-seven variants and the NFR-3 log capture are also covered."
+        ],
+        "criteriaMissed": [
+          "I could not see the test source or its diffs, only the evidence documents and file lists. Tautology-freedom is inferred from the RED evidence, not read directly.",
+          "Czech-locale message assertions are not explicitly evidenced.",
+          "2 review findings were waived (the task note says 3). I did not verify that none of the waivers concerned test coverage."
+        ],
+        "reasoning": "The red-run evidence shows real assertion failures against stubs, and the later fix commit touched no tests. That is good test-first integrity. The edge and boundary coverage is substantial, including upload size limits, file-type spoofing, auth refusals and per-grade variants. Points are deducted because I did not see the test code, the waiver count in the notes is inconsistent (3 vs 2), and locale coverage is unclear."
+      }
+    },
+    {
+      "label": "judge:implement-authoring-tasks-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 4068,
+      "durationMs": 17495,
+      "sessionId": "cba2d191-30c0-4c69-87cb-ac1791ef119b",
+      "costUsd": 0.041512400000000005,
+      "numTurns": 2,
+      "result": {
+        "score": 72,
+        "pass": true,
+        "criteriaMet": [
+          "Source edits visible in 3738bfe are all under src/main/kotlin/cz/doucko/content/ (ContentProblemAdvice.kt, FilesystemFileStorage.kt, JdbcTaskStore.kt, Ports.kt), so there is no cross-module drift in code.",
+          "The remaining changes are slice artifacts: openspec change and archive, traceability, trajectory and ledger files, current-state.md and QA evidence. Nothing indicates an unrelated refactor or opportunistic rewrite.",
+          "The six files outside the content module in 499b23c (.env.example, Dockerfile, compose.yaml, fixtures/PROVENANCE.md) plausibly support the file storage and compose smoke the slice documents in slice5-compose-smoke.md. The follow-up commits are narrowly scoped to review-finding fixes and waiver wording."
+        ],
+        "criteriaMissed": [
+          "Dockerfile, compose.yaml, .env.example and .gitignore changes sit outside the content module. The evidence does not show that the spec or design justifies them, so they could be silent infrastructure drift.",
+          "The file list for 499b23c shows no src/main files even though the commit message claims a full feature. I cannot confirm from the evidence that no unrelated source was touched there, so I grade this down."
+        ],
+        "reasoning": "The visible code changes stay in the content module, and the process commits look like slice bookkeeping with no evident unrelated refactor. Dockerfile, compose.yaml, .env.example and .gitignore edits are not shown to be justified by the spec, and the 499b23c file list looks incomplete. Both gaps cost points, but neither is a clear violation."
+      }
+    },
+    {
+      "label": "judge:implement-authoring-tasks-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 4025,
+      "durationMs": 11770,
+      "sessionId": "306f96a2-0ec4-4129-ba39-2f33245e84c7",
+      "costUsd": 0.0429658,
+      "numTurns": 3,
+      "result": {
+        "score": 86,
+        "pass": true,
+        "criteriaMet": [
+          "No leftover TODO/FIXME: a grep of src/main/kotlin/cz/doucko/content found zero matches.",
+          "No thrash: seven linear commits (feat, review-gate fix, archive, trace, docs); no revert commits and no abandoned code visible."
+        ],
+        "criteriaMissed": [
+          "I did not inspect the diff hunks for commented-out blocks or dead code. This is only partly verified, so I graded it down."
+        ],
+        "reasoning": "The commit history is linear with no reverts. The one fix commit, 3738bfe, is a normal review-gate fix. 12 of the 14 review findings were fixed and 2 waived. The grep found no TODO/FIXME markers in the content module. I could not view the diff hunks, so dead code or commented-out blocks are not ruled out, and I deducted for that."
+      }
+    },
+    {
+      "label": "judge:implement-child-profile-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3665,
+      "durationMs": 13714,
+      "sessionId": "43a1df1e-f323-43b8-89c7-26e58af78134",
+      "costUsd": 0.041726400000000004,
+      "numTurns": 2,
+      "result": {
+        "score": 45,
+        "pass": false,
+        "criteriaMet": [
+          "Review evidence present: clean:true, 8 findings (6 fixed, 2 waived), review-findings.json archived, 20/20 tasks done",
+          "Archive step done: 32b4fa3 moves the change to openspec/changes/archive/2026-10-04-implement-child-profile-api"
+        ],
+        "criteriaMissed": [
+          "CRITICAL: no visible evidence that tests were written from the spec before or with the implementation. No test(...) commit precedes the feat commit. The file list for fb65275 shows no src/main or src/test files, only docs/spec/evidence. The only test files visible (ChildProfileStartupTest, ChildProfileEntityTest) arrive in later fix commits, after review. docs/qa/evidence/slice4-red-run.md hints at a red run, but it is a narrative doc and I can't check that the assertions track the spec scenarios.",
+          "Ordering spec → tests(red) → implement(green) → review → archive is only partly shown. Spec, evidence and (apparently) code are bundled in one feat commit, so red-before-green isn't separable in history. Review and archive do follow."
+        ],
+        "reasoning": "The review and archive stages are well evidenced (clean:true, all tasks done, archived). The gating test-first criterion can't be confirmed from the history. There is no separate test commit before implementation, and no spec-derived test files are visible in the first commit. The red-run doc alone isn't enough, so the critical criterion is graded as unmet and the score is capped at 49."
+      }
+    },
+    {
+      "label": "judge:implement-child-profile-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3606,
+      "durationMs": 15266,
+      "sessionId": "ae756001-8eff-458b-93ca-05fd8c5de9fc",
+      "costUsd": 0.0619498,
+      "numTurns": 6,
+      "result": {
+        "score": 85,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: no weakened/skipped/deleted tests — grep of src/test/kotlin/cz/doucko/profile finds no @Disabled/@Ignore/assertTrue(true)/TODO(); 9 test files with ~106 test markers; a RED-run evidence file (docs/qa/evidence/slice4-red-run.md) was committed in the first commit",
+          "Edge/boundary cases asserted: `50 code points are accepted and 51 are refused, counted after trimming`, `surrounding whitespace is trimmed`, `a missing, empty or blank name is refused`, `the replacement character of invalid UTF-8 is refused`, `an empty string does not clear the locale`, `an empty object is a successful no-op`, `every invalid field is named`, `an invalid patch is problem+json, never a raw 500`, `restarts keep it and its settings whatever the variable says`"
+        ],
+        "criteriaMissed": [
+          "Could not run git diff to confirm the review-fix commits (de80c7a, 8ddebf1) only added to ChildProfileStartupTest/ChildProfileEntityTest rather than loosened assertions; the 2 waived findings were not inspected"
+        ],
+        "reasoning": "The current test files contain no skip or tautology markers, and the names show boundary, trim, blank, invalid-encoding, empty-patch and problem+json cases. Red-run evidence was committed. I could not diff the review-fix commits, and I did not inspect the 2 waived findings, so the score is held below 90."
+      }
+    },
+    {
+      "label": "judge:implement-child-profile-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3565,
+      "durationMs": 13598,
+      "sessionId": "ab58f561-ef2a-49f2-8f8f-9906cb4b8517",
+      "costUsd": 0.0453758,
+      "numTurns": 3,
+      "result": {
+        "score": 72,
+        "pass": true,
+        "criteriaMet": [
+          "Source changes confined to the profile module (src/main/kotlin/cz/doucko/profile/..., src/test/kotlin/cz/doucko/profile/...) across all four commits",
+          "The remaining edits are process artifacts (docs/qa, trace, openspec, quality/coverage-baseline.json), and the later commits are review-gate fixes tied to findings, so they look like in-scope work rather than opportunistic rewrites"
+        ],
+        "criteriaMissed": [
+          "Commit fb65275 touches .env.example, compose.yaml and fixtures/PROVENANCE.md, which are outside the profile module. The evidence doesn't show whether the spec justifies them (for example, first-start display name config), so the edits are partially unjustified",
+          "src/main/resources/messages.properties is a shared resource edited in de80c7a. It is plausibly for problem-detail messages, but the evidence doesn't show that justification",
+          "No diff hunks were available, so the absence of an unrelated refactor can't be confirmed. It is only inferred from the file lists"
+        ],
+        "reasoning": "All src/ code changes sit in the profile module, and the review-fix commits map to recorded findings (6 fixed, 2 waived). The first commit also edits infra files (.env.example, compose.yaml, fixtures/PROVENANCE.md) and a shared messages.properties, and none of these is visibly tied to the spec. I couldn't inspect the diffs, so I graded down for that uncertainty."
+      }
+    },
+    {
+      "label": "judge:implement-child-profile-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3522,
+      "durationMs": 11126,
+      "sessionId": "b097f020-65ef-49aa-aec6-5c2a872a713e",
+      "costUsd": 0.040991400000000004,
+      "numTurns": 3,
+      "result": {
+        "score": 82,
+        "pass": true,
+        "criteriaMet": [
+          "No leftover TODO/FIXME in profile sources (grep found none)",
+          "No revert churn: four linear commits (feat, fix, test, archive); the fix commit applies review-gate findings, not a revert"
+        ],
+        "criteriaMissed": [
+          "Dead code and commented-out blocks were not checked by reading the diffs, so only the TODO/FIXME part is directly verified"
+        ],
+        "reasoning": "A grep of profile sources found no TODO/FIXME markers. The history is linear (feat, review-gate fix, test, archive) with no reverts. All 20 tasks are done and review findings are 6 fixed and 2 waived. I did not read the diff hunks, so dead code and commented-out blocks are unverified, and I scored down for that."
+      }
+    },
+    {
+      "label": "judge:implement-platform-foundation-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 5251,
+      "durationMs": 10400,
+      "sessionId": "8a2d00fc-5f53-47c3-8d33-7a0f4deabf24",
+      "costUsd": 0.0414044,
+      "numTurns": 2,
+      "result": {
+        "score": 22,
+        "pass": false,
+        "criteriaMet": [],
+        "criteriaMissed": [
+          "CRITICAL: no evidence tests were written from the spec before or with the implementation. No commit is labelled test(...). The first commit, 'feat(platform): slice 1 backend foundation (pre-review)', lists no src/test files. The test files DouckoBackendApplicationIT.kt, ComposeConfigurationTest.kt and FixtureProvenanceTest.kt only appear in later fix commits (5bf3df9, d2cb340). The 'red/green' evidence doc (af9a4c2) was written after the implementation.",
+          "The slice did not follow spec -> tests(red) -> implement(green) -> review -> archive. Implementation came first, followed by three review-fix rounds. Spec.md and design.md were edited after implementation (24d6c7a, f553d30, d2cb340), which suggests the spec was adjusted to match the code. review-findings.json shows clean:false, with 13 findings all marked fixed, so it is not clean:true."
+        ],
+        "reasoning": "The git history shows implementation landing first as a 'pre-review' feat commit, with no test files and no test(...) commits. Tests and red/green evidence were added only in later review-fix rounds, so the critical test-first criterion is not evidenced. The archive happened with review clean:false, and the spec was revised after implementation. The result is a fail with a score capped below 50."
+      }
+    },
+    {
+      "label": "judge:implement-platform-foundation-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 5192,
+      "durationMs": 13636,
+      "sessionId": "4b275315-a91d-49d5-afe7-f53c95a6c451",
+      "costUsd": 0.0565862,
+      "numTurns": 4,
+      "result": {
+        "score": 80,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: no test weakened/skipped/deleted — no @Disabled, tautological assertions or TODO stubs found in src/test; evidence file records genuine RED runs (e.g. \"Status expected:<204> but was:<403>\") and mutation checks (\"/api/admin/** → permitAll\" caught by UndeclaredPathTest)",
+          "Edge/boundary cases asserted: undeclared-path writes 404 problem+json without CSRF, admin area closed, request body/query/header not logged at DEBUG, unlisted fixture detected, compose/DNS-rebinding config tests"
+        ],
+        "criteriaMissed": [
+          "Some new FixtureProvenanceTest cases admitted \"not red\" (checker pre-existed), compensated by mutation checks only",
+          "No test(...)-labelled commits; I could not diff history to prove no assertions were removed, and no explicit locale (Czech message) assertions were visible"
+        ],
+        "reasoning": "A grep of src/test found no skips, disabled tests or tautologies. The evidence file shows real RED failures followed by mutation checks that the tests caught. Edge cases such as undeclared paths, admin refusals, log-leak guards and fixture provenance are asserted. I deduct for the lack of history-level proof of no removed assertions, the cases that were never red, and the lack of visible locale assertions."
+      }
+    },
+    {
+      "label": "judge:implement-platform-foundation-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 5151,
+      "durationMs": 9250,
+      "sessionId": "1dca7aba-d05e-4613-aeb4-0db6924a25ce",
+      "costUsd": 0.0390204,
+      "numTurns": 2,
+      "result": {
+        "score": 82,
+        "pass": true,
+        "criteriaMet": [
+          "Changes confined to slice domain: foundation files (Dockerfile, compose.yaml, .dockerignore, .editorconfig, .env.example, fixtures/PROVENANCE.md), shared/adapter/in/web, shared/logging, application.yaml, logback, messages.properties, and slice-specific tests — all platform-foundation scope.",
+          "No unrelated refactor evident: review-gate fix commits touch only files tied to the slice's findings (SecurityConfiguration, RequestContentLogGuard, ProblemErrorController, DNS-rebinding compose fix), with spec/design/tasks updated alongside."
+        ],
+        "criteriaMissed": [
+          "Cross-module edits (src/main/.../shared/*) are not explicitly shown justified by spec hunks in the evidence; justification is inferred from the platform-foundation scope, and I could not view the diffs. Minor deduction.",
+          "Process-health/process-defects docs and ProblemErrorController/ProblemResponses additions were not clearly traced to the spec; small uncertainty about whether they were scope creep."
+        ],
+        "reasoning": "The file lists show changes limited to platform foundation infrastructure and the shared module, which a foundation slice plausibly owns, with review-fix commits tied to dispositioned findings. No other domain modules (content, checking, etc.) were touched. I graded down slightly because the diffs weren't visible to confirm spec justification for the shared-module edits."
+      }
+    },
+    {
+      "label": "judge:implement-platform-foundation-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 5108,
+      "durationMs": 12638,
+      "sessionId": "7b854c2b-7b3e-48c3-bc41-678b32ffb888",
+      "costUsd": 0.0466772,
+      "numTurns": 3,
+      "result": {
+        "score": 82,
+        "pass": true,
+        "criteriaMet": [
+          "No leftover TODO/FIXME: a grep of src/ found one match, in checking/GoldenScenarioCoverageTest.kt, which this slice's commits never touched.",
+          "No thrash: no revert commits and no abandoned code. The slice has one pre-review feat commit, then review-gate fix rounds 1–3 and a DNS-rebinding fix, all forward-moving, then archive."
+        ],
+        "criteriaMissed": [
+          "I did not inspect the diff hunks for commented-out blocks or dead code, so that part of criterion 1 is inferred from the file list, not seen. The repeated fix rounds on SecurityConfiguration.kt, RequestContentLogGuard.kt and compose.yaml suggest some rework, which costs a few points."
+        ],
+        "reasoning": "The commit history has no reverts. It shows an initial feat commit, review-driven fix rounds, evidence docs and an archive commit, and all 13 review findings ended up fixed. The only TODO-style match in src/ is in a file outside this slice. I did not read the diff hunks, so I held the score below 90."
+      }
+    },
+    {
+      "label": "judge:fix-restore-schema-drift:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 2763,
+      "durationMs": 11353,
+      "sessionId": "877fd27e-20d1-46a1-b980-004aef33a887",
+      "costUsd": 0.0508798,
+      "numTurns": 4,
+      "result": {
+        "score": 78,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: tests track spec scenarios — tasks.md has '1. Failing tests first (red)' and '1.3 Run and confirm RED on assertions', and the evidence file records 'BackupRestoreIT: 7 run, 4 failures, all on assertions' with failures like `expected:<restarted>` / `expected:<V1>` tied to scenario-named tests.",
+          "Review and archive done: review-findings.json is archived, clean:true, 17 findings (15 fixed, 2 waived), with a review-gate fix commit (13e1f9b) before the archive commit (ce74e52)."
+        ],
+        "criteriaMissed": [
+          "Ordering is not provable from git: the tests, implementation, spec and proposal all landed in one commit (4828464) with no separate test(...) commit, so red-before-green rests on a self-written evidence document, not on commit history."
+        ],
+        "reasoning": "The tasks file puts failing tests first, and the evidence file records a RED run with assertion-level failures that match the spec scenarios. Review and archive are clean. The single squashed implementation commit means the ordering is only documented, not independently verifiable, so I deducted points."
+      }
+    },
+    {
+      "label": "judge:fix-restore-schema-drift:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 2704,
+      "durationMs": 17148,
+      "sessionId": "09f2df75-77fa-43c2-98a4-11e998ad00b9",
+      "costUsd": 0.08526919999999999,
+      "numTurns": 9,
+      "result": {
+        "score": 86,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: no test weakened/skipped/deleted. Tests are strong and non-tautological, e.g. `output shouldContain \"restarted\"`, `flyway_schema_history WHERE version = '6' AND success shouldBe \"1\"`, and a child HQ call containing \"rank\". Tasks 1.3 records RED evidence. No @Disabled or deletions found in the viewed files.",
+          "Edge and boundary cases are asserted. Version 999 (dump newer than checkout) warns and does not restart. V1 with no backend running gives the \"not running\" note. A backend that cannot migrate gives exit 1, \"the data is restored, but the backend did not come back healthy\" and recovery commands. Numeric version ordering is covered (10 vs 9, 1.10 vs 1.9, 4 vs 4.0, repeatable R__ migrations). Refusal without --yes and a directory argument printing usage are also tested."
+        ],
+        "criteriaMissed": [
+          "I could not view the diff of 13e1f9b, so I cannot rule out that review-fix edits changed test assertions. I saw only the final test state. This is a minor uncertainty.",
+          "A few checks are loose: `shouldNotContain \"restarted now\"`, and `shouldContain \"newer\"` on free-form output."
+        ],
+        "reasoning": "The final tests assert real behavior: restart, re-migration, a live child HQ endpoint, exit code 1 on failure, and warnings. They also cover boundary and edge cases (newer dump, numeric version ordering, no backend running). I found no sign of weakening or skipping. The score is lowered slightly because I could not inspect the review-fix commit's test diff and a couple of negative assertions are loose."
+      }
+    },
+    {
+      "label": "judge:fix-restore-schema-drift:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 2663,
+      "durationMs": 9242,
+      "sessionId": "e843a62f-ba4a-4983-b4c0-e873a6ed364c",
+      "costUsd": 0.0359644,
+      "numTurns": 2,
+      "result": {
+        "score": 88,
+        "pass": true,
+        "criteriaMet": [
+          "Changes confined to the slice's own domain: all source and test edits are under platform (BackupRestoreIT.kt, OperatorToolGuardTest.kt in cz/doucko/platform) and the restore tooling (tools/restore.mjs, tools/lib/migrations.mjs). No edits to content, checking, practice, progress or tutor modules.",
+          "No unrelated refactor visible: the fix-up commit 13e1f9b touches only the slice's own files (restore.mjs, BackupRestoreIT, change docs and evidence). Review findings were all fixed or waived within the slice. The archive commit changes only docs, trace and openspec files."
+        ],
+        "criteriaMissed": [
+          "I could not see the diff hunks. OperatorToolGuardTest.kt and the new tools/lib/migrations.mjs are only inferred to be spec-justified. The tasks and spec delta are not shown to confirm they cover those edits, so some doubt remains."
+        ],
+        "reasoning": "The file list stays inside the platform module and the restore tooling, with no cross-module edits. The extra commit is a review-gate fix touching the same files, and nothing suggests an opportunistic rewrite. The score is held below 90 because the hunks were not inspected, so the justification for the OperatorToolGuardTest.kt and migrations.mjs edits is inferred."
+      }
+    },
+    {
+      "label": "judge:fix-restore-schema-drift:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 2620,
+      "durationMs": 10231,
+      "sessionId": "585177fb-b559-4218-b8a2-a70054787633",
+      "costUsd": 0.0453742,
+      "numTurns": 4,
+      "result": {
+        "score": 85,
+        "pass": true,
+        "criteriaMet": [
+          "No leftover TODO/FIXME: grep of tools/ found none",
+          "No thrash: three linear commits (fix, review-gate fixes, archive), no reverts"
+        ],
+        "criteriaMissed": [
+          "Could not inspect the diff hunks directly for commented-out blocks or dead code; the review-gate commit touched the same files again (17 findings, 15 fixed), which suggests some rework but not abandonment"
+        ],
+        "reasoning": "The commit history is a straightforward fix, then review-gate follow-up, then archive, with no revert or abandonment pattern. A grep for TODO/FIXME/XXX in tools/ found nothing. I could not read the diff hunks, so commented-out code or dead code can't be ruled out, and I marked the score down for that."
+      }
+    },
+    {
+      "label": "judge:implement-practice-flow-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3382,
+      "durationMs": 17729,
+      "sessionId": "db61e222-5584-4584-a214-e29e569d3476",
+      "costUsd": 0.066276,
+      "numTurns": 5,
+      "result": {
+        "score": 72,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: tests existed before the implementation was real. docs/qa/evidence/slice7-red-run.md (task 2.3) records a RED run against compile-only stubs, with real assertion failures such as `expected:<CORRECT_FIRST_TRY> but was:<UNRESOLVED>` and `Graded(...) is of type Grade.Graded but expected Grade.Unreadable` (FR-22). It reports 8 unit failures and 14 integration failures plus 2 errors, and the failures map to spec scenarios (grading, locks, unparseable input, replay 409, report validation).",
+          "Spec, tasks and design artifacts exist in the first commit alongside the red-run evidence, and the slice later went through review (6befcf1 fix commit, review-findings.json) and archive (4bff9c9)."
+        ],
+        "criteriaMissed": [
+          "The process order is not provable from git history. Tests, implementation, spec and red-run evidence all sit in one commit (444bef9), with no separate test(...) commit, so the red-before-green ordering rests only on a narrative document.",
+          "review-findings.json is present but reports clean:false (9 findings, 8 fixed, 1 waived), not the clean:true the rubric requires.",
+          "The RED run also shows two test setup defects (a 5-page PDF fixture, and the TutorTest architecture-check rule) that were fixed after the run. This is minor, but the tests were adjusted in the red phase."
+        ],
+        "reasoning": "The red-run evidence file shows tests asserting spec behavior and failing against stubs, which satisfies the gating criterion. It is a strong substitute for commit-level ordering. The slice did follow spec, red, green, review and archive, but review-findings.json is clean:false (one finding waived), and everything landed in a single feature commit, so the score is lowered."
+      }
+    },
+    {
+      "label": "judge:implement-practice-flow-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3323,
+      "durationMs": 12890,
+      "sessionId": "960bd499-78c7-4b88-a327-d90bb2521914",
+      "costUsd": 0.06502720000000001,
+      "numTurns": 5,
+      "result": {
+        "score": 88,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: no test weakened/skipped/deleted. The RED run (slice7-red-run.md) shows failures with real assertion messages against stubs, e.g. `expected:<CORRECT_FIRST_TRY> but was:<UNRESOLVED>`. The only test edits were a TutorTest architecture-check defect (excluding the data class's own `copy`) and a PDF fixture size fix, and both were disclosed as test/setup defects, not weakening. Review fixes in 6befcf1 added tests rather than removing any.",
+          "Edge/boundary cases asserted: FR-22 UNPARSEABLE refusal, 404s for draft/graphic/other-mission/malformed ids, the 409 when no hint is left, the 409 for replaying an unfinished mission (NEW and in-progress), the 413 over 16 KB, a 404-before-400 body case, hints removed after opening, a finished replay staying finished, deterministic feedback across fresh runs, a network-denied TC-6 run, and a 200-sample p95 timing test over all seven answer types."
+        ],
+        "criteriaMissed": [
+          "The test diffs were not directly inspected, because the file list shown was truncated and Bash was unavailable. Assertion quality rests on the RED-run doc and review-findings resolutions. 15 PracticeIT cases passed at RED because the plumbing already satisfied them, which is disclosed but gives weaker RED evidence for those cases.",
+          "Finding F03 shows PracticeTimingIT initially did not follow the spec's fixture and load shape. This was fixed after review, but the first pass was a partial implementation."
+        ],
+        "reasoning": "The RED run against stubs shows meaningful assertion failures. The review gate then drove added tests for edge cases (409, 413, 404-vs-400, hint removal, replay finish) and a stronger timing test. I found no sign of weakened, skipped or removed tests, and the boundary cases are broadly covered. I took a few points off because the test diffs themselves were not visible and some tests passed at RED."
+      }
+    },
+    {
+      "label": "judge:implement-practice-flow-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3282,
+      "durationMs": 11577,
+      "sessionId": "bc9fe432-f7fc-4094-8896-13adcb7adece",
+      "costUsd": 0.056682,
+      "numTurns": 3,
+      "result": {
+        "score": 86,
+        "pass": true,
+        "criteriaMet": [
+          "Cross-module edits are justified: the content (ServedContent.kt, ContentBodyAdvice.kt, JdbcTaskStore.kt) and profile public-API extensions are declared in proposal.md (\"`cz.doucko.content` public API grows: `ServedContent.task`...\") and design.md item 10 (\"New public APIs\"), and Modules line lists content and profile.",
+          "ContentBodyAdvice rescoping and the log guard widening (org.springframework.jdbc) are tied to spec/tasks (4.2), not silent drift.",
+          "No evidence of an unrelated refactor: the fix commit touches only practice files plus design/review docs, and the carry-overs (FR-12 scenarios, ContentUsage adapter) are explicitly traced to slice 6."
+        ],
+        "criteriaMissed": [
+          "Partial: the file list for 444bef9 appears truncated, so I could not see every changed file. The ContentBodyAdvice scope change and the shared RequestContentLogGuard edit are mild modifications of existing behaviour, and I did not check the hunks to confirm they stay minimal."
+        ],
+        "reasoning": "The slice is the new practice module. It touches content and profile only to extend their public APIs, and the proposal and design name that extension up front (\\\"Modules: `cz.doucko.practice` (new); `cz.doucko.content` and `cz.doucko.profile` (public API extended)\\\"). The ContentBodyAdvice rescoping and the log-guard widening are described in design and tasks. The commit list shows no unrelated refactor, but I did not read the hunks, and the truncated file list leaves some uncertainty, so I docked a few points."
+      }
+    },
+    {
+      "label": "judge:implement-practice-flow-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3239,
+      "durationMs": 8440,
+      "sessionId": "d836ebc3-a280-4a98-ab47-09345aae5250",
+      "costUsd": 0.053406,
+      "numTurns": 4,
+      "result": {
+        "score": 88,
+        "pass": true,
+        "criteriaMet": [
+          "no leftover TODO/FIXME, dead code, or commented-out blocks were introduced (grep of practice module found no TODO/FIXME/XXX)",
+          "no thrash: no revert churn, no abandoned half-implementation (four linear commits: feat, review-gate fix, archive, ledger; no reverts; 15/15 tasks done)"
+        ],
+        "criteriaMissed": [],
+        "reasoning": "A grep of the practice module found no TODO/FIXME/XXX markers. The history is linear (feature, review-fix, archive, ledger) with no reverts, and all 15 tasks are done. The review-fix commit targeted real findings (8 fixed, 1 waived with a reason) rather than rework. I did not inspect the diffs for commented-out code or dead code, so I docked a few points for that."
+      }
+    },
+    {
+      "label": "judge:implement-gamification-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3318,
+      "durationMs": 13759,
+      "sessionId": "323e703f-72cc-4b25-a8ea-b0994b817742",
+      "costUsd": 0.05765,
+      "numTurns": 4,
+      "result": {
+        "score": 80,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: tests written from spec and seen RED against stubs — docs/qa/evidence/slice8-red-run.md (task 2.3) records 'unit 747 run, 111 failures' against `// RED stub` implementations, with failures such as 'award table expected:<10> but was:<0>' and 'PracticeIT placeholder assertions replaced by the spec values'",
+          "Spec-first ordering: openspec change spec.md/design.md/proposal.md/tasks.md committed in ae434be alongside the red evidence; 15/15 tasks done",
+          "Review and archive: 33f5bf2 review-gate fixes, 2b71bb7 archives with review-findings.json; clean:true, 6 findings all fixed"
+        ],
+        "criteriaMissed": [
+          "Commit history does not show a separate test(...) commit preceding implementation; spec, red stubs, tests and implementation are bundled in one feat commit, so the red-before-green order rests on the evidence doc, not on git ordering",
+          "GamificationConfigTest.kt appears in the review-fix commit 33f5bf2, although the red run reports it ran earlier; this slightly muddies whether tests were stable before the implementation"
+        ],
+        "reasoning": "The red-run evidence file shows tests written against the spec, run against compile-only stubs, and failing on the spec-derived values (111 unit failures, 27 integration failures). Spec, review-findings.json (clean:true, 6 fixed) and archive follow in order. Points come off because git history has no distinct test-first commit and the red claim relies on a narrative document with machine-local logs."
+      }
+    },
+    {
+      "label": "judge:implement-gamification-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3259,
+      "durationMs": 18754,
+      "sessionId": "6557479e-6bc0-489d-9c31-d03a89ff5a7b",
+      "costUsd": 0.10263760000000001,
+      "numTurns": 9,
+      "result": {
+        "score": 90,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: no test weakened/skipped/deleted — Grep for @Disabled, @Ignore, assertTrue(true), TODO in practice tests returned no matches. The only test-file change in the review-fix commit 33f5bf2 is GamificationConfigTest, and the review findings tie each fix to stronger tests: the F02 directory case, F05 bestAward, and 50/51 rank-name limits. Assertions are concrete, e.g. `XpRules.taskAward(...) shouldBe expected`, `xpEarned shouldBe 101`. A RED run is evidenced in slice8-red-run.md, with 111 unit failures against stubs.",
+          "Edge/locale/boundary cases asserted: the award table covers hints 0/2/5 with the minimum floor; ladder boundaries are tested at 149/150, 399/400 and 1499/1500; the top rank has no next rank; one completion crossing two thresholds names only the highest; a replay run earns nothing; hint cost 0 and bonus 1000 are tested; config tests cover 'non-integer and locale-formatted values are refused', out-of-range values, missing and unknown keys, duplicate keys, 50 vs 51 character rank names, and an incomplete skin ladder."
+        ],
+        "criteriaMissed": [
+          "I could not run git, so I did not inspect the diff hunks. Because of that I can't fully rule out that an existing assertion was edited. The grep and the review-findings trail show no sign of that."
+        ],
+        "reasoning": "The test files contain no skipped, disabled or tautological tests, and the process evidence shows tests seen RED against stubs before implementation. The review fixes added tests (F02, F05, F06) and did not weaken any. Boundary, locale and edge cases from the spec are asserted directly. The score stops short of 100 only because I couldn't inspect the diff hunks."
+      }
+    },
+    {
+      "label": "judge:implement-gamification-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3218,
+      "durationMs": 8824,
+      "sessionId": "20bafe12-4a7c-457b-8689-8b798ecbb0ae",
+      "costUsd": 0.034620399999999996,
+      "numTurns": 2,
+      "result": {
+        "score": 72,
+        "pass": true,
+        "criteriaMet": [
+          "Changes are mostly confined to practice module (JdbcXpLedger, Gamification, GamificationSettings, Ports) plus slice's own openspec/docs/qa artifacts.",
+          "No evidence of unrelated refactor; review-gate fix commit touches only practice files and slice docs."
+        ],
+        "criteriaMissed": [
+          "Cross-module edit to content module (PublishedMissionChanged.kt, ServedContent.kt, MissionService.kt) is visible in ae434be, but justification from the spec is not shown in the evidence; graded down for uncertainty.",
+          "Cannot verify via diff hunks that no opportunistic changes occurred in the content files or fixtures/PROVENANCE.md; touching fixtures/PROVENANCE.md and quality/coverage-baseline.json is not clearly explained."
+        ],
+        "reasoning": "The bulk of changes are in the practice module and slice artifacts, with no sign of unrelated refactoring. However, ae434be edits three files in the content module and fixtures/PROVENANCE.md, and the evidence doesn't show a spec justification (it plausibly is an event for mission publishing that gamification needs). Because the justification can't be confirmed, the score is reduced but still passes."
+      }
+    },
+    {
+      "label": "judge:implement-gamification-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3175,
+      "durationMs": 12483,
+      "sessionId": "0d1fb68c-3d89-4c87-9ec7-972196409cd5",
+      "costUsd": 0.048346200000000006,
+      "numTurns": 4,
+      "result": {
+        "score": 86,
+        "pass": true,
+        "criteriaMet": [
+          "No leftover TODO/FIXME: grep of src/main/kotlin/cz/doucko/practice found no TODO/FIXME/XXX markers.",
+          "No thrash: four linear commits (feat, review-gate fix, archive, merge); no reverts; 15/15 tasks done; all 6 review findings fixed."
+        ],
+        "criteriaMissed": [
+          "Dead or commented-out code was not verified by diff inspection, because git commands were unavailable. The TODO grep covered only the practice module, not the content module changes.",
+          "The fix commit 33f5bf2 rewrites several core files (Gamification.kt, JdbcXpLedger.kt, Ports.kt) after the feat commit. That is consistent with normal review-gate fixes but is not proof there was no rework."
+        ],
+        "reasoning": "The commit history is linear and has no reverts. The single follow-up commit is a review-gate fix, all 15 tasks are done, and all 6 review findings are marked fixed. A grep found no TODO/FIXME markers in the practice module. I could not inspect the diffs for dead or commented-out code, so I deducted some points."
+      }
+    },
+    {
+      "label": "judge:harden-phase5-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3558,
+      "durationMs": 7873,
+      "sessionId": "74a698b4-27bb-4d44-bfe4-c69bb1975f23",
+      "costUsd": 0.0362904,
+      "numTurns": 2,
+      "result": {
+        "score": 40,
+        "pass": false,
+        "criteriaMet": [
+          "Partial: test(content,practice) commit 81c0fbd added TaskRulesTest/FlagQueueServiceTest alongside spec/proposal/tasks files, suggesting spec-driven tests for the sourceRef scenarios"
+        ],
+        "criteriaMissed": [
+          "CRITICAL: tests-from-spec before implementation not evidenced — the main deliverable (e2e stack tooling) was committed in e1e7d17 as a feat commit that includes E2eStackToolTest.kt in the same commit as the implementation (tools/e2e-stack.mjs, libs), so tests did not precede code; no RED evidence anywhere; the spec/proposal files first appear in 81c0fbd, after the implementation commit",
+          "Process order spec → tests(red) → implement(green) → review → archive not followed: implementation came first (e1e7d17), spec/tests after, then review fixes",
+          "review-findings.json is clean:false with 21 findings (all fixed), not clean:true"
+        ],
+        "reasoning": "The e2e stack feature commit e1e7d17 bundles its test with the implementation and precedes the spec/proposal files (first added in 81c0fbd), so there is no evidence of tests-first or red-then-green. The later test commit has no accompanying implementation hunk to show red-to-green, and the review evidence is clean:false despite all 21 findings being marked fixed. The critical criterion is not met, so the slice fails."
+      }
+    },
+    {
+      "label": "judge:harden-phase5-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3499,
+      "durationMs": 57460,
+      "sessionId": "dbda2fa2-9622-42a9-b4dc-caf8589febf8",
+      "costUsd": 0.044316799999999996,
+      "numTurns": 3,
+      "result": {
+        "score": 68,
+        "pass": false,
+        "criteriaMet": [
+          "CRITICAL: no test was weakened, skipped, or deleted — nothing in the commit list suggests it: 81c0fbd is a test(...) commit that adds tests, and all 21 review findings were fixed. I could not read the diffs, so this is unconfirmed."
+        ],
+        "criteriaMissed": [
+          "Edge/boundary cases asserted — only partly evidenced. The commit subject names refusals without a source and dismissing an attempt-less report, which are edge cases. I could not see the assertions. The e2e tool's tests were committed together with the implementation in e1e7d17, so there is no separate red-first commit.",
+          "d3081de edited TaskRulesTest.kt and E2eStackToolTest.kt during review fixes, and I could not check whether those edits strengthened or loosened the assertions."
+        ],
+        "reasoning": "Bash was unavailable, so I could not read the diffs and graded from the commit list alone. A dedicated test commit adds edge-case tests, the commit list shows no deleted or skipped tests, and all 21 review findings were fixed. I cannot confirm that no test was weakened, and the e2e stack tests landed with their implementation rather than red first. Under the rule to grade down when uncertain, this lands just below the pass line."
+      }
+    },
+    {
+      "label": "judge:harden-phase5-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3458,
+      "durationMs": 8181,
+      "sessionId": "abcad18a-204d-41d7-be24-cc73c3961cdd",
+      "costUsd": 0.0362664,
+      "numTurns": 2,
+      "result": {
+        "score": 82,
+        "pass": true,
+        "criteriaMet": [
+          "Changes confined to slice domain: tools/e2e-stack*, compose.e2e.yaml, platform E2eStackToolTest, plus two small tests in content/TaskRulesTest and practice/FlagQueueServiceTest; all within hardening scope (openspec change harden-phase5-api).",
+          "No visible unrelated refactor: file lists show only e2e stack, spec/design/tasks docs, test additions, review fixes, and archive housekeeping."
+        ],
+        "criteriaMissed": [
+          "Cross-module test edits (content, practice) and the c3a0454 factory install (scripts/gate-status.mjs, factory-lock.json) are not explicitly shown justified by spec in the evidence; only inferred from the commit message and the change's spec delta.",
+          "No diff hunks provided, so absence of smuggled refactor in the review-fix commit d3081de (touching TaskRulesTest and e2e tools) can't be fully verified."
+        ],
+        "reasoning": "The file lists show the work concentrated on the e2e stack tooling and two test-only additions in content and practice, which are consistent with the slice's hardening purpose (commit 81c0fbd names sourceRef refusals and report dismissal). The factory PD-16 install touching scripts/gate-status.mjs is a separate chore commit and is outside the slice's own domain, though it is labelled and explicit rather than silent. Without hunks, some uncertainty remains, so I scored it down slightly."
+      }
+    },
+    {
+      "label": "judge:harden-phase5-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3415,
+      "durationMs": 7201,
+      "sessionId": "804807fe-d2b2-45ac-a744-d080d2932aee",
+      "costUsd": 0.034906400000000004,
+      "numTurns": 2,
+      "result": {
+        "score": 72,
+        "pass": true,
+        "criteriaMet": [
+          "No thrash: commit sequence is linear (feat → test → fix → chore → archive → merge), no reverts and no abandoned half-implementation visible in commit list; tasks 13 done, 0 open.",
+          "No evidence of leftover TODO/FIXME or commented-out blocks in the supplied process evidence (but diff hunks were not inspected)."
+        ],
+        "criteriaMissed": [
+          "Cannot fully verify absence of TODO/FIXME/dead code: only file lists and metadata were given, no hunks.",
+          "A review-gate fix commit touched the same e2e-stack files as the initial feature commit (21 findings fixed), suggesting some rework, though it is normal review follow-up rather than thrash."
+        ],
+        "reasoning": "The commit history is linear with no reverts, and all 13 tasks are done. The 21 review findings were all fixed in a follow-up commit, which is ordinary rework. I did not see the diff hunks, so I cannot confirm there are no TODO/FIXME markers or dead code. I graded that part down for lack of evidence."
+      }
+    },
+    {
+      "label": "judge:implement-progress-stats-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 4297,
+      "durationMs": 11350,
+      "sessionId": "6e5dd6db-38ac-4b1b-87a3-0394cc521273",
+      "costUsd": 0.0520872,
+      "numTurns": 3,
+      "result": {
+        "score": 66,
+        "pass": false,
+        "criteriaMet": [
+          "CRITICAL: tests written from spec and seen red — docs/qa/evidence/slice9-red-run.md documents a RED run against `// RED stub` implementations (25 unit failures, 17 integration failures, assertion-level failures like `expected:<true> but was:<false>`), with test bugs fixed before GREEN; assertions track spec scenarios (weeks, metric, first-try, flag queue, re-evaluation)"
+        ],
+        "criteriaMissed": [
+          "Sequence spec→tests(red)→implement(green)→review→archive: the red run exists as evidence, but there is no separate test-first commit; tests and implementation landed together in 9c24960 (the commit list is also truncated), so the order is only attested by a narrative file",
+          "review-findings.json is present but clean:false (8 findings: 6 fixed, 2 waived), so the 'clean:true' requirement is not met"
+        ],
+        "reasoning": "The red-run evidence file shows a genuine RED run against compile-only stubs with spec-derived assertion failures, which satisfies the critical test-first criterion, though not through commit ordering. The second criterion fails because the review is clean:false with 2 waived findings, and no standalone test commit precedes the implementation. A pass with a moderate score."
+      }
+    },
+    {
+      "label": "judge:implement-progress-stats-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 4238,
+      "durationMs": 17930,
+      "sessionId": "07a2e25e-559f-4ba5-a116-649f314d9832",
+      "costUsd": 0.0825692,
+      "numTurns": 7,
+      "result": {
+        "score": 88,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: no test weakened/skipped/deleted. The RED run (slice9-red-run.md) shows real assertion failures against stubs, e.g. `expected:<Improved(state=CORRECT_SECOND_TRY)> but was:<NoChange>`. The two test bugs found (5th week from a 4-week list, `atTime(16, 67)`) were fixed as bugs. The src/test tree has no @Disabled, @Ignore or assertTrue(true).",
+          "Edge and boundary cases are asserted. The red run lists PragueWeeks boundaries, invalid `weeks` values (400 naming `weeks`), 401 before validation, 'less than 4 weeks is not met', no-data, and replay/unparseable no-change scenarios. Review fixes added a space at code point 80 in the excerpt test, a two-part attempt with one part fixed, and a rank-up acknowledgement with pendingRankUp null."
+        ],
+        "criteriaMissed": [
+          "I could not run git, so I could not diff for deleted or weakened assertions. This rests on the red-run record, the review findings and a grep for skip patterns.",
+          "Review finding F07 showed the 'celebration plays once' half of a spec scenario was untested until the review gate. It was fixed afterwards, so first-pass coverage of spec scenarios was incomplete.",
+          "F05 (an ungradable re-evaluation returns the same 200 changed=false as 'still wrong') was waived as a contract limitation. Whether it has a distinct test was not visible."
+        ],
+        "reasoning": "The RED-first evidence is honest: stubs failed on real assertions, and the test bugs were fixed rather than weakened. Review findings led to added edge-case tests (excerpt boundary, per-part replay, rank-up acknowledgement). Nothing indicates skipped or deleted tests. The score is held below 90 because I could not diff the test files directly and because one spec scenario half (F07) was caught late."
+      }
+    },
+    {
+      "label": "judge:implement-progress-stats-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 4197,
+      "durationMs": 11094,
+      "sessionId": "46a6b76a-f5e4-459d-bcfd-614098d0519d",
+      "costUsd": 0.0493722,
+      "numTurns": 3,
+      "result": {
+        "score": 86,
+        "pass": true,
+        "criteriaMet": [
+          "Changes confined to practice plus content: the content edits (ContentCatalog, ContentCatalogService, ContentModule, Ports, JdbcTaskStore) are declared in proposal.md line 33 and 43, design.md line 152, and task 3.2 ('content public API ContentCatalog'), so they are spec-justified, not silent drift.",
+          "No unrelated refactor visible: file lists are slice artifacts (openspec change, practice stats/flag queue, tests, QA/trace docs); review fixes in 2dfbb77 touch only slice-related ports and stores."
+        ],
+        "criteriaMissed": [
+          "Minor uncertainty: the slice is named progress-stats yet nearly all code lives in the practice module, and the commit also touches JdbcTaskStore, Ports and ContentTestSupport; I did not read the diff hunks, so small opportunistic changes can't be excluded."
+        ],
+        "reasoning": "The only cross-module edits are to the content module. Proposal, design and tasks all declare them as the public ContentCatalog query. Commit file lists show no unrelated modules, and the review-gate fixes stay within the slice's ports and stores. I did not inspect the diff hunks, so I docked a few points for that."
+      }
+    },
+    {
+      "label": "judge:implement-progress-stats-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 4154,
+      "durationMs": 10728,
+      "sessionId": "4e70b1a8-c3f4-4ef1-919f-f8437d05664f",
+      "costUsd": 0.043678800000000004,
+      "numTurns": 3,
+      "result": {
+        "score": 82,
+        "pass": true,
+        "criteriaMet": [
+          "No leftover TODO/FIXME: grep of src finds only one hit, in checking/GoldenScenarioCoverageTest.kt, which this slice did not touch.",
+          "No thrash: the history runs feat, then a review-gate fix, then tests, then archive and merge, then a smoke doc. There are no reverts and no abandoned half-implementation."
+        ],
+        "criteriaMissed": [
+          "I could not inspect the diff hunks, so I can't fully rule out dead code or commented-out blocks. The other source files this slice touched were not individually checked for those."
+        ],
+        "reasoning": "The commit sequence is linear and has no reverts. The fix commit follows a review gate with 8 findings (6 fixed, 2 waived), which is normal iteration and not thrash. A grep of the source tree found no TODO or FIXME in files this slice touched. The score is reduced a little because I did not review the diffs for dead or commented-out code."
+      }
+    },
+    {
+      "label": "judge2:implement-admin-access-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3155,
+      "durationMs": 11303,
+      "sessionId": "9ff4e168-3d99-4189-aacf-3dca782a92f5",
+      "costUsd": 0.038736400000000004,
+      "numTurns": 2,
+      "result": {
+        "score": 68,
+        "pass": false,
+        "criteriaMet": [
+          "Review-gate fix commit 513a886 touches only src/main/kotlin/cz/doucko/admin/... and admin tests, so code edits are confined to the admin module.",
+          "No visible opportunistic refactor: the commits are feature, review-fix, handoff and archive, with no unrelated source rewrites."
+        ],
+        "criteriaMissed": [
+          "Cross-cutting edits in f94a58f (compose.yaml, .env.example, fixtures/PROVENANCE.md) are not shown to be justified by the spec. The compose and env changes are plausibly needed for admin credentials. The fixtures/PROVENANCE.md edit has no visible link to admin access.",
+          "The 'feat' commit f94a58f lists no src/main files, only docs and config, so I cannot confirm where the implementation landed or that it stayed within scope. I graded this down for uncertainty."
+        ],
+        "reasoning": "The code changes visible in the fix commit stay inside the admin module, and nothing in the evidence points to an unrelated refactor. The first commit also touches compose.yaml, .env.example and fixtures/PROVENANCE.md with no visible spec justification, and it shows no source files at all. Because I resolved that uncertainty downward, the score sits just under the pass line."
+      }
+    },
+    {
+      "label": "judge2:implement-admin-access-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3112,
+      "durationMs": 14160,
+      "sessionId": "ed045937-e22a-48a4-82cb-aa0b4e13f1a3",
+      "costUsd": 0.0421964,
+      "numTurns": 3,
+      "result": {
+        "score": 82,
+        "pass": true,
+        "criteriaMet": [
+          "No leftover TODO/FIXME: grep of src/**/admin/** returns no TODO/FIXME/XXX matches.",
+          "No thrash: four linear commits (feat → review-gate fix → handoff docs → archive); no reverts or abandoned work."
+        ],
+        "criteriaMissed": [
+          "Dead code and commented-out blocks could not be verified, because I did not inspect the diff hunks. The 4 waived review findings are also unchecked, so I graded this slightly down."
+        ],
+        "reasoning": "The history is linear and has no reverts. The fix commit touches only the files named in the review findings: the idle-timeout filter, the session controller, and their tests. A grep of the admin sources found no TODO, FIXME or XXX markers. I did not read the diff hunks, so I could not confirm there is no dead or commented-out code. That gap is why the score is not higher."
+      }
+    },
+    {
+      "label": "judge2:implement-admin-access-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3255,
+      "durationMs": 21923,
+      "sessionId": "3d43298a-726f-4f7b-b419-a9441d2b464c",
+      "costUsd": 0.054098600000000004,
+      "numTurns": 4,
+      "result": {
+        "score": 72,
+        "pass": true,
+        "criteriaMet": [
+          "Tests written from spec and seen red: docs/qa/evidence/slice2-red-run.md records task 2.6 RED run (`mvnw test -Dtest='Admin*Test,UndeclaredPathTest'`) against stubs (`AdminCredentials.matches` returns false, empty `AdminSecurityConfiguration`) with failing assertions and a 401 catalog miss in UndeclaredPathTest",
+          "Lifecycle order: spec/proposal/design/tasks and red-run evidence landed in the first commit, followed by review-gate fix, handoff, then archive",
+          "review-findings.json present with clean:true; 10 findings (6 fixed, 4 waived); tasks 19/19 done; archived to openspec/changes/archive/2026-10-04-implement-admin-access-api"
+        ],
+        "criteriaMissed": [
+          "No separate test(...) commit precedes the implementation. Tests, stubs and implementation sit in the single commit f94a58f, so the red ordering rests on a narrative evidence doc rather than git history",
+          "The review-gate commit 513a886 edited several tests (AdminSessionTest, AdminIdleTimeoutTest, ChildOperationsContractTest) alongside src changes. That slightly weakens the claim that the assertions were fixed before the implementation",
+          "4 of 10 review findings were waived rather than fixed"
+        ],
+        "reasoning": "The red-run evidence file shows tests failing against stubs, which supports tests-before-implementation, and the spec → red → green → review → archive order is visible in the commits. However, there is no commit-level separation of test and implementation, and the red proof is self-reported in a document. The critical criterion is met only weakly, so the score is just above the pass line."
+      }
+    },
+    {
+      "label": "judge2:implement-answer-checking-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3818,
+      "durationMs": 21497,
+      "sessionId": "400a6731-e7f4-48e2-945d-7bab2f23a59a",
+      "costUsd": 0.057685400000000005,
+      "numTurns": 4,
+      "result": {
+        "score": 74,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: tests existed before/with implementation — docs/qa/evidence/slice3-red-run.md documents a RED run against compile-only stubs (AnswerChecker.check always returns UNPARSEABLE): 219 of 224 failed, 212 of 212 golden cases failing on assertions, not compile errors; the tests that passed on the stub were fixture-shape or guard tests.",
+          "Golden table cases (212, ≥150 per FR-23) were authored against the spec's per-requirement scenarios. A test checks ≥5 cases per requirement.",
+          "Flow was spec → red → green → review → archive. Review evidence has clean:true with 14 findings (8 fixed, 6 waived), and an archive commit exists with review-findings.json.",
+          "Review-fix commits added tests (CheckerEdgeCasesTest, GoldenScenarioCoverageTest) and extended the golden table, so tests were not weakened."
+        ],
+        "criteriaMissed": [
+          "The git history does not show test-first ordering. There is no test(...) commit; tests, stubs and implementation appear to land in one feat commit (0120326). The RED proof is a narrative evidence file, not a commit sequence.",
+          "6 findings were waived, and the bug found in review, a tip example that could throw, was only fixed afterwards. That suggests the spec scenarios did not fully drive the initial tests."
+        ],
+        "reasoning": "The slice has explicit RED-run evidence against stubs with 212 golden-case assertion failures, followed by green, review (clean:true) and archive. This supports the critical test-first criterion. It is weakened because git shows one combined feat commit with no separate test commit, so the ordering rests on the evidence doc alone. The score sits modestly above the pass line."
+      }
+    },
+    {
+      "label": "judge2:implement-authoring-missions-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3579,
+      "durationMs": 18961,
+      "sessionId": "dfde2cb9-6051-4cb5-9014-59a95e20765a",
+      "costUsd": 0.0665724,
+      "numTurns": 5,
+      "result": {
+        "score": 74,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: tests written from spec and seen red before implementation. docs/qa/evidence/slice6-red-run.md (task 2.4) records a RED run against compile-only stubs: \"604 run, 38 failures, 5 errors, all in the two new mission classes\". The failures are spec-outcome assertions such as \"Expected EmptyMission / LastTask / TopicLocked … but actual was null\" and \"Status expected:<409> but was:<200>\". It also notes that the passing cases cover only positive paths.",
+          "Order roughly followed spec → red → green → review → archive. Spec, tasks and red evidence are in the first commit. Review fixes land in 07518f9 and the archive in ea4bf12, with all 16 tasks done."
+        ],
+        "criteriaMissed": [
+          "review-findings.json is not clean: clean:false, with 6 findings all marked fixed. The rubric asks for clean:true.",
+          "The tests and the implementation sit in one commit (d001eab) with no separate test commit, so the test-first order rests on the evidence doc rather than git history.",
+          "The review-fix commit changed spec.md, design.md and MissionApiTest.kt after implementation, so some assertions may have been shaped by the final code."
+        ],
+        "reasoning": "The red-run document gives concrete evidence that spec-derived tests failed on the right assertions before the implementation was real, which satisfies the critical criterion. The review did not reach clean:true, and test-first order is not visible in git history because the tests and implementation share one commit. The result is a pass, but not a strong one."
+      }
+    },
+    {
+      "label": "judge2:implement-authoring-missions-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3436,
+      "durationMs": 12581,
+      "sessionId": "eacff81f-cab4-4848-9b29-0b40a0f89b5d",
+      "costUsd": 0.048527999999999995,
+      "numTurns": 4,
+      "result": {
+        "score": 80,
+        "pass": true,
+        "criteriaMet": [
+          "No leftover TODO/FIXME: a grep of src found 0 matches.",
+          "No thrash: four linear commits (feat, one review-gate fix, archive, ledger), no revert commits, 16/16 tasks done, 6/6 review findings fixed."
+        ],
+        "criteriaMissed": [
+          "Dead code and commented-out blocks could not be checked directly, because I couldn't run git or read the diff hunks. The file list for the feat commit looks truncated, so I'm grading that part down a little."
+        ],
+        "reasoning": "A grep of src found no TODO or FIXME markers. The history is a clean sequence: implement, one review-fix commit that touched only service, domain and test files, then archive. There are no reverts or abandoned work. I couldn't inspect the diff hunks for dead or commented-out code, so I deducted a little for that."
+      }
+    },
+    {
+      "label": "judge2:implement-authoring-tasks-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 4287,
+      "durationMs": 15141,
+      "sessionId": "599a991f-88cc-4982-856d-5bc53ae2b4be",
+      "costUsd": 0.0584886,
+      "numTurns": 4,
+      "result": {
+        "score": 72,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL test-first: docs/qa/evidence/slice5-red-run.md (task 2.4) documents a RED run against compile-only stubs: 537 run, 64 failures, 35 errors, with failures stated as assertion failures (e.g. SpecRulesTest 34/34 \"Validation.Invalid with no errors where a valid spec or a specific field error is expected\"). That shows tests existed before the rules and tracked spec behaviour.",
+          "Review stage: review-findings.json is present, clean:true, 14 findings (12 fixed, 2 waived), with a separate review-gate fix commit 3738bfe.",
+          "Archive stage: the change was archived in 69bd884 and tasks show 17 done, 0 open.",
+          "Spec stage: the spec delta and tasks were authored in the change folder before implementation (red-run refers to task 2.4)."
+        ],
+        "criteriaMissed": [
+          "The git history cannot prove the order: the spec, tests, plumbing and implementation all landed in one commit (499b23c), and no test(...) commit exists. The RED order rests on a narrative evidence file only.",
+          "Some of the red evidence is weak: 7 content tests passed against the stubs, and the stubs sat alongside already-built plumbing. That makes the spec → red → green order less clean than a separate test commit would."
+        ],
+        "reasoning": "The red-run file gives concrete, assertion-based evidence that tests were written against stubs and failed before the implementation. Review (clean:true) and archive are present. The score is held down because the single squashed feat commit leaves the ordering unverifiable from git, and the evidence is self-reported."
+      }
+    },
+    {
+      "label": "judge2:implement-authoring-tasks-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 4187,
+      "durationMs": 11606,
+      "sessionId": "3128ee14-d862-47ed-9118-c1f4d2f67630",
+      "costUsd": 0.0394644,
+      "numTurns": 2,
+      "result": {
+        "score": 72,
+        "pass": true,
+        "criteriaMet": [
+          "Source edits visible in the review-gate fix commit are confined to the content module (ContentProblemAdvice, FilesystemFileStorage, JdbcTaskStore, Ports under cz/doucko/content), with no other module touched.",
+          "Archive and trace commits touch only slice artifacts, the content-authoring spec, and the standard trace and QA files, as expected for the harness."
+        ],
+        "criteriaMissed": [
+          "Dockerfile, compose.yaml, .env.example and .gitignore changed in the feature and fix commits. These are cross-cutting infrastructure files outside the content module. The commit message doesn't justify them. They plausibly support the compose smoke evidence, but I can't confirm that from the evidence.",
+          "The file list for 499b23c shows no src/ files even though the commit is titled as a feature. The list may be truncated, so I couldn't verify that the implementation stayed in scope or that no refactor was bundled in."
+        ],
+        "reasoning": "The visible code changes are confined to the content module, and the later commits are slice artifacts and trace files. The Dockerfile, compose and env changes are unexplained cross-cutting edits. They are most likely tied to the real-stack smoke, so I read them as mild drift rather than a smuggled refactor. I graded down slightly for the unverifiable parts."
+      }
+    },
+    {
+      "label": "judge2:implement-authoring-tasks-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 4228,
+      "durationMs": 13107,
+      "sessionId": "f4e4786f-f1a2-40aa-85a6-08633767de61",
+      "costUsd": 0.0669138,
+      "numTurns": 4,
+      "result": {
+        "score": 74,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL no weakening: docs/qa/evidence/slice5-red-run.md documents a genuine RED run against compile-only stubs (537 run, 64 failures, 35 errors) with per-class assertion failures, and the pre-existing classes stayed green. Review findings show fixes were to code, not tests (F01–F12 fixed in 3738bfe via .gitignore, adapter, advice and lock changes). Review is clean:true. No evidence of skipped, deleted or tautological tests.",
+          "Edge/boundary cases asserted: SpecRulesTest has 34 cases, all failing under stubs on specific field errors; TaskRulesTest 15 cases (query trimming); the grade-seven variants (`WithGradeSeven`) of the source and task API tests; fault-injection for FK violations (F03); TransactionHooksTest (F11); not-uuid on topicId (F12); 415 for a renamed PNG; the storage-root-inside-repo refusal."
+        ],
+        "criteriaMissed": [
+          "Partial: the file lists for the commits include no src/test paths, so I could not inspect the test diffs or assertion text myself. Boundary and locale coverage rests on the red-run summary and the review resolutions, not on the code.",
+          "Partial: 7 content cases passed under the stubs, so they were never seen RED. They cover refusal paths such as 415, 401/403 and a missing part, and they could pass vacuously."
+        ],
+        "reasoning": "The red-run evidence shows a real test-first process. Failures are specific assertion failures, not compile errors, and the later fixes changed production code, not tests. The weakest points are that I could not see the test diffs, and that a few tests passed against the stubs and were never seen RED. I found no evidence of weakened or skipped tests, so the critical criterion holds, but the score stays modest because the boundary and locale coverage is only indirectly evidenced."
+      }
+    },
+    {
+      "label": "judge2:implement-child-profile-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3784,
+      "durationMs": 12498,
+      "sessionId": "46ea255e-61f3-4287-99d7-3edfd3d390b5",
+      "costUsd": 0.0416204,
+      "numTurns": 2,
+      "result": {
+        "score": 70,
+        "pass": true,
+        "criteriaMet": [
+          "Criterion 2: review-findings.json present with clean:true (8 findings, 6 fixed, 2 waived), 20/20 tasks done, and archived to openspec/changes/archive/2026-10-04-implement-child-profile-api, after a review-gate fix commit.",
+          "Criterion 1 (weakly): fb65275 includes docs/qa/evidence/slice4-red-run.md alongside the spec/design/proposal/tasks, which is explicit evidence that a RED run was recorded before the GREEN implementation."
+        ],
+        "criteriaMissed": [
+          "No separate test(...) commit precedes the feat commit. Test-first ordering rests on the red-run evidence file and not on git history.",
+          "The first commit's file list shows no src/test files, so I can't confirm that assertions track the spec scenarios. Later tests (ChildProfileStartupTest, ChildProfileEntityTest) were added in review-fix commits after the implementation."
+        ],
+        "reasoning": "The slice has a spec, a recorded red run (slice4-red-run.md), a review gate with clean:true, and an archive step. That meets the pipeline order in criterion 2 and gives the critical test-first criterion minimal support. Git history doesn't show tests landing before the implementation, because spec, red-run evidence and feat sit in one commit. The visible tests were added after the implementation, in review-fix commits. I scored it just above the pass line for that reason."
+      }
+    },
+    {
+      "label": "judge2:implement-child-profile-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3684,
+      "durationMs": 11534,
+      "sessionId": "b4b58fd0-573b-473a-ad50-7f2f578452fd",
+      "costUsd": 0.044408199999999995,
+      "numTurns": 3,
+      "result": {
+        "score": 66,
+        "pass": false,
+        "criteriaMet": [
+          "No unrelated refactor evident: later commits (de80c7a, 8ddebf1) only touch profile module files, review-findings, tests, coverage baseline, and messages.properties."
+        ],
+        "criteriaMissed": [
+          "Slice confinement is not clearly evidenced: first commit fb65275 touches .env.example, compose.yaml, and fixtures/PROVENANCE.md, which lie outside the profile module, and the evidence does not show them justified by the spec.",
+          "src/main/resources/messages.properties is shared across modules; the edit is plausible for profile messages but not shown to be spec-justified.",
+          "Unable to verify the hunks of the out-of-module edits, so they are graded down."
+        ],
+        "reasoning": "Most work stays in cz.doucko.profile, openspec, and QA docs, with no sign of an opportunistic refactor. However, fb65275 edits compose.yaml, .env.example, and fixtures/PROVENANCE.md, and de80c7a edits the shared messages.properties. None of these is shown to be tied to the spec, and I could not inspect the hunks. Uncertainty is graded down, which puts the score below the pass line."
+      }
+    },
+    {
+      "label": "judge2:implement-platform-foundation-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 5370,
+      "durationMs": 8196,
+      "sessionId": "e4eede45-eb0f-4e8d-9f77-0119060f091a",
+      "costUsd": 0.0385384,
+      "numTurns": 2,
+      "result": {
+        "score": 35,
+        "pass": false,
+        "criteriaMet": [
+          "Review-findings.json present with all 13 findings fixed and tasks 21/21 done; archive happened after review."
+        ],
+        "criteriaMissed": [
+          "CRITICAL: no evidence tests were written from spec before implementation — the first commit 69ea343 is 'feat ... (pre-review)' and lists no test files, and no test(...) commits exist; test files appear only in later fix commits (5bf3df9, d2cb340), after the implementation, so they track final code shape rather than spec-first red tests.",
+          "Order spec→tests(red)→implement(green)→review→archive not evidenced: no red-phase commit; the red/green doc (af9a4c2) came after the fixes, retroactively; review-findings clean:false (13 findings, all fixed) rather than clean:true."
+        ],
+        "reasoning": "The commit history shows a single 'feat (pre-review)' commit with no test files, followed by fix rounds. Tests (ComposeConfigurationTest, IT changes, FixtureProvenanceTest) were added only in later review-fix commits, so there is no evidence of spec-first tests seen red before implementation. The critical criterion is unmet. Review evidence is clean:false, though all findings were fixed and the archive step followed."
+      }
+    },
+    {
+      "label": "judge2:implement-platform-foundation-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 5311,
+      "durationMs": 18941,
+      "sessionId": "d6e45e08-fb72-43e3-b0bd-6df28e6936d1",
+      "costUsd": 0.0924978,
+      "numTurns": 5,
+      "result": {
+        "score": 80,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: no weakening/skips — no @Disabled/@Ignore/expect(true) found in src/test; only two test-touching commits (5bf3df9, d2cb340), both extending tests; af9a4c2 records red/green and mutation evidence",
+          "Edge/boundary cases asserted — exact-match locale, null/empty/unknown answerMode, wrong JSON types, 72-byte password boundary, DNS-rebinding Host refusals, Czech-character git filenames, no-request-content-in-logs at TRACE"
+        ],
+        "criteriaMissed": [
+          "Could not inspect per-commit hunks (no git access), so absence of silent assertion removals in the fix rounds is inferred from the file list and evidence docs, not directly seen",
+          "Two assumeTrue guards in OperatorToolGuardTest are environment-conditional skips (Windows-only/link creation), legitimate but reduce coverage on other platforms"
+        ],
+        "reasoning": "Current tests contain no disabled or tautological assertions. They cover many boundary and locale cases, including exact-match locales, the 72-byte password limit, Czech filenames and rebound Host headers. Review-fix commits added tests rather than removing them, and the red/green and mutation evidence supports meaningful assertions. I could not run git to read the hunks, so I held the score at 80, not higher."
+      }
+    },
+    {
+      "label": "judge2:fix-restore-schema-drift:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 2882,
+      "durationMs": 10995,
+      "sessionId": "a78c96fa-8aad-48d7-b155-485b8275658c",
+      "costUsd": 0.0376744,
+      "numTurns": 2,
+      "result": {
+        "score": 45,
+        "pass": false,
+        "criteriaMet": [
+          "Review evidence present: review-findings.json archived with clean:true (17 findings: 15 fixed, 2 waived)",
+          "Archive step happened: ce74e52 archives the change under openspec/changes/archive/2026-10-05-fix-restore-schema-drift",
+          "Spec artifacts (proposal, design, spec delta, tasks) exist alongside the tests and implementation in 4828464, with 10 of 10 tasks done"
+        ],
+        "criteriaMissed": [
+          "CRITICAL: No evidence the tests were written from the spec before or with the implementation. 4828464 bundles BackupRestoreIT.kt, OperatorToolGuardTest.kt, tools/restore.mjs and tools/lib/migrations.mjs in one commit, and there is no separate test(...) commit. Nothing visible shows a red run before the fix. I could not confirm that the assertions track the spec scenarios rather than the final code shape.",
+          "Spec → tests(red) → implement(green) ordering is not demonstrated. The spec, tests and implementation all land in a single commit, so red-before-green cannot be shown from the commit history. The later review-gate commit 13e1f9b also changes tests and the implementation together."
+        ],
+        "reasoning": "The review and archive stages are well evidenced: review-findings.json is clean:true and the change was archived. The gating test-first criterion is not evidenced, because tests and implementation arrive together in 4828464 with no test(...) commit and no visible red run. Under the grade-down rule for uncertainty, the critical criterion is unmet, so the verdict fails and the score is capped below 50."
+      }
+    },
+    {
+      "label": "judge2:implement-practice-flow-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3501,
+      "durationMs": 9872,
+      "sessionId": "b3cb64f4-9e8d-43de-b288-9dfb3cfd5ae6",
+      "costUsd": 0.0377064,
+      "numTurns": 2,
+      "result": {
+        "score": 40,
+        "pass": false,
+        "criteriaMet": [],
+        "criteriaMissed": [
+          "CRITICAL: tests-from-spec ordering is not demonstrated. There is no test(...) commit before the feat commit. Spec, design, tasks, implementation and tests all land in one commit, 444bef9. The only ordering signal is docs/qa/evidence/slice7-red-run.md, a self-written note in that same commit. Nothing shows that assertions track the spec scenarios rather than the final code shape. The listed files are truncated, so this is not verifiable.",
+          "Spec → tests(red) → implement(green) → review → archive: review and archive did happen (6befcf1 fixes, 4bff9c9 archive). But review-findings.json has clean:false (8 fixed, 1 waived), and the rubric requires clean:true. The red step is also not separable in git history."
+        ],
+        "reasoning": "The git history has one monolithic feat commit with no test-first commit, so red-before-green is not evidenced. The red-run markdown is only weak, same-commit evidence. Review evidence shows clean:false with a waived finding, which misses the clean:true requirement. The unmet critical criterion caps the score at 49."
+      }
+    },
+    {
+      "label": "judge2:implement-gamification-api:in-scope",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3337,
+      "durationMs": 12403,
+      "sessionId": "8a8c4cd2-0ef4-4deb-beda-c664b4682883",
+      "costUsd": 0.0478658,
+      "numTurns": 3,
+      "result": {
+        "score": 88,
+        "pass": true,
+        "criteriaMet": [
+          "Cross-module edits are justified by the spec: the proposal (line 30, 41), tasks 3.2 and design.md (lines 64-69, 147-148) explicitly declare the content-module public API additions (PublishedMissionChanged event, ServedContent.missionsContaining) and say they're published via MissionService.",
+          "No unrelated refactor visible: file lists are confined to practice module, the declared content API additions, slice docs/QA artifacts, and the Flyway migration the design names; review-gate fix commit touches only practice files and slice docs."
+        ],
+        "criteriaMissed": [
+          "The first-commit file list appears truncated, so it can't be shown that the full set of changes is free of other stray edits; also the MissionService.kt hunk wasn't inspected, so the absence of incidental rewrites there is inferred, not seen."
+        ],
+        "reasoning": "The only edits outside the practice module are to content (PublishedMissionChanged.kt, ServedContent.kt, MissionService.kt). The proposal, tasks and design all call these out as public-API additions, so they are spec-justified rather than silent drift. The other commits stay within practice and the slice's own docs and artifacts. I docked some points because the file list looks truncated and I didn't read the diff hunks."
+      }
+    },
+    {
+      "label": "judge2:implement-gamification-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3437,
+      "durationMs": 16710,
+      "sessionId": "f2dfb635-40df-430b-a3a5-8288fb8abb14",
+      "costUsd": 0.0660404,
+      "numTurns": 5,
+      "result": {
+        "score": 78,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: tests written from the spec and seen red. docs/qa/evidence/slice8-red-run.md records a run against `// RED stub` implementations: unit 747 run, 111 failures; integration 65 run, 27 failures. The failures are spec-value assertions, e.g. `expected:<10> but was:<0>`, bonus `expected:<20> but was:<0>`, `expected:<160> but was:<140>`. Stubs were compile-only and pre-existing tests stayed green. The spec, tasks and RED evidence are in the first commit ae434be.",
+          "Order spec → tests(red) → implement(green) → review → archive. Spec and tasks were authored in ae434be, then a fix commit 33f5bf2 for review findings, then archive commit 2b71bb7. review-findings.json is in the archive with clean:true, 6 findings, all fixed. 15 of 15 tasks are done."
+        ],
+        "criteriaMissed": [
+          "The history does not show the red step. There is no separate test(...) commit, and tests, stubs and final implementation all land in one commit, ae434be. Red ordering rests on a hand-written evidence doc whose logs are machine-local and not committed (`../scratch/s8-backend-red.log`).",
+          "The RED run was split across two days and cut off mid-run (laptop sleep), with only a targeted integration rerun. Tests were also touched after review: GamificationConfigTest.kt appears in the fix commit 33f5bf2."
+        ],
+        "reasoning": "The RED-run evidence is concrete. It names the stubs and gives failure counts and assertion messages that match spec values, which shows the tests tracked the spec and existed before the real implementation. Review and archive are clean: review-findings.json has clean:true and all 6 findings fixed. The score is held down because git history alone cannot prove the red-before-green order (no separate test commit) and the logs are not committed."
+      }
+    },
+    {
+      "label": "judge2:harden-phase5-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3677,
+      "durationMs": 11421,
+      "sessionId": "348b60af-9ea1-4a14-9f42-32d1e78d8284",
+      "costUsd": 0.0398624,
+      "numTurns": 2,
+      "result": {
+        "score": 30,
+        "pass": false,
+        "criteriaMet": [
+          "Tests did exist alongside the implementation: E2eStackToolTest.kt was committed in e1e7d17 with the tools, and a test(...) commit 81c0fbd added sourceRef/dismiss tests; all 13 tasks done and the change was archived."
+        ],
+        "criteriaMissed": [
+          "CRITICAL: no evidence the tests were written from the spec before the implementation. E2eStackToolTest.kt landed in the same commit as the e2e-stack implementation (e1e7d17). The change's proposal, design and spec delta first appear in 81c0fbd, after that implementation, so the spec did not come first. No red run is evidenced.",
+          "The test-only commit 81c0fbd has no following src/main implementation commit, so it shows no red→green sequence. The tests probably cover existing behaviour.",
+          "The order spec → tests(red) → implement(green) → review → archive is not followed. The implementation came first, then spec and tests, then review fixes, then archive.",
+          "Review evidence is clean:false (21 findings, all fixed), but the rubric requires clean:true."
+        ],
+        "reasoning": "The first commit, e1e7d17, bundles the e2e-stack implementation with its test. The openspec proposal, design and spec delta only appear in a later commit, 81c0fbd, so the spec did not drive the implementation. The only test-only commit has no matching implementation commit, so there is no red→green evidence. The review file shows clean:false, which misses the second criterion. The unmet critical criterion caps the score below 50."
+      }
+    },
+    {
+      "label": "judge2:harden-phase5-api:craft",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3534,
+      "durationMs": 11377,
+      "sessionId": "f1aeb1fa-569b-4349-8eaf-fbc0373003ef",
+      "costUsd": 0.0438344,
+      "numTurns": 3,
+      "result": {
+        "score": 78,
+        "pass": true,
+        "criteriaMet": [
+          "No leftover TODO/FIXME: grep of tools/ found no TODO|FIXME|XXX markers.",
+          "No thrash: linear six-commit history with no reverts; d3081de is a review-gate fix pass (21 findings all fixed), not an abandoned implementation. 13 tasks done, 0 open."
+        ],
+        "criteriaMissed": [
+          "Dead code and commented-out blocks were not fully verified; I only grepped for markers, not the diff hunks.",
+          "Partial thrash signal: d3081de re-touched the same e2e-stack files and tests from e1e7d17, and 21 review findings is a lot of rework. It looks like normal review iteration but is not clean first-pass work."
+        ],
+        "reasoning": "The history is linear with no reverts, all tasks are closed, and the grep found no TODO/FIXME in tools/. The review gate produced 21 findings that were all fixed in a single follow-up commit, which counts as review iteration rather than abandonment. I did not inspect the diff hunks for dead or commented-out code, so I scored conservatively."
+      }
+    },
+    {
+      "label": "judge2:implement-progress-stats-api:process-order",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 4416,
+      "durationMs": 13411,
+      "sessionId": "532e33f7-f25d-4e03-b32d-047152cf0fb0",
+      "costUsd": 0.0491138,
+      "numTurns": 3,
+      "result": {
+        "score": 45,
+        "pass": false,
+        "criteriaMet": [
+          "Spec, design, proposal and tasks were authored in the first commit 9c24960, before archive.",
+          "A red-run evidence file (docs/qa/evidence/slice9-red-run.md) was committed in 9c24960, which hints that tests were seen failing."
+        ],
+        "criteriaMissed": [
+          "CRITICAL: Tests written from the spec and existing with/before the implementation. No commit is labelled test() before the implementation. The only test(...) commit, 1db68a2, comes after the feat and fix commits and is described as 'edge paths ... after the review fixes'. The first commit lumps spec, evidence and implementation together, and I could see no test files in the visible list for it. The red-run note alone doesn't show that assertions tracked the spec scenarios.",
+          "Review evidence is clean:false, with 8 findings (6 fixed, 2 waived). The rubric requires clean:true.",
+          "The history is not a clean spec → red tests → green implementation → review → archive sequence. Implementation and spec were committed together, and the tests came late."
+        ],
+        "reasoning": "The first commit (9c24960) bundles the spec, a red-run evidence file and the implementation. The only test-labelled commit (1db68a2) was made after the implementation and the review fixes. That is weak evidence for the critical test-first criterion, and I graded the uncertainty down. Review-findings shows clean:false, so the second criterion also fails. A red-run document is a partial mitigating factor."
+      }
+    },
+    {
+      "label": "judge2:harden-phase5-api:test-integrity",
+      "phase": "Judge",
+      "agentType": "eval-judge",
+      "structured": true,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --append-system-prompt <…> --json-schema <…> --model sonnet",
+      "promptChars": 3618,
+      "durationMs": 16285,
+      "sessionId": "a423205c-e6e6-4102-963c-2b5a2072da89",
+      "costUsd": 0.056720599999999996,
+      "numTurns": 5,
+      "result": {
+        "score": 76,
+        "pass": true,
+        "criteriaMet": [
+          "CRITICAL: no test weakened/skipped/deleted. The only removal was a duplicate page-range assertion in TaskRulesTest, recorded as a review finding (\"Duplicate page-range assertion removed from TaskRulesTest\"). A grep of src/test found no @Disabled and no trivial assertTrue(true) tests. The \"13 verify steps skipped\" refers to review-run verifier steps, not tests.",
+          "Edge/boundary cases are asserted. The test commit covers \"sourceRef refusals without a source\" and \"dismissing an attempt-less report\". E2eStackToolTest checks that secrets and compose selectors do not leak \"whatever their case\" (mixed-case child name, compose_file, COMPOSE_PROJECT_NAME, DOUCKO_BIND_ADDRESS)."
+        ],
+        "criteriaMissed": [
+          "I could not read the actual diff hunks (Bash was unavailable), so assertion strength rests on review-finding text and a grep. Graded down for that.",
+          "No locale-specific cases (for example Czech input) are visible in the evidence. This is a hardening slice, so there may be none."
+        ],
+        "reasoning": "The review-findings resolutions show that the only test removal was a duplicate assertion, which is not weakening. The edge cases named in the test commit and the E2eStackToolTest finding are concrete and boundary-oriented. I could not inspect the diffs directly, so I graded it down for that."
+      }
+    },
+    {
+      "label": "write-trajectory-artifacts",
+      "phase": "Aggregate",
+      "agentType": null,
+      "structured": false,
+      "ok": true,
+      "command": "claude -p --output-format json --no-session-persistence --permission-mode acceptEdits --max-budget-usd 0.35 --tools Read,Grep,Glob --model sonnet",
+      "promptChars": 66749,
+      "durationMs": 11233,
+      "sessionId": "bf6e4b6c-ee65-459e-b8c6-6e006f096855",
+      "costUsd": 0.1298648,
+      "numTurns": 2,
+      "result": "I haven't written any of the three files. This session has no way to create local files: Bash is disabled and there is no Write or Edit tool. The Docs and Drive tools don't write to the repo.\n\nI also couldn't get the real UTC time. The timestamp has to come from `date -u +%Y-%m-%dT%H:%M:%SZ`, and I won't make one up for `WORKFLOW_FILL_ISO_UTC`.\n\nThese are the targets that remain unwritten:\n- `evals/results/trajectory-latest.json`\n- `evals/results/trajectory-manifest.json`\n- `docs/qa/trajectory-eval-report.md`\n\nIf you re-run this with Bash or Write enabled, I'll create the directories, stamp one timestamp into both JSON files, and write all three exactly as specified."
+    }
+  ],
+  "logs": [
+    {
+      "phase": "Collect",
+      "message": "11 slice(s) × 4 dimensions = 44 judgements"
+    },
+    {
+      "phase": "Aggregate",
+      "message": "scored 44 judgement(s): 35 pass; dimensions {\"process-order\":60.8,\"test-integrity\":84.5,\"in-scope\":80.8,\"craft\":83}"
+    }
+  ],
+  "persisted": [],
+  "returned": {
+    "slices": 11,
+    "judgements": 44,
+    "passed": 35,
+    "dimensions": {
+      "process-order": 60.8,
+      "test-integrity": 84.5,
+      "in-scope": 80.8,
+      "craft": 83
+    },
+    "sliceRollup": {
+      "implement-admin-access-api": 70,
+      "implement-answer-checking-api": 73,
+      "implement-authoring-missions-api": 73,
+      "implement-authoring-tasks-api": 72,
+      "implement-child-profile-api": 58,
+      "implement-platform-foundation-api": 29,
+      "fix-restore-schema-drift": 62,
+      "implement-practice-flow-api": 56,
+      "implement-gamification-api": 79,
+      "harden-phase5-api": 35,
+      "implement-progress-stats-api": 56
+    },
+    "wrote": [
+      "evals/results/trajectory-latest.json",
+      "evals/results/trajectory-manifest.json",
+      "docs/qa/trajectory-eval-report.md"
+    ]
+  }
+}
