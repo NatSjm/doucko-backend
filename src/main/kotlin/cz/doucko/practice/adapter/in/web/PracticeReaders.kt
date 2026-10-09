@@ -16,6 +16,9 @@ import tools.jackson.databind.JsonNode
  */
 internal object PracticeReaders {
     const val MAX_SELECTION = 20
+
+    /** U+0000, which Postgres text and JSONB refuse; refused here as invalid input instead of a database error. */
+    private const val NUL = '\u0000'
     const val MAX_ELEMENT = 100
 
     fun answers(node: JsonNode): Map<String, RawAnswer> {
@@ -27,6 +30,10 @@ internal object PracticeReaders {
             val value = answers.get(key)
             val field = "answers.$key"
             when {
+                value.isString && value.asString().contains(NUL) -> {
+                    errors += FieldError(field, "nul-character")
+                }
+
                 value.isString -> {
                     result[key] = RawAnswer.Text(value.asString())
                 }
@@ -40,6 +47,10 @@ internal object PracticeReaders {
 
                         items.any { !it.isString } -> {
                             errors += FieldError(field, "answer-shape")
+                        }
+
+                        items.any { it.asString().contains(NUL) } -> {
+                            errors += FieldError(field, "nul-character")
                         }
 
                         items.any { it.asString().let { s -> s.codePointCount(0, s.length) } > MAX_ELEMENT } -> {
