@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-10-09T17:41:09.280Z",
+  "kind": "trajectory-eval",
+  "slices": [
+    "implement-admin-access-api",
+    "implement-answer-checking-api",
+    "implement-authoring-missions-api",
+    "implement-authoring-tasks-api",
+    "implement-child-profile-api",
+    "implement-platform-foundation-api",
+    "fix-restore-schema-drift",
+    "implement-practice-flow-api",
+    "implement-gamification-api",
+    "harden-phase5-api",
+    "implement-progress-stats-api"
+  ],
+  "dimensions": {
+    "process-order": 60.8,
+    "test-integrity": 84.5,
+    "in-scope": 80.8,
+    "craft": 83
+  }
+}
