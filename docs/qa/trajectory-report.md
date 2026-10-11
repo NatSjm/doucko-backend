@@ -21,7 +21,7 @@ Result: PASS, 3 warning(s)
 | 2026-10-07-implement-gamification-api | clean | 4 | yes | practice, content |
 | 2026-10-08-harden-phase5-api | clean | 6 | yes | - |
 | 2026-10-08-implement-progress-stats-api | clean | 6 | yes | practice, content |
-| 2026-10-09-release-review-api | clean | 5 | yes | content, practice |
+| 2026-10-09-release-review-api | clean | 6 | yes | content, practice |
 
 ## Cross-slice module overlap
 
